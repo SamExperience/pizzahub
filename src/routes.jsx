@@ -5,6 +5,7 @@ import Tableau from "./pages/Tableau";
 import Menu from "./pages/Menu";
 import Dashboard from "./pages/Dashboard";
 import AppLayout from "./components/AppLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export const routes = [
   {
@@ -12,27 +13,32 @@ export const routes = [
     element: <Login />,
   },
   {
-    path: "/onboarding",
-    element: <Onboarding />,
-  },
-  {
-    path: "/stores",
-    element: <StoreSelection />,
-  },
-  {
-    element: <AppLayout />,
+    element: <ProtectedRoute />,
     children: [
       {
-        path: "/tableau",
-        element: <Tableau />,
+        path: "/onboarding",
+        element: <Onboarding />,
       },
       {
-        path: "/menu",
-        element: <Menu />,
+        path: "/stores",
+        element: <StoreSelection />,
       },
       {
-        path: "/dashboard",
-        element: <Dashboard />,
+        element: <AppLayout />,
+        children: [
+          {
+            path: "/tableau",
+            element: <Tableau />,
+          },
+          {
+            path: "/menu",
+            element: <Menu />,
+          },
+          {
+            path: "/dashboard",
+            element: <Dashboard />,
+          },
+        ],
       },
     ],
   },
