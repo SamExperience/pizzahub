@@ -4,6 +4,7 @@ import StoreSelection from "./pages/StoreSelection";
 import Tableau from "./pages/Tableau";
 import Menu from "./pages/Menu";
 import Dashboard from "./pages/Dashboard";
+import AppLayout from "./components/AppLayout";
 
 export const routes = [
   {
@@ -19,15 +20,20 @@ export const routes = [
     element: <StoreSelection />,
   },
   {
-    path: "/tableau",
-    element: <Tableau />,
-  },
-  {
-    path: "/menu",
-    element: <Menu />,
-  },
-  {
-    path: "/dashboard",
-    element: <Dashboard />,
+    element: <AppLayout />,
+    children: [
+      {
+        path: "/tableau",
+        element: <Tableau />,
+      },
+      {
+        path: "/menu",
+        element: <Menu />,
+      },
+      {
+        path: "/dashboard",
+        element: <Dashboard />,
+      },
+    ],
   },
 ];
