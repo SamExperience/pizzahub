@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { register } from "../src/services/auth.service";
+import { register, login } from "../src/services/auth.service";
 
 describe("register", () => {
   it("registers a new user with valid credentials", async () => {
@@ -37,6 +37,39 @@ describe("register", () => {
 
     await expect(register(email, password)).rejects.toMatchObject({
       code: "auth/invalid-email",
+    });
+  });
+});
+
+describe("login", () => {
+  it("logs in a user with valid credentials", async () => {
+    const email = `login-${Date.now()}@example.com`;
+    const password = "Password123!";
+
+    await register(email, password);
+
+    const userCredential = await login(email, password);
+
+    expect(userCredential.user.email).toBe(email);
+  });
+
+  it("throws an error when the email does not exist", async () => {
+    const email = `unknown-${Date.now()}@example.com`;
+    const password = "Password123!";
+
+    await expect(login(email, password)).rejects.toMatchObject({
+      code: "auth/user-not-found",
+    });
+  });
+
+  it("throws an error when the password is incorrect", async () => {
+    const email = `wrong-password-${Date.now()}@example.com`;
+    const password = "Password123!";
+
+    await register(email, password);
+
+    await expect(login(email, "WrongPassword123!")).rejects.toMatchObject({
+      code: "auth/wrong-password",
     });
   });
 });

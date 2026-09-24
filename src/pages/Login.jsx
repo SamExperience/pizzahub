@@ -1,18 +1,30 @@
 import { useState } from "react";
-import { register } from "../services/auth.service";
+import { register, login } from "../services/auth.service";
 
-async function handleSubmit(e) {
-  e.preventDefault();
-
-  try {
-    const user = await register("test@example.com", "Password123!");
-    console.log("register ok, user>>>", user);
-  } catch (error) {
-    console.log("Cathc Error: ", error.message);
-  }
-}
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email");
+    const password = formData.get("password");
+
+    try {
+      if (isSignup) {
+        const user = await register(email, password);
+        console.log("register ok, user>>>", user);
+      } else {
+        const userlog = await login(email, password);
+        console.log("login ok, user>>>", userlog);
+      }
+    } catch (error) {
+      console.log("Catch Error:", error.message);
+    }
+  }
 
   return (
     <main>
@@ -35,6 +47,7 @@ export default function Login() {
             id="password"
             name="password"
             type="password"
+            onChange={(e) => setPassword(e.target.value)}
             autoComplete={isSignup ? "new-password" : "current-password"}
             required
           />
@@ -47,14 +60,24 @@ export default function Login() {
                 id="confirm-password"
                 name="confirmPassword"
                 type="password"
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
                 required
-              />
+              />{" "}
+              <br />
+              {confirmPassword && password !== confirmPassword ? (
+                <small style={{ color: "red" }}>Passwords do not match</small>
+              ) : (
+                <small style={{ color: "green" }}></small>
+              )}
               <br />
             </>
           )}
 
-          <button type="submit">
+          <button
+            type="submit"
+            disabled={isSignup && password !== confirmPassword}
+          >
             {isSignup ? "Create account" : "Log in"}
           </button>
           <br />
