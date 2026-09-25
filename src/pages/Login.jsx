@@ -31,6 +31,7 @@ export default function Login() {
     const user = await loginWithGoogle();
     console.log("login with google ok>>> ", user);
   }
+
   return (
     <main>
       <section id="login">
