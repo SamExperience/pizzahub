@@ -11,8 +11,7 @@ export const getUserDB = async (uid) => {
     console.log("User Exist!!!", snap.data());
     return snap.data();
   } else {
-    s;
-    console.log("User NOT  Exist!!!");
+    console.log("Service: User NOT  Exist!!!");
   }
 };
 
@@ -28,4 +27,5 @@ export const addUserDB = async (user) => {
     createdAt: server(serverTimestamp()),
     updatedAt: server(serverTimestamp()),
   });
+  console.log(">>>User added on DB ");
 };

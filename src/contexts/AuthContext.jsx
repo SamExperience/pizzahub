@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { register, login, loginWithGoogle } from "../services/auth.service";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebase";
+
 //db
 import { getUserDB, addUserDB } from "../services/user.service";
 
@@ -10,7 +11,8 @@ export const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [authUser, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingLogin, setloadingLogin] = useState(true);
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
 
   useEffect(() => {
     const authSubscription = onAuthStateChanged(auth, async (authUser) => {
@@ -22,17 +24,17 @@ export function AuthProvider({ children }) {
 
         if (!dataUser) {
           console.log(
-            ">>>User Auth but NOT found on DB, go to onboarding page",
+            ">>>User Auth OK but NOT found on DB, go to onboarding page",
           );
           setUserProfile(null);
         } else {
-          console.log(">>>User auth and IN DB, go to stores page");
+          console.log(">>>User auth OK and OK IN DB, go to stores page");
           setUserProfile(dataUser);
         }
       }
 
       console.log("USER ON CHANGE>>> ", authUser);
-      setLoading(false);
+      setloadingLogin(false);
     });
 
     return authSubscription;
@@ -46,8 +48,10 @@ export function AuthProvider({ children }) {
         loginWithGoogle,
         authUser,
         userProfile,
-        loading,
+        loadingLogin,
         addUserDB,
+        selectedStoreId,
+        setSelectedStoreId,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import Login from "./pages/Login";
+import PublicRoute from "./components/PublicRoute";
 import Onboarding from "./pages/Onboarding";
 import StoreSelection from "./pages/StoreSelection";
 import Tableau from "./pages/Tableau";
@@ -10,7 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 export const routes = [
   {
     path: "/",
-    element: <Login />,
+    element: <PublicRoute />,
   },
   {
     element: <ProtectedRoute />,
