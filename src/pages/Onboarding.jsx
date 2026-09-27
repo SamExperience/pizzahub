@@ -4,9 +4,11 @@ import { useAuth } from "../contexts/AuthContext";
 const initialFormData = {
   companyName: "",
   storeName: "",
-  address: "",
-  addressNumber: "",
+  street: "",
+  streetNumber: "",
   postalCode: "",
+  city: "",
+  country: "Switzerland",
 };
 
 export default function Onboarding() {
@@ -75,28 +77,28 @@ export default function Onboarding() {
             </div>
 
             <div>
-              <label htmlFor="address">Address</label>
+              <label htmlFor="street">Street</label>
               <br />
               <input
-                id="address"
-                name="address"
+                id="street"
+                name="street"
                 type="text"
                 placeholder="Rue du Lyon"
-                value={formData.address}
+                value={formData.street}
                 onChange={handleChange}
                 required
               />
 
               <br />
 
-              <label htmlFor="addressNumber">Number</label>
+              <label htmlFor="streetNumber">Number</label>
               <br />
               <input
-                id="addressNumber"
-                name="addressNumber"
+                id="streetNumber"
+                name="streetNumber"
                 type="text"
                 placeholder="3"
-                value={formData.addressNumber}
+                value={formData.streetNumber}
                 onChange={handleChange}
                 required
               />
@@ -111,6 +113,33 @@ export default function Onboarding() {
                 type="text"
                 placeholder="1201"
                 value={formData.postalCode}
+                onChange={handleChange}
+                required
+              />
+
+              <br />
+
+              <label htmlFor="city">City</label>
+              <br />
+              <input
+                id="city"
+                name="city"
+                type="text"
+                placeholder="Genève"
+                value={formData.city}
+                onChange={handleChange}
+                required
+              />
+
+              <br />
+
+              <label htmlFor="country">Country</label>
+              <br />
+              <input
+                id="country"
+                name="country"
+                type="text"
+                value={formData.country}
                 onChange={handleChange}
                 required
               />
