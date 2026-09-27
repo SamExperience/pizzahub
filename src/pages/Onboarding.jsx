@@ -13,7 +13,7 @@ const initialFormData = {
 
 export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { logout } = useAuth();
 
   function handleChange(event) {
@@ -27,7 +27,8 @@ export default function Onboarding() {
 
   function handleSubmit(event) {
     event.preventDefault();
-
+    setIsSubmitting(true);
+    setFormData(initialFormData);
     console.log(formData);
   }
 
@@ -146,7 +147,9 @@ export default function Onboarding() {
             </div>
           </fieldset>
 
-          <button type="submit">Create workspace</button>
+          <button type="submit" disabled={isSubmitting}>
+            Create workspace
+          </button>
         </form>
       </main>
     </div>
