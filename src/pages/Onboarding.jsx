@@ -1,14 +1,125 @@
+import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 
+const initialFormData = {
+  companyName: "",
+  storeName: "",
+  address: "",
+  addressNumber: "",
+  postalCode: "",
+};
+
 export default function Onboarding() {
+  const [formData, setFormData] = useState(initialFormData);
+
   const { logout } = useAuth();
+
+  function handleChange(event) {
+    const { name, value } = event.target;
+
+    setFormData((currentData) => ({
+      ...currentData,
+      [name]: value,
+    }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+
+    console.log(formData);
+  }
+
   return (
     <div>
+      <h1>Onboarding</h1>
+
       <button type="button" onClick={logout}>
         Logout
       </button>
-      <h1>Onboarding</h1>
-      <p>Onboarding content</p>
+
+      <main>
+        <form onSubmit={handleSubmit}>
+          <fieldset>
+            <legend>Company data</legend>
+
+            <div>
+              <label htmlFor="companyName">Company name</label>
+              <br />
+              <input
+                id="companyName"
+                name="companyName"
+                type="text"
+                placeholder="Write name here..."
+                value={formData.companyName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Store data</legend>
+
+            <div>
+              <label htmlFor="storeName">Store name</label>
+              <br />
+              <input
+                id="storeName"
+                name="storeName"
+                type="text"
+                placeholder="Write name here..."
+                value={formData.storeName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="address">Address</label>
+              <br />
+              <input
+                id="address"
+                name="address"
+                type="text"
+                placeholder="Rue du Lyon"
+                value={formData.address}
+                onChange={handleChange}
+                required
+              />
+
+              <br />
+
+              <label htmlFor="addressNumber">Number</label>
+              <br />
+              <input
+                id="addressNumber"
+                name="addressNumber"
+                type="text"
+                placeholder="3"
+                value={formData.addressNumber}
+                onChange={handleChange}
+                required
+              />
+
+              <br />
+
+              <label htmlFor="postalCode">NPA</label>
+              <br />
+              <input
+                id="postalCode"
+                name="postalCode"
+                type="text"
+                placeholder="1201"
+                value={formData.postalCode}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </fieldset>
+
+          <button type="submit">Create workspace</button>
+        </form>
+      </main>
     </div>
   );
 }
