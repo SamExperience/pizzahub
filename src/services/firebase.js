@@ -15,7 +15,7 @@ export const auth = getAuth(app);
 //firestore db service
 export const db = getFirestore(app);
 
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || import.meta.env.MODE === "test") {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
 }
