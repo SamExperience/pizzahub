@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /companies/{companyId} {
+      allow read: if request.auth != null
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.companyId == companyId;
+
+      allow create: if request.auth != null
+        && getAfter(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.companyId == companyId
+        && getAfter(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == "admin";
+    }
+
+    match /stores/{storeId} {
+      allow read: if request.auth != null
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.storeId == storeId;
+
+      allow create: if request.auth != null
+        && getAfter(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.storeId == storeId
+        && getAfter(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == "admin"
+        && getAfter(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.companyId == request.resource.data.companyId;
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null
+        && userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == "admin"
+        && request.resource.data.companyId != null
+        && request.resource.data.storeId != null
+        && getAfter(
+          /databases/$(database)/documents/companies/$(request.resource.data.companyId)
+        ).data.createdAt == request.time
+        && getAfter(
+          /databases/$(database)/documents/stores/$(request.resource.data.storeId)
+        ).data.createdAt == request.time;
+    }
+  }
+}
