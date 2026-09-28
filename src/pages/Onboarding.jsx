@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { createOnboardingWorkspace } from "../services/onboarding.service";
 
 const initialFormData = {
   companyName: "",
@@ -14,7 +15,8 @@ const initialFormData = {
 export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { logout } = useAuth();
+  const [error, setError] = useState(null);
+  const { authUser, logout } = useAuth();
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -25,12 +27,33 @@ export default function Onboarding() {
     }));
   }
 
-  function handleSubmit(event) {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+
     setIsSubmitting(true);
-    setFormData(initialFormData);
-    console.log(formData);
-  }
+    setError(null);
+
+    try {
+      const { userId, companyId, storeId } = await createOnboardingWorkspace({
+        uid: authUser.uid,
+        userName: authUser.displayName,
+        ...formData,
+      });
+
+      setFormData(initialFormData);
+
+      console.log("Onboarding success:", {
+        userId,
+        companyId,
+        storeId,
+      });
+    } catch (err) {
+      setError(err);
+      console.error("Onboarding error:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div>
@@ -150,6 +173,7 @@ export default function Onboarding() {
           <button type="submit" disabled={isSubmitting}>
             Create workspace
           </button>
+          {error && <p>Unable to create workspace. Please try again.</p>}
         </form>
       </main>
     </div>
