@@ -1,15 +1,49 @@
-import { describe, expect, it } from "vitest";
-import { deleteDoc, doc, getDoc } from "firebase/firestore";
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { randomUUID } from "node:crypto";
 
-import { db } from "../src/services/firebase";
+import { auth, db } from "../src/services/firebase";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 
-describe("createOnboardingWorkspace", () => {
-  it("creates Company, Store, and User with the correct relationships", async () => {
-    const uid = `test-onboarding-${randomUUID()}`;
+const firestoreEmulatorClearUrl =
+  `http://127.0.0.1:8080/emulator/v1/projects/${db.app.options.projectId}` +
+  "/databases/(default)/documents";
 
-    const formData = {
+async function clearFirestoreEmulator() {
+  const response = await fetch(firestoreEmulatorClearUrl, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to clear Firestore Emulator: ${response.status}`);
+  }
+}
+
+describe("createOnboardingWorkspace", () => {
+  beforeEach(async () => {
+    await signOut(auth);
+    await clearFirestoreEmulator();
+  });
+
+  afterEach(async () => {
+    await signOut(auth);
+    await clearFirestoreEmulator();
+  });
+
+  it("creates Company, Store, and User with the correct relationships", async () => {
+    const email = `onboarding-${randomUUID()}@test.local`;
+    const password = "Password123!";
+
+    const credential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
+
+    const uid = credential.user.uid;
+
+    const result = await createOnboardingWorkspace({
       uid,
       userName: "Test User",
       companyName: "Test Company",
@@ -19,9 +53,9 @@ describe("createOnboardingWorkspace", () => {
       postalCode: "1201",
       city: "Genève",
       country: "Switzerland",
-    };
+    });
 
-    const result = await createOnboardingWorkspace(formData);
+    expect(result.userId).toBe(uid);
 
     const companyRef = doc(db, "companies", result.companyId);
     const storeRef = doc(db, "stores", result.storeId);
@@ -64,11 +98,23 @@ describe("createOnboardingWorkspace", () => {
       role: "admin",
       displayName: "Test User",
     });
+  });
 
-    await Promise.all([
-      deleteDoc(companyRef),
-      deleteDoc(storeRef),
-      deleteDoc(userRef),
-    ]);
+  it("rejects onboarding creation when the user is not authenticated", async () => {
+    await expect(
+      createOnboardingWorkspace({
+        uid: `unauthenticated-${randomUUID()}`,
+        userName: "Test User",
+        companyName: "Test Company",
+        storeName: "Test Store",
+        street: "Rue du Lyon",
+        streetNumber: "3",
+        postalCode: "1201",
+        city: "Genève",
+        country: "Switzerland",
+      }),
+    ).rejects.toMatchObject({
+      code: "permission-denied",
+    });
   });
 });
