@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "ERROR: tag $GITHUB_REF_NAME is not on main"; exit 1
+          fi
+
+      - name: Validate version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: invalid tag format ($TAG)"; exit 1
+          fi
+          PREV=$(git tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "$TAG" | sort -V | tail -n 1)
+          echo "New: $TAG | Previous: ${PREV:-none}"
+          if [ -n "$PREV" ] && [ "$(printf '%s\n%s\n' "$PREV" "$TAG" | sort -V | tail -n 1)" != "$TAG" ]; then
+            echo "ERROR: $TAG is not greater than $PREV"; exit 1
+          fi
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
