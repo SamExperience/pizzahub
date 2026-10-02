@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { createOnboardingWorkspace } from "../services/onboarding.service";
+import LogoutButton from "../components/LogoutButton";
 
 const initialFormData = {
   companyName: "",
@@ -16,7 +17,7 @@ export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const { authUser, logout, refreshProfile } = useAuth();
+  const { authUser, refreshProfile } = useAuth();
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -58,9 +59,7 @@ export default function Onboarding() {
     <div>
       <h1>Onboarding</h1>
 
-      <button type="button" onClick={logout}>
-        Logout
-      </button>
+      <LogoutButton />
 
       <main>
         <form onSubmit={handleSubmit}>

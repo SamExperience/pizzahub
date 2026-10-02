@@ -1,4 +1,5 @@
 import { useStore } from "../contexts/StoreContext";
+import LogoutButton from "../components/LogoutButton";
 
 export default function StoreSelection() {
   const { accessibleStore, loadingStore, errorStore, fetchAccesibleStore } =
@@ -7,6 +8,7 @@ export default function StoreSelection() {
   return (
     <div>
       <h1>Store Selection</h1>
+      <LogoutButton />
       {errorStore && (
         <p>
           Unable to load your store.
