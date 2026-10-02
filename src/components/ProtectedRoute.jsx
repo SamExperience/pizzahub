@@ -1,8 +1,10 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
+import { useStore } from "../contexts/StoreContext";
 
 export default function ProtectedRoute() {
-  const { authUser, userProfile, loadingLogin, selectedStoreId } = useAuth();
+  const { authUser, userProfile, loadingLogin } = useAuth();
+  const { accessibleStore, loadingStore } = useStore();
   const location = useLocation();
 
   if (loadingLogin) return null;
@@ -15,8 +17,12 @@ export default function ProtectedRoute() {
     if (location.pathname === "/onboarding") return <Outlet />;
     return <Navigate to="/onboarding" replace />;
   }
+  if (loadingStore) return null;
+  if (location.pathname === "/onboarding") {
+    return <Navigate to="/stores" replace />;
+  }
 
-  if (!selectedStoreId) {
+  if (!accessibleStore) {
     if (location.pathname === "/stores") return <Outlet />;
     return <Navigate to="/stores" replace />;
   }
