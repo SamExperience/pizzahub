@@ -1,5 +1,11 @@
 import { db } from "./firebase";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 
 export const getUserDB = async (uid) => {
   //reference
