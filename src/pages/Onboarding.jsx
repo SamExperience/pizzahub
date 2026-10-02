@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { createOnboardingWorkspace } from "../services/onboarding.service";
-import LogoutButton from "../components/LogoutButton";
 
 const initialFormData = {
   companyName: "",
@@ -59,7 +58,6 @@ export default function Onboarding() {
     <div>
       <h1>Onboarding</h1>
 
-      <LogoutButton />
 
       <main>
         <form onSubmit={handleSubmit}>

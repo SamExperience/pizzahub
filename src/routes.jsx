@@ -16,16 +16,16 @@ export const routes = [
     element: <ProtectedRoute />,
     children: [
       {
-        path: "/onboarding",
-        element: <Onboarding />,
-      },
-      {
-        path: "/stores",
-        element: <StoreSelection />,
-      },
-      {
         element: <AppLayout />,
         children: [
+          {
+            path: "/onboarding",
+            element: <Onboarding />,
+          },
+          {
+            path: "/stores",
+            element: <StoreSelection />,
+          },
           {
             path: "/tableau",
             element: <Tableau />,
