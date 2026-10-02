@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { getAccessibleStore } from "../services/store.service";
 import { useAuth } from "./AuthContext";
 
@@ -10,7 +16,7 @@ export function StoreProvider({ children }) {
   const [errorStore, setErrorStore] = useState(null);
   const { authUser, loadingLogin, userProfile } = useAuth();
 
-  const fetchAccesibleStore = async () => {
+  const fetchAccesibleStore = useCallback(async () => {
     setErrorStore(null);
     setLoadingStore(true);
 
@@ -25,7 +31,7 @@ export function StoreProvider({ children }) {
       setErrorStore(error);
       setLoadingStore(false);
     }
-  };
+  }, [authUser]);
 
   useEffect(() => {
     if (loadingLogin === true) return;
@@ -38,7 +44,7 @@ export function StoreProvider({ children }) {
     if (!userProfile) return;
 
     fetchAccesibleStore();
-  }, [authUser, loadingLogin, userProfile]);
+  }, [authUser, loadingLogin, userProfile, fetchAccesibleStore]);
 
   return (
     <StoreContext.Provider
