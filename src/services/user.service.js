@@ -21,7 +21,7 @@ export const getUserDB = async (uid) => {
   }
 };
 
-export const addUserDB = async (user) => {
+/* export const addUserDB = async (user) => {
   const usersRef = collection(db, "users");
 
   await setDoc(doc(usersRef, user.uid), {
@@ -30,8 +30,9 @@ export const addUserDB = async (user) => {
     role: "admin",
     displayName: user.displayName,
     email: user.email,
-    createdAt: server(serverTimestamp()),
-    updatedAt: server(serverTimestamp()),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
   console.log(">>>User added on DB ");
 };
+ */
