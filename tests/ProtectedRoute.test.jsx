@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../src/contexts/AuthContext";
+import { useStore } from "../src/contexts/StoreContext";
 import ProtectedRoute from "../src/components/ProtectedRoute";
 
 vi.mock("../src/contexts/AuthContext", () => ({
   useAuth: vi.fn(),
+}));
+
+vi.mock("../src/contexts/StoreContext", () => ({
+  useStore: vi.fn(),
 }));
 
 vi.mock("react-router", async () => {
@@ -19,12 +24,18 @@ vi.mock("react-router", async () => {
 });
 
 describe("ProtectedRoute", () => {
+  beforeEach(() => {
+    useStore.mockReturnValue({
+      accessibleStore: null,
+      loadingStore: false,
+    });
+  });
+
   it("renders nothing while authentication is loading", () => {
     useAuth.mockReturnValue({
       authUser: null,
       userProfile: null,
       loadingLogin: true,
-      selectedStoreId: null,
     });
 
     expect(ProtectedRoute()).toBeNull();
@@ -35,7 +46,6 @@ describe("ProtectedRoute", () => {
       authUser: null,
       userProfile: null,
       loadingLogin: false,
-      selectedStoreId: null,
     });
 
     useLocation.mockReturnValue({
@@ -53,7 +63,6 @@ describe("ProtectedRoute", () => {
       authUser: { uid: "user-1" },
       userProfile: null,
       loadingLogin: false,
-      selectedStoreId: null,
     });
 
     useLocation.mockReturnValue({
@@ -71,7 +80,6 @@ describe("ProtectedRoute", () => {
       authUser: { uid: "user-1" },
       userProfile: null,
       loadingLogin: false,
-      selectedStoreId: null,
     });
 
     useLocation.mockReturnValue({
@@ -83,12 +91,52 @@ describe("ProtectedRoute", () => {
     expect(result.type).toBe(Outlet);
   });
 
-  it("redirects users without a selected store to store selection", () => {
+  it("renders nothing while the store is loading", () => {
     useAuth.mockReturnValue({
       authUser: { uid: "user-1" },
       userProfile: { uid: "user-1" },
       loadingLogin: false,
-      selectedStoreId: null,
+    });
+
+    useStore.mockReturnValue({
+      accessibleStore: null,
+      loadingStore: true,
+    });
+
+    useLocation.mockReturnValue({
+      pathname: "/dashboard",
+    });
+
+    expect(ProtectedRoute()).toBeNull();
+  });
+
+  it("redirects users with a profile away from onboarding to store selection", () => {
+    useAuth.mockReturnValue({
+      authUser: { uid: "user-1" },
+      userProfile: { uid: "user-1" },
+      loadingLogin: false,
+    });
+
+    useStore.mockReturnValue({
+      accessibleStore: { id: "store-1" },
+      loadingStore: false,
+    });
+
+    useLocation.mockReturnValue({
+      pathname: "/onboarding",
+    });
+
+    const result = ProtectedRoute();
+
+    expect(result.type).toBe(Navigate);
+    expect(result.props.to).toBe("/stores");
+  });
+
+  it("redirects users without an accessible store to store selection", () => {
+    useAuth.mockReturnValue({
+      authUser: { uid: "user-1" },
+      userProfile: { uid: "user-1" },
+      loadingLogin: false,
     });
 
     useLocation.mockReturnValue({
@@ -101,12 +149,11 @@ describe("ProtectedRoute", () => {
     expect(result.props.to).toBe("/stores");
   });
 
-  it("allows users without a selected store to access store selection", () => {
+  it("allows users without an accessible store to access store selection", () => {
     useAuth.mockReturnValue({
       authUser: { uid: "user-1" },
       userProfile: { uid: "user-1" },
       loadingLogin: false,
-      selectedStoreId: null,
     });
 
     useLocation.mockReturnValue({
@@ -123,7 +170,11 @@ describe("ProtectedRoute", () => {
       authUser: { uid: "user-1" },
       userProfile: { uid: "user-1" },
       loadingLogin: false,
-      selectedStoreId: "store-1",
+    });
+
+    useStore.mockReturnValue({
+      accessibleStore: { id: "store-1" },
+      loadingStore: false,
     });
 
     useLocation.mockReturnValue({
