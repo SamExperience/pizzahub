@@ -1,9 +1,24 @@
 import { useStore } from "../contexts/StoreContext";
 import StoreCard from "../components/StoreCard";
+import { useEffect } from "react";
 
 export default function StoreSelection() {
-  const { accessibleStore, loadingStore, errorStore, fetchAccesibleStore } =
-    useStore();
+  const {
+    accessibleStore,
+    loadingStore,
+    errorStore,
+    fetchAccesibleStore,
+    selectedStore,
+    setselectedStore,
+  } = useStore();
+
+  useEffect(() => {
+    console.log(">>>>>", selectedStore);
+  }, [selectedStore]);
+
+  const handleStoreId = (store) => {
+    setselectedStore(store);
+  };
 
   return (
     <div>
@@ -21,7 +36,7 @@ export default function StoreSelection() {
       {accessibleStore && (
         <StoreCard
           store={accessibleStore}
-          onSelect={(store) => console.log(">>>Selected store: ", store)}
+          onSelect={(store) => handleStoreId(store)}
         />
       )}
     </div>

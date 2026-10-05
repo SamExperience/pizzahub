@@ -164,7 +164,28 @@ describe("ProtectedRoute", () => {
 
     expect(result.type).toBe(Outlet);
   });
+  it("redirects users with an accessible store but no selected store to store selection", () => {
+    useAuth.mockReturnValue({
+      authUser: { uid: "user-1" },
+      userProfile: { uid: "user-1" },
+      loadingLogin: false,
+    });
 
+    useStore.mockReturnValue({
+      accessibleStore: { id: "store-1" },
+      selectedStore: null,
+      loadingStore: false,
+    });
+
+    useLocation.mockReturnValue({
+      pathname: "/tableau",
+    });
+
+    const result = ProtectedRoute();
+
+    expect(result.type).toBe(Navigate);
+    expect(result.props.to).toBe("/stores");
+  });
   it("allows fully authenticated users into the application", () => {
     useAuth.mockReturnValue({
       authUser: { uid: "user-1" },
@@ -174,6 +195,7 @@ describe("ProtectedRoute", () => {
 
     useStore.mockReturnValue({
       accessibleStore: { id: "store-1" },
+      selectedStore: { id: "store-1" },
       loadingStore: false,
     });
 

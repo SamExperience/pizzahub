@@ -12,6 +12,7 @@ const StoreContext = createContext();
 
 export function StoreProvider({ children }) {
   const [accessibleStore, setAccessibleStore] = useState(null);
+  const [selectedStore, setselectedStore] = useState(null);
   const [loadingStore, setLoadingStore] = useState(true);
   const [errorStore, setErrorStore] = useState(null);
   const { authUser, loadingLogin, userProfile } = useAuth();
@@ -48,7 +49,14 @@ export function StoreProvider({ children }) {
 
   return (
     <StoreContext.Provider
-      value={{ accessibleStore, loadingStore, errorStore, fetchAccesibleStore }}
+      value={{
+        accessibleStore,
+        loadingStore,
+        errorStore,
+        fetchAccesibleStore,
+        selectedStore,
+        setselectedStore,
+      }}
     >
       {children}
     </StoreContext.Provider>

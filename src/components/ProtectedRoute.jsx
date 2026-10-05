@@ -4,7 +4,7 @@ import { useStore } from "../contexts/StoreContext";
 
 export default function ProtectedRoute() {
   const { authUser, userProfile, loadingLogin } = useAuth();
-  const { accessibleStore, loadingStore } = useStore();
+  const { accessibleStore, loadingStore, selectedStore } = useStore();
   const location = useLocation();
 
   if (loadingLogin) return null;
@@ -23,6 +23,11 @@ export default function ProtectedRoute() {
   }
 
   if (!accessibleStore) {
+    if (location.pathname === "/stores") return <Outlet />;
+    return <Navigate to="/stores" replace />;
+  }
+
+  if (!selectedStore) {
     if (location.pathname === "/stores") return <Outlet />;
     return <Navigate to="/stores" replace />;
   }
