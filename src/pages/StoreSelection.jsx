@@ -1,7 +1,7 @@
 import { useStore } from "../contexts/StoreContext";
 import StoreCard from "../components/StoreCard";
 import { useEffect } from "react";
-
+import { getMenuByStoreId } from "../services/menu.service";
 export default function StoreSelection() {
   const {
     accessibleStore,
@@ -13,7 +13,12 @@ export default function StoreSelection() {
   } = useStore();
 
   useEffect(() => {
-    console.log(">>>>>", selectedStore);
+    console.log(">>>>>Store selected", selectedStore);
+
+    async function getMenu(id) {
+      return await getMenuByStoreId(id);
+    }
+    if (selectedStore) getMenu(selectedStore.id);
   }, [selectedStore]);
 
   const handleStoreId = (store) => {

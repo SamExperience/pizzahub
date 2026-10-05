@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest --no-file-parallelism",
     "emulator": "firebase emulators:start"
   },
   "dependencies": {
