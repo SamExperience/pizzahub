@@ -9,20 +9,23 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebase";
 
 //db
-import { getUserDB, addUserDB } from "../services/user.service";
+import { getUserDB } from "../services/user.service";
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingLogin, setloadingLogin] = useState(true);
-  const [selectedStoreId, setSelectedStoreId] = useState(null);
 
   const logout = async () => {
     await signout();
     console.log("Logout successfull >>>>>>>>>>>>>>");
   };
+  async function refreshProfile() {
+    const userDB = await getUserDB(authUser.uid);
+    setUserProfile(userDB);
+  }
 
   useEffect(() => {
     const authSubscription = onAuthStateChanged(auth, async (authUser) => {
@@ -60,9 +63,7 @@ export function AuthProvider({ children }) {
         userProfile,
         loadingLogin,
         logout,
-        addUserDB,
-        selectedStoreId,
-        setSelectedStoreId,
+        refreshProfile,
       }}
     >
       {children}
