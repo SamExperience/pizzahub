@@ -2,7 +2,11 @@ import { useStore } from "../contexts/StoreContext";
 import StoreCard from "../components/StoreCard";
 import { useEffect } from "react";
 import { getMenuByStoreId } from "../services/menu.service";
+import { useNavigate } from "react-router";
+
 export default function StoreSelection() {
+  const navigate = useNavigate();
+
   const {
     accessibleStore,
     loadingStore,
@@ -15,11 +19,17 @@ export default function StoreSelection() {
   useEffect(() => {
     console.log(">>>>>Store selected", selectedStore);
 
-    async function getMenu(id) {
-      return await getMenuByStoreId(id);
+    async function checkMenu() {
+      const menu = await getMenuByStoreId(selectedStore.id);
+
+      if (menu) {
+        navigate("/tableau");
+      } else {
+        navigate("/menu");
+      }
     }
-    if (selectedStore) getMenu(selectedStore.id);
-  }, [selectedStore]);
+    if (selectedStore) checkMenu();
+  }, [selectedStore, navigate]);
 
   const handleStoreId = (store) => {
     setselectedStore(store);
