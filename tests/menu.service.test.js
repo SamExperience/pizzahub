@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { getMenuByStoreId } from "../src/services/menu.service";
 import { register } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
-
+import { createMenu, getMenuByStoreId } from "../src/services/menu.service";
 const TEST_PASSWORD = "Password123!";
 
 const registerTestUser = async () => {
@@ -31,5 +30,29 @@ describe("getMenuByStoreId", () => {
     const menu = await getMenuByStoreId(result.storeId);
 
     expect(menu).toBeNull();
+  });
+});
+
+describe("createMenu", () => {
+  it("creates a menu for a store", async () => {
+    const user = await registerTestUser();
+
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Create Menu Test Company",
+      storeName: "Create Menu Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "4",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+
+    const menu = await createMenu(result.storeId, "Menu principale");
+
+    expect(menu.id).toBeDefined();
+    expect(menu.storeId).toBe(result.storeId);
+    expect(menu.name).toBe("Menu principale");
   });
 });

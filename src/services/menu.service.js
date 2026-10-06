@@ -1,4 +1,11 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
 
 import { db } from "./firebase";
 
@@ -21,4 +28,22 @@ export const getMenuByStoreId = async (storeId) => {
 
     return null;
   }
+};
+
+export const createMenu = async (storeId, nameMenu) => {
+  const menuRef = collection(db, "menus");
+
+  const data = {
+    storeId: storeId,
+    name: nameMenu,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  const menuSnap = await addDoc(menuRef, data);
+  console.log(">>>Menu created");
+
+  return {
+    id: menuSnap.id,
+    ...data,
+  };
 };
