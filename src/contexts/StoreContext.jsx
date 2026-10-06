@@ -36,12 +36,15 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     if (loadingLogin === true) return;
+
     if (!authUser) {
       setAccessibleStore(null);
+      setselectedStore(null);
       setErrorStore(null);
       setLoadingStore(true);
       return;
     }
+
     if (!userProfile) return;
 
     fetchAccesibleStore();
