@@ -55,26 +55,34 @@ service cloud.firestore {
     }
 
     match /menus/{menuId} {
-    allow read: if request.auth != null
-      && resource.data.storeId ==
-        get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.storeId;
+      allow read: if request.auth != null
+        && resource.data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
 
-    allow create: if request.auth != null
-      && request.resource.data.storeId ==
-        get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.storeId;
-    }
-    match /categories/{categoryId} {
-    allow create: if request.auth != null
-      && get(
-        /databases/$(database)/documents/menus/$(request.resource.data.menuId)
-      ).data.storeId ==
-        get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.storeId;
-    }
+      allow create: if request.auth != null
+        && request.resource.data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
+      }
+      match /categories/{categoryId} {
+      allow read: if request.auth != null
+        && get(
+          /databases/$(database)/documents/menus/$(resource.data.menuId)
+        ).data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
+
+      allow create: if request.auth != null
+        && get(
+          /databases/$(database)/documents/menus/$(request.resource.data.menuId)
+        ).data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
+      }
   }
 }
