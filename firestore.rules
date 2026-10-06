@@ -53,5 +53,13 @@ service cloud.firestore {
           /databases/$(database)/documents/stores/$(request.resource.data.storeId)
         ).data.createdAt == request.time;
     }
+
+   match /menus/{menuId} {
+    allow read: if request.auth != null
+      && resource.data.storeId ==
+        get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.storeId;
+}
   }
 }

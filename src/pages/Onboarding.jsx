@@ -16,7 +16,7 @@ export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const { authUser, logout } = useAuth();
+  const { authUser, refreshProfile } = useAuth();
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -40,13 +40,12 @@ export default function Onboarding() {
         ...formData,
       });
 
-      setFormData(initialFormData);
-
       console.log("Onboarding success:", {
         userId,
         companyId,
         storeId,
       });
+      await refreshProfile();
     } catch (err) {
       setError(err);
       console.error("Onboarding error:", err);
@@ -59,9 +58,6 @@ export default function Onboarding() {
     <div>
       <h1>Onboarding</h1>
 
-      <button type="button" onClick={logout}>
-        Logout
-      </button>
 
       <main>
         <form onSubmit={handleSubmit}>

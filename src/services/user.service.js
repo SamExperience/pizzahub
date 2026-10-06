@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 
 export const getUserDB = async (uid) => {
   //reference
@@ -13,19 +13,4 @@ export const getUserDB = async (uid) => {
   } else {
     console.log("Service: User NOT  Exist!!!");
   }
-};
-
-export const addUserDB = async (user) => {
-  const usersRef = collection(db, "users");
-
-  await setDoc(doc(usersRef, user.uid), {
-    companyId: null,
-    storeId: null,
-    role: "admin",
-    displayName: user.displayName,
-    email: user.email,
-    createdAt: server(serverTimestamp()),
-    updatedAt: server(serverTimestamp()),
-  });
-  console.log(">>>User added on DB ");
 };

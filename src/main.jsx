@@ -5,13 +5,16 @@ import { RouterProvider } from "react-router/dom";
 import "./index.css";
 import { routes } from "./routes.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
+import { StoreProvider } from "./contexts/StoreContext.jsx";
 
 const router = createBrowserRouter(routes);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <StoreProvider>
+        <RouterProvider router={router} />
+      </StoreProvider>
     </AuthProvider>
   </StrictMode>,
 );
