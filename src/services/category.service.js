@@ -9,6 +9,7 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  getDoc,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -102,9 +103,80 @@ export const deleteCategoryById = async (categoryId) => {
 };
 
 export const updateCategoryById = async (categoryId, data) => {
+  // Check parameters
+  if (!categoryId) {
+    throw new Error("Category ID is required");
+  }
+
+  if (!data || typeof data !== "object") {
+    throw new Error("Category data is required");
+  }
+
+  const hasName = Object.prototype.hasOwnProperty.call(data, "name");
+  const hasPosition = Object.prototype.hasOwnProperty.call(data, "position");
+
+  if (!hasName && !hasPosition) {
+    throw new Error("Nothing to update");
+  }
+
   const categoryRef = doc(db, "categories", categoryId);
+  const categorySnap = await getDoc(categoryRef);
+
+  if (!categorySnap.exists()) {
+    throw new Error("Category not found");
+  }
+
+  const currentCategory = categorySnap.data();
+  const updates = {};
+
+  // Validate name only if provided
+  if (hasName) {
+    if (typeof data.name !== "string") {
+      throw new Error("Category name is required");
+    }
+
+    const normalizedName = data.name.trim();
+
+    if (!normalizedName) {
+      throw new Error("Category name is required");
+    }
+
+    if (normalizedName !== currentCategory.name) {
+      const isNameValid = await validateCategoryName(
+        currentCategory.menuId,
+        normalizedName,
+      );
+
+      if (!isNameValid) {
+        throw new Error("Category name already exists");
+      }
+    }
+
+    updates.name = normalizedName;
+  }
+
+  // Validate position only if provided
+  if (hasPosition) {
+    if (!Number.isInteger(data.position) || data.position < 1) {
+      throw new Error("Category position must be a positive integer");
+    }
+
+    if (data.position !== currentCategory.position) {
+      const isPositionValid = await validateCategoryPosition(
+        currentCategory.menuId,
+        data.position,
+      );
+
+      if (!isPositionValid) {
+        throw new Error("Category position is already in use");
+      }
+    }
+
+    updates.position = data.position;
+  }
+
   await updateDoc(categoryRef, {
-    ...data,
+    ...updates,
     updatedAt: serverTimestamp(),
   });
 };
