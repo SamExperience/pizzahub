@@ -6,6 +6,8 @@ import {
   query,
   serverTimestamp,
   where,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -44,4 +46,9 @@ export const getCategoriesByMenuId = async (menuId) => {
     id: doc.id,
     ...doc.data(),
   }));
+};
+
+export const deleteCategoryById = async (categoryId) => {
+  const categoryRef = doc(db, "categories", categoryId);
+  await deleteDoc(categoryRef);
 };

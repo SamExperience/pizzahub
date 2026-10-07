@@ -5,6 +5,7 @@ import { createMenu } from "../src/services/menu.service";
 import {
   createCategory,
   getCategoriesByMenuId,
+  deleteCategoryById,
 } from "../src/services/category.service";
 
 const TEST_PASSWORD = "Password123!";
@@ -71,5 +72,33 @@ describe("getCategoriesByMenuId", () => {
     expect(categories[0].name).toBe("Pizzas");
     expect(categories[1].name).toBe("Boissons");
     expect(categories[2].name).toBe("Desserts");
+  });
+});
+
+describe("deleteCategoryById", () => {
+  it("deletes a category by id", async () => {
+    const user = await registerTestUser();
+
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Delete Category Test Company",
+      storeName: "Delete Category Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "7",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+
+    const menu = await createMenu(result.storeId, "Menu principale");
+
+    const category = await createCategory(menu.id, "Pizzas", 1);
+
+    await deleteCategoryById(category.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+
+    expect(categories).toHaveLength(0);
   });
 });
