@@ -8,6 +8,7 @@ import {
   where,
   deleteDoc,
   doc,
+  updateDoc,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -51,4 +52,12 @@ export const getCategoriesByMenuId = async (menuId) => {
 export const deleteCategoryById = async (categoryId) => {
   const categoryRef = doc(db, "categories", categoryId);
   await deleteDoc(categoryRef);
+};
+
+export const updateCategoryById = async (categoryId, data) => {
+  const categoryRef = doc(db, "categories", categoryId);
+  await updateDoc(categoryRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
 };
