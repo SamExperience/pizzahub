@@ -21,7 +21,6 @@ const registerTestUser = async () => {
 describe("createCategory", () => {
   it("creates a category for a menu", async () => {
     const user = await registerTestUser();
-
     const result = await createOnboardingWorkspace({
       uid: user.uid,
       userName: user.displayName,
@@ -33,15 +32,108 @@ describe("createCategory", () => {
       city: "Genève",
       country: "Switzerland",
     });
-
     const menu = await createMenu(result.storeId, "Menu principale");
-
     const category = await createCategory(menu.id, "Pizzas", 1);
-
     expect(category.id).toBeDefined();
     expect(category.menuId).toBe(menu.id);
     expect(category.name).toBe("Pizzas");
     expect(category.position).toBe(1);
+  });
+  it("trims whitespace from the category name", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Normalize Category Test Company",
+      storeName: "Normalize Category Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "6",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+    const menu = await createMenu(result.storeId, "Menu principale");
+    const category = await createCategory(menu.id, " Pizzas ", 1);
+    expect(category.name).toBe("Pizzas");
+  });
+  it("rejects a duplicate category name in the same menu", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Duplicate Name Test Company",
+      storeName: "Duplicate Name Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "7",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+    const menu = await createMenu(result.storeId, "Menu principale");
+    await createCategory(menu.id, "Pizzas", 1);
+    await expect(createCategory(menu.id, "Pizzas", 2)).rejects.toThrow(
+      "Category name already exists",
+    );
+  });
+  it("rejects a duplicate category position in the same menu", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Duplicate Position Test Company",
+      storeName: "Duplicate Position Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "8",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+    const menu = await createMenu(result.storeId, "Menu principale");
+    await createCategory(menu.id, "Pizzas", 1);
+    await expect(createCategory(menu.id, "Desserts", 1)).rejects.toThrow(
+      "Category position is already in use",
+    );
+  });
+  it("rejects an invalid menu id", async () => {
+    await expect(createCategory("", "Pizzas", 1)).rejects.toThrow(
+      "Menu ID is required",
+    );
+  });
+  it("rejects an invalid category name", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Invalid Name Test Company",
+      storeName: "Invalid Name Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "9",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+    const menu = await createMenu(result.storeId, "Menu principale");
+    await expect(createCategory(menu.id, " ", 1)).rejects.toThrow(
+      "Category name is required",
+    );
+  });
+  it("rejects an invalid category position", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Invalid Position Test Company",
+      storeName: "Invalid Position Test Store",
+      street: "Rue du Lyon",
+      streetNumber: "10",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+    const menu = await createMenu(result.storeId, "Menu principale");
+    await expect(createCategory(menu.id, "Pizzas", 0)).rejects.toThrow(
+      "Category position must be a positive integer",
+    );
   });
 });
 

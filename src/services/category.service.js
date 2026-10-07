@@ -13,19 +13,66 @@ import {
 
 import { db } from "./firebase";
 
+const validateCategoryName = async (menuId, name) => {
+  const categoryRef = collection(db, "categories");
+
+  const q = query(
+    categoryRef,
+    where("menuId", "==", menuId),
+    where("name", "==", name),
+  );
+
+  const result = await getDocs(q);
+
+  return result.empty;
+};
+const validateCategoryPosition = async (menuId, position) => {
+  const categoryRef = collection(db, "categories");
+
+  const q = query(
+    categoryRef,
+    where("menuId", "==", menuId),
+    where("position", "==", position),
+  );
+
+  const result = await getDocs(q);
+
+  return result.empty;
+};
+
 export const createCategory = async (menuId, nameCategory, position) => {
+  //check parameter
+  if (!menuId) throw new Error("Menu ID is required");
+
+  if (!nameCategory || typeof nameCategory !== "string")
+    throw new Error("Category name is required");
+
+  const normalizedName = nameCategory.trim();
+  if (!normalizedName) throw new Error("Category name is required");
+
+  if (!Number.isInteger(position) || position < 1)
+    throw new Error("Category position must be a positive integer");
+
+  //check nameCategory and position
+  const isNameValid = await validateCategoryName(menuId, normalizedName);
+  if (!isNameValid) throw new Error("Category name already exists");
+
+  //check position
+  const isPositionValid = await validateCategoryPosition(menuId, position);
+  if (!isPositionValid) throw new Error("Category position is already in use");
+
   const categoryRef = collection(db, "categories");
 
   const data = {
     menuId: menuId,
-    name: nameCategory,
+    name: normalizedName,
     position: position,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
 
   const categorySnap = await addDoc(categoryRef, data);
-  console.log(`Category ${nameCategory} created`);
+  console.log(`Category ${normalizedName} created`);
 
   return {
     id: categorySnap.id,
