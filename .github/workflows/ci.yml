@@ -45,7 +45,7 @@ jobs:
 
       - run: npm run lint
 
-      - run: npx firebase-tools emulators:exec --only auth,firestore "npm test -- --run"
+      - run: npx firebase-tools emulators:exec --only auth,firestore,storage "npm test -- --run"
 
       - run: npm run build
         env:
