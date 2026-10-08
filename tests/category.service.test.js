@@ -7,6 +7,7 @@ import {
   getCategoriesByMenuId,
   deleteCategoryById,
   updateCategoryById,
+  reorderCategories,
 } from "../src/services/category.service";
 
 const TEST_PASSWORD = "Password123!";
@@ -168,7 +169,119 @@ describe("getCategoriesByMenuId", () => {
   });
 });
 
+const createTestMenu = async (label, streetNumber) => {
+  const user = await registerTestUser();
+  const result = await createOnboardingWorkspace({
+    uid: user.uid,
+    userName: user.displayName,
+    companyName: `${label} Test Company`,
+    storeName: `${label} Test Store`,
+    street: "Rue du Lyon",
+    streetNumber,
+    postalCode: "1201",
+    city: "Genève",
+    country: "Switzerland",
+  });
+
+  return createMenu(result.storeId, "Menu principale");
+};
+
+describe("reorderCategories", () => {
+  it("reorders categories with non-sequential positions", async () => {
+    const menu = await createTestMenu("Reorder Positions", "20");
+    await createCategory(menu.id, "Pizzas", 2);
+    await createCategory(menu.id, "Boissons", 5);
+    await createCategory(menu.id, "Desserts", 9);
+
+    await reorderCategories(menu.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.position)).toEqual([1, 2, 3]);
+  });
+  it("keeps the existing order", async () => {
+    const menu = await createTestMenu("Reorder Order", "21");
+    await createCategory(menu.id, "Desserts", 7);
+    await createCategory(menu.id, "Pizzas", 3);
+    await createCategory(menu.id, "Boissons", 4);
+
+    await reorderCategories(menu.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.name)).toEqual([
+      "Pizzas",
+      "Boissons",
+      "Desserts",
+    ]);
+  });
+  it("does not fail when the menu has no categories", async () => {
+    const menu = await createTestMenu("Reorder Empty", "22");
+
+    await expect(reorderCategories(menu.id)).resolves.not.toThrow();
+
+    expect(await getCategoriesByMenuId(menu.id)).toHaveLength(0);
+  });
+  it("does not change name and menuId", async () => {
+    const menu = await createTestMenu("Reorder Fields", "23");
+    await createCategory(menu.id, "Pizzas", 4);
+    await createCategory(menu.id, "Desserts", 8);
+
+    await reorderCategories(menu.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.name)).toEqual(["Pizzas", "Desserts"]);
+    expect(categories.every((c) => c.menuId === menu.id)).toBe(true);
+  });
+});
+
 describe("deleteCategoryById", () => {
+  it("renumbers the following categories after a deletion", async () => {
+    const menu = await createTestMenu("Delete Renumber", "24");
+    const first = await createCategory(menu.id, "Pizzas", 1);
+    await createCategory(menu.id, "Boissons", 2);
+    await createCategory(menu.id, "Desserts", 3);
+
+    await deleteCategoryById(first.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.position)).toEqual([1, 2]);
+  });
+  it("keeps the correct order of the remaining categories", async () => {
+    const menu = await createTestMenu("Delete Order", "25");
+    await createCategory(menu.id, "Pizzas", 1);
+    const middle = await createCategory(menu.id, "Boissons", 2);
+    await createCategory(menu.id, "Desserts", 3);
+
+    await deleteCategoryById(middle.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.name)).toEqual(["Pizzas", "Desserts"]);
+    expect(categories.map((c) => c.position)).toEqual([1, 2]);
+  });
+  it("deletes the last category without altering the previous ones", async () => {
+    const menu = await createTestMenu("Delete Last", "26");
+    await createCategory(menu.id, "Pizzas", 1);
+    await createCategory(menu.id, "Boissons", 2);
+    const last = await createCategory(menu.id, "Desserts", 3);
+
+    await deleteCategoryById(last.id);
+
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.name)).toEqual(["Pizzas", "Boissons"]);
+    expect(categories.map((c) => c.position)).toEqual([1, 2]);
+  });
+  it("deletes the only category of the menu", async () => {
+    const menu = await createTestMenu("Delete Only", "27");
+    const category = await createCategory(menu.id, "Pizzas", 1);
+
+    await deleteCategoryById(category.id);
+
+    expect(await getCategoriesByMenuId(menu.id)).toHaveLength(0);
+  });
+  it("rejects an invalid category id", async () => {
+    await expect(deleteCategoryById("")).rejects.toThrow(
+      "Category ID is required",
+    );
+  });
   it("deletes a category by id", async () => {
     const user = await registerTestUser();
 

@@ -6,10 +6,10 @@ import {
   query,
   serverTimestamp,
   where,
-  deleteDoc,
   doc,
   updateDoc,
   getDoc,
+  writeBatch,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -39,6 +39,38 @@ const validateCategoryPosition = async (menuId, position) => {
   const result = await getDocs(q);
 
   return result.empty;
+};
+
+// Assigns sequential positions (1, 2, 3...) keeping the current order.
+// If a batch is passed, updates are added to it and the caller commits.
+export const reorderCategories = async (
+  menuId,
+  { batch, excludeCategoryId } = {},
+) => {
+  const ownBatch = !batch;
+  const writeBatchRef = batch ?? writeBatch(db);
+
+  const categories = (await getCategoriesByMenuId(menuId)).filter(
+    (category) => category.id !== excludeCategoryId,
+  );
+
+  let updatesCount = 0;
+
+  categories.forEach((category, index) => {
+    const newPosition = index + 1;
+
+    if (category.position !== newPosition) {
+      writeBatchRef.update(doc(db, "categories", category.id), {
+        position: newPosition,
+        updatedAt: serverTimestamp(),
+      });
+      updatesCount++;
+    }
+  });
+
+  if (ownBatch && updatesCount > 0) {
+    await writeBatchRef.commit();
+  }
 };
 
 export const createCategory = async (menuId, nameCategory, position) => {
@@ -98,8 +130,24 @@ export const getCategoriesByMenuId = async (menuId) => {
 };
 
 export const deleteCategoryById = async (categoryId) => {
+  if (!categoryId) {
+    throw new Error("Category ID is required");
+  }
+
   const categoryRef = doc(db, "categories", categoryId);
-  await deleteDoc(categoryRef);
+  const categorySnap = await getDoc(categoryRef);
+
+  if (!categorySnap.exists()) {
+    throw new Error("Category not found");
+  }
+
+  const { menuId } = categorySnap.data();
+
+  // Delete and renumbering are committed atomically
+  const batch = writeBatch(db);
+  batch.delete(categoryRef);
+  await reorderCategories(menuId, { batch, excludeCategoryId: categoryId });
+  await batch.commit();
 };
 
 export const updateCategoryById = async (categoryId, data) => {
