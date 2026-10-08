@@ -100,5 +100,32 @@ service cloud.firestore {
               /databases/$(database)/documents/users/$(request.auth.uid)
             ).data.storeId;
     }
+
+    // Minimal rules for product creation; update/delete/hardening: task 6.11
+    match /products/{productId} {
+      allow read: if request.auth != null
+        && get(
+          /databases/$(database)/documents/menus/$(
+            get(
+              /databases/$(database)/documents/categories/$(resource.data.categoryId)
+            ).data.menuId
+          )
+        ).data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
+
+      allow create: if request.auth != null
+        && get(
+          /databases/$(database)/documents/menus/$(
+            get(
+              /databases/$(database)/documents/categories/$(request.resource.data.categoryId)
+            ).data.menuId
+          )
+        ).data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
+    }
   }
 }
