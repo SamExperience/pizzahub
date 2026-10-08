@@ -5,6 +5,8 @@ import { createMenu } from "../src/services/menu.service";
 import { createCategory } from "../src/services/category.service";
 import {
   createProduct,
+  getProductById,
+  getProductsByCategoryId,
   validateProductPricing,
 } from "../src/services/product.service";
 
@@ -150,5 +152,40 @@ describe("createProduct", () => {
     await expect(
       createProduct(category.id, { name: "X", position: 0, price: 1 }),
     ).rejects.toThrow("Product position must be a positive integer");
+  });
+});
+
+describe("product reading", () => {
+  let readCategory;
+
+  beforeAll(async () => {
+    readCategory = await createCategory(category.menuId, "Desserts", 2);
+    await createProduct(readCategory.id, { name: "B", position: 2, price: 2 });
+    await createProduct(readCategory.id, { name: "A", position: 1, price: 1 });
+  });
+
+  it("lists products of a category ordered by position", async () => {
+    const products = await getProductsByCategoryId(readCategory.id);
+    expect(products.map((p) => p.name)).toEqual(["A", "B"]);
+    expect(products.every((p) => p.categoryId === readCategory.id)).toBe(true);
+  });
+
+  it("returns an empty list for a category without products", async () => {
+    const empty = await createCategory(category.menuId, "Empty", 3);
+    expect(await getProductsByCategoryId(empty.id)).toEqual([]);
+  });
+
+  it("gets a product by id", async () => {
+    const [first] = await getProductsByCategoryId(readCategory.id);
+    const product = await getProductById(first.id);
+    expect(product).toMatchObject({ id: first.id, name: "A", price: 1 });
+  });
+
+  it("rejects missing ids and unknown products", async () => {
+    await expect(getProductsByCategoryId("")).rejects.toThrow(
+      "Category ID is required",
+    );
+    await expect(getProductById("")).rejects.toThrow("Product ID is required");
+    await expect(getProductById("unknown-product")).rejects.toThrow();
   });
 });

@@ -3,7 +3,11 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  orderBy,
+  query,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -90,5 +94,34 @@ export const createProduct = async (categoryId, data) => {
   return {
     id: productSnap.id,
     ...productData,
+  };
+};
+
+export const getProductsByCategoryId = async (categoryId) => {
+  if (!categoryId) throw new Error("Category ID is required");
+
+  const q = query(
+    collection(db, "products"),
+    where("categoryId", "==", categoryId),
+    orderBy("position"),
+  );
+
+  const productsSnap = await getDocs(q);
+
+  return productsSnap.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+};
+
+export const getProductById = async (productId) => {
+  if (!productId) throw new Error("Product ID is required");
+
+  const productSnap = await getDoc(doc(db, "products", productId));
+  if (!productSnap.exists()) throw new Error("Product not found");
+
+  return {
+    id: productSnap.id,
+    ...productSnap.data(),
   };
 };
