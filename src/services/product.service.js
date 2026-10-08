@@ -279,6 +279,23 @@ export const updateProductById = async (productId, data) => {
   });
 };
 
+// Availability is a flag only: an unavailable product stays in the menu and
+// is never deleted or hidden by the service layer.
+export const setProductAvailability = async (productId, isAvailable) => {
+  if (!productId) throw new Error("Product ID is required");
+
+  const available = validateProductAvailability(isAvailable);
+
+  const productRef = doc(db, "products", productId);
+  const productSnap = await getDoc(productRef);
+  if (!productSnap.exists()) throw new Error("Product not found");
+
+  await updateDoc(productRef, {
+    isAvailable: available,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 export const getProductsByCategoryId = async (categoryId) => {
   if (!categoryId) throw new Error("Category ID is required");
 
@@ -308,6 +325,17 @@ export const getProductById = async (productId) => {
   };
 };
 
+// Best-effort image removal: an orphaned file must never block a deletion.
+export const deleteProductImage = async (imageUrl) => {
+  if (!imageUrl) return;
+
+  try {
+    await deleteObject(ref(storage, imageUrl));
+  } catch (error) {
+    console.warn(`Product image not deleted: ${error.message}`);
+  }
+};
+
 // Deletes the product and renumbers the remaining products of its category
 // to 1..n in one atomic batch. The image is removed afterwards on a
 // best-effort basis: an orphaned file must never block the deletion.
@@ -335,11 +363,5 @@ export const deleteProductById = async (productId) => {
   });
   await batch.commit();
 
-  if (imageUrl) {
-    try {
-      await deleteObject(ref(storage, imageUrl));
-    } catch (error) {
-      console.warn(`Product image not deleted: ${error.message}`);
-    }
-  }
+  await deleteProductImage(imageUrl);
 };

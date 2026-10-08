@@ -3,6 +3,11 @@ import { register } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { createMenu } from "../src/services/menu.service";
 import {
+  createProduct,
+  getProductById,
+  setProductAvailability,
+} from "../src/services/product.service";
+import {
   createCategory,
   getCategoriesByMenuId,
   deleteCategoryById,
@@ -276,6 +281,34 @@ describe("deleteCategoryById", () => {
     await deleteCategoryById(category.id);
 
     expect(await getCategoriesByMenuId(menu.id)).toHaveLength(0);
+  });
+  it("deletes all products of the category, available or not", async () => {
+    const menu = await createTestMenu("Delete Products", "28");
+    const category = await createCategory(menu.id, "Pizzas", 1);
+    const other = await createCategory(menu.id, "Boissons", 2);
+    const available = await createProduct(category.id, {
+      name: "Margherita",
+      position: 1,
+      price: 10,
+    });
+    const unavailable = await createProduct(category.id, {
+      name: "Diavola",
+      position: 2,
+      price: 12,
+    });
+    await setProductAvailability(unavailable.id, false);
+    const kept = await createProduct(other.id, {
+      name: "Cola",
+      position: 1,
+      price: 3,
+    });
+
+    await deleteCategoryById(category.id);
+
+    // Rules deny reading a missing document, so only rejection is asserted.
+    await expect(getProductById(available.id)).rejects.toThrow();
+    await expect(getProductById(unavailable.id)).rejects.toThrow();
+    expect((await getProductById(kept.id)).name).toBe("Cola");
   });
   it("rejects an invalid category id", async () => {
     await expect(deleteCategoryById("")).rejects.toThrow(

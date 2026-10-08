@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "./firebase";
+import { deleteProductImage, getProductsByCategoryId } from "./product.service";
 
 const validateCategoryName = async (menuId, name) => {
   const categoryRef = collection(db, "categories");
@@ -142,12 +143,21 @@ export const deleteCategoryById = async (categoryId) => {
   }
 
   const { menuId } = categorySnap.data();
+  const products = await getProductsByCategoryId(categoryId);
 
-  // Delete and renumbering are committed atomically
+  // Category, its products (available or not) and renumbering are committed
+  // atomically
   const batch = writeBatch(db);
   batch.delete(categoryRef);
+  products.forEach((product) => {
+    batch.delete(doc(db, "products", product.id));
+  });
   await reorderCategories(menuId, { batch, excludeCategoryId: categoryId });
   await batch.commit();
+
+  await Promise.all(
+    products.map((product) => deleteProductImage(product.imageUrl)),
+  );
 };
 
 export const updateCategoryById = async (categoryId, data) => {

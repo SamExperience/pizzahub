@@ -12,6 +12,7 @@ import {
   deleteProductById,
   getProductById,
   getProductsByCategoryId,
+  setProductAvailability,
   updateProductById,
   validateProductCookingLevels,
   validateProductPricing,
@@ -448,6 +449,99 @@ describe("updateProductById", () => {
     ).rejects.toThrow("Product availability must be a boolean");
     await expect(
       updateProductById("unknown-product", { name: "X" }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("setProductAvailability", () => {
+  let availabilityCategory;
+
+  beforeAll(async () => {
+    availabilityCategory = await createCategory(
+      category.menuId,
+      "Availability",
+      10,
+    );
+  });
+
+  const makeProduct = (position) =>
+    createProduct(availabilityCategory.id, {
+      name: `Product ${position}`,
+      position,
+      price: 5,
+    });
+
+  it("toggles availability and persists it", async () => {
+    const product = await makeProduct(1);
+
+    await setProductAvailability(product.id, false);
+    expect((await getProductById(product.id)).isAvailable).toBe(false);
+
+    await setProductAvailability(product.id, true);
+    expect((await getProductById(product.id)).isAvailable).toBe(true);
+  });
+
+  it("keeps an unavailable product in the menu with its data unchanged", async () => {
+    const cat = await createCategory(category.menuId, "Kept", 11);
+    const first = await createProduct(cat.id, {
+      name: "First",
+      position: 1,
+      price: 4,
+    });
+    const second = await createProduct(cat.id, {
+      name: "Second",
+      position: 2,
+      price: 6,
+    });
+
+    await setProductAvailability(first.id, false);
+
+    const products = await getProductsByCategoryId(cat.id);
+    expect(products.map((p) => [p.id, p.position, p.isAvailable])).toEqual([
+      [first.id, 1, false],
+      [second.id, 2, true],
+    ]);
+    const stored = await getProductById(first.id);
+    expect(stored.name).toBe("First");
+    expect(stored.price).toBe(4);
+  });
+
+  it("keeps availability when a sibling is deleted", async () => {
+    const cat = await createCategory(category.menuId, "Sibling", 12);
+    const first = await createProduct(cat.id, {
+      name: "First",
+      position: 1,
+      price: 4,
+    });
+    const second = await createProduct(cat.id, {
+      name: "Second",
+      position: 2,
+      price: 6,
+    });
+    await setProductAvailability(second.id, false);
+
+    await deleteProductById(first.id);
+
+    const remaining = await getProductsByCategoryId(cat.id);
+    expect(remaining.map((p) => [p.id, p.position, p.isAvailable])).toEqual([
+      [second.id, 1, false],
+    ]);
+  });
+
+  it("rejects invalid input", async () => {
+    const product = await makeProduct(2);
+
+    await expect(setProductAvailability("", true)).rejects.toThrow(
+      "Product ID is required",
+    );
+    await expect(setProductAvailability(product.id, "yes")).rejects.toThrow(
+      "Product availability must be a boolean",
+    );
+    await expect(setProductAvailability(product.id)).rejects.toThrow(
+      "Product availability must be a boolean",
+    );
+    await expect(
+      setProductAvailability("unknown-product", false),
     ).rejects.toThrow();
   });
 });
