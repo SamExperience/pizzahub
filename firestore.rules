@@ -54,12 +54,70 @@ service cloud.firestore {
         ).data.createdAt == request.time;
     }
 
-   match /menus/{menuId} {
-    allow read: if request.auth != null
-      && resource.data.storeId ==
+    // Store of the signed-in user, read from their profile.
+    function userStoreId() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data.storeId;
+    }
+
+    function menuStoreId(menuId) {
+      return get(
+        /databases/$(database)/documents/menus/$(menuId)
+      ).data.storeId;
+    }
+
+    function categoryStoreId(categoryId) {
+      return menuStoreId(
         get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.storeId;
-}
+          /databases/$(database)/documents/categories/$(categoryId)
+        ).data.menuId
+      );
+    }
+
+    match /menus/{menuId} {
+      allow read: if request.auth != null
+        && resource.data.storeId == userStoreId();
+
+      allow create: if request.auth != null
+        && request.resource.data.storeId == userStoreId();
+
+      allow update: if request.auth != null
+        && request.resource.data.storeId == resource.data.storeId
+        && resource.data.storeId == userStoreId();
+
+      allow delete: if request.auth != null
+        && resource.data.storeId == userStoreId();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if request.auth != null
+        && menuStoreId(resource.data.menuId) == userStoreId();
+
+      allow create: if request.auth != null
+        && menuStoreId(request.resource.data.menuId) == userStoreId();
+
+      allow update: if request.auth != null
+        && request.resource.data.menuId == resource.data.menuId
+        && menuStoreId(resource.data.menuId) == userStoreId();
+
+      allow delete: if request.auth != null
+        && menuStoreId(resource.data.menuId) == userStoreId();
+    }
+
+    match /products/{productId} {
+      allow read: if request.auth != null
+        && categoryStoreId(resource.data.categoryId) == userStoreId();
+
+      allow create: if request.auth != null
+        && categoryStoreId(request.resource.data.categoryId) == userStoreId();
+
+      allow update: if request.auth != null
+        && request.resource.data.categoryId == resource.data.categoryId
+        && categoryStoreId(resource.data.categoryId) == userStoreId();
+
+      allow delete: if request.auth != null
+        && categoryStoreId(resource.data.categoryId) == userStoreId();
+    }
   }
 }
