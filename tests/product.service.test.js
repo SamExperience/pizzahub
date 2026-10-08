@@ -21,6 +21,7 @@ import {
 const TEST_PASSWORD = "Password123!";
 
 let category;
+let storeId;
 
 beforeAll(async () => {
   const userCredential = await register(
@@ -39,6 +40,7 @@ beforeAll(async () => {
     city: "Genève",
     country: "Switzerland",
   });
+  storeId = result.storeId;
   const menu = await createMenu(result.storeId, "Menu principale");
   category = await createCategory(menu.id, "Pizzas", 1);
 });
@@ -581,8 +583,8 @@ describe("deleteProductById", () => {
   });
 
   it("deletes the product image from Storage", async () => {
-    const imageRef = ref(storage, `products/test-${Date.now()}.txt`);
-    await uploadString(imageRef, "image");
+    const imageRef = ref(storage, `products/${storeId}/test-${Date.now()}.png`);
+    await uploadString(imageRef, "image", "raw", { contentType: "image/png" });
     const imageUrl = await getDownloadURL(imageRef);
     const product = await makeProduct(deleteCategory.id, 1, { imageUrl });
 
@@ -592,8 +594,11 @@ describe("deleteProductById", () => {
   });
 
   it("still deletes the product when the image is already gone", async () => {
-    const imageRef = ref(storage, `products/missing-${Date.now()}.txt`);
-    await uploadString(imageRef, "image");
+    const imageRef = ref(
+      storage,
+      `products/${storeId}/missing-${Date.now()}.png`,
+    );
+    await uploadString(imageRef, "image", "raw", { contentType: "image/png" });
     const imageUrl = await getDownloadURL(imageRef);
     const product = await makeProduct(deleteCategory.id, 1, { imageUrl });
     await deleteObject(imageRef);

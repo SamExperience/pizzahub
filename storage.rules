@@ -2,9 +2,22 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Minimal rules for product images; store-level hardening: task 6.11
-    match /products/{allPaths=**} {
-      allow read, write: if request.auth != null;
+    function userStoreId() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data.storeId;
+    }
+
+    // Product images live under products/{storeId}/ and are limited to the
+    // store of the signed-in user (profile read from Firestore).
+    match /products/{storeId}/{allPaths=**} {
+      allow read, delete: if request.auth != null
+        && userStoreId() == storeId;
+
+      allow create, update: if request.auth != null
+        && userStoreId() == storeId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
   }
 }
