@@ -22,7 +22,7 @@ export const getMenuByStoreId = async (storeId) => {
       menusSnap.docs[0].data(),
     );
 
-    return menusSnap.docs[0].data();
+    return { id: menusSnap.docs[0].id, ...menusSnap.docs[0].data() };
   } else {
     console.log(">>> Menu does not exist.");
 
