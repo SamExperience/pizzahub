@@ -9,9 +9,11 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
+import { deleteObject, ref } from "firebase/storage";
 
-import { db } from "./firebase";
+import { db, storage } from "./firebase";
 
 const isValidPrice = (value) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -174,7 +176,7 @@ export const updateProductById = async (productId, data) => {
   });
 };
 
-export const getProductsByCategoryId =async (categoryId) => {
+export const getProductsByCategoryId = async (categoryId) => {
   if (!categoryId) throw new Error("Category ID is required");
 
   const q = query(
@@ -201,4 +203,40 @@ export const getProductById = async (productId) => {
     id: productSnap.id,
     ...productSnap.data(),
   };
+};
+
+// Deletes the product and renumbers the remaining products of its category
+// to 1..n in one atomic batch. The image is removed afterwards on a
+// best-effort basis: an orphaned file must never block the deletion.
+export const deleteProductById = async (productId) => {
+  if (!productId) throw new Error("Product ID is required");
+
+  const productRef = doc(db, "products", productId);
+  const productSnap = await getDoc(productRef);
+  if (!productSnap.exists()) throw new Error("Product not found");
+
+  const { categoryId, imageUrl } = productSnap.data();
+  const siblings = (await getProductsByCategoryId(categoryId)).filter(
+    (product) => product.id !== productId,
+  );
+
+  const batch = writeBatch(db);
+  batch.delete(productRef);
+  siblings.forEach((product, index) => {
+    if (product.position !== index + 1) {
+      batch.update(doc(db, "products", product.id), {
+        position: index + 1,
+        updatedAt: serverTimestamp(),
+      });
+    }
+  });
+  await batch.commit();
+
+  if (imageUrl) {
+    try {
+      await deleteObject(ref(storage, imageUrl));
+    } catch (error) {
+      console.warn(`Product image not deleted: ${error.message}`);
+    }
+  }
 };

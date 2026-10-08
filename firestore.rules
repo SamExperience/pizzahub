@@ -101,7 +101,7 @@ service cloud.firestore {
             ).data.storeId;
     }
 
-    // Minimal rules for product creation; update/delete/hardening: task 6.11
+    // Minimal rules for product creation; hardening: task 6.11
     match /products/{productId} {
       allow read: if request.auth != null
         && get(
@@ -130,6 +130,19 @@ service cloud.firestore {
       // Minimal update rule: same store, category cannot change.
       allow update: if request.auth != null
         && request.resource.data.categoryId == resource.data.categoryId
+        && get(
+          /databases/$(database)/documents/menus/$(
+            get(
+              /databases/$(database)/documents/categories/$(resource.data.categoryId)
+            ).data.menuId
+          )
+        ).data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
+
+      // Minimal delete rule: same store.
+      allow delete: if request.auth != null
         && get(
           /databases/$(database)/documents/menus/$(
             get(

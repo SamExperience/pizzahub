@@ -1,10 +1,15 @@
+// @vitest-environment node
+// Storage emulator uploads fail under jsdom XHR; the node environment uses fetch.
+import { deleteObject, getDownloadURL, ref, uploadString } from "firebase/storage";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { storage } from "../src/services/firebase";
 import { register } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { createMenu } from "../src/services/menu.service";
 import { createCategory } from "../src/services/category.service";
 import {
   createProduct,
+  deleteProductById,
   getProductById,
   getProductsByCategoryId,
   updateProductById,
@@ -286,5 +291,70 @@ describe("updateProductById", () => {
     await expect(
       updateProductById("unknown-product", { name: "X" }),
     ).rejects.toThrow();
+  });
+});
+
+describe("deleteProductById", () => {
+  let deleteCategory;
+
+  beforeAll(async () => {
+    deleteCategory = await createCategory(category.menuId, "Deletes", 5);
+  });
+
+  const makeProduct = (categoryId, position, extra = {}) =>
+    createProduct(categoryId, {
+      name: `Product ${position}`,
+      position,
+      price: 5,
+      ...extra,
+    });
+
+  it("deletes the product and renumbers the remaining ones", async () => {
+    const cat = await createCategory(category.menuId, "Renumber", 6);
+    const [first, second, third] = [
+      await makeProduct(cat.id, 1),
+      await makeProduct(cat.id, 2),
+      await makeProduct(cat.id, 3),
+    ];
+
+    await deleteProductById(second.id);
+
+    // Rules deny reading a missing document, so only rejection is asserted.
+    await expect(getProductById(second.id)).rejects.toThrow();
+    const remaining = await getProductsByCategoryId(cat.id);
+    expect(remaining.map((p) => [p.id, p.position])).toEqual([
+      [first.id, 1],
+      [third.id, 2],
+    ]);
+  });
+
+  it("deletes the product image from Storage", async () => {
+    const imageRef = ref(storage, `products/test-${Date.now()}.txt`);
+    await uploadString(imageRef, "image");
+    const imageUrl = await getDownloadURL(imageRef);
+    const product = await makeProduct(deleteCategory.id, 1, { imageUrl });
+
+    await deleteProductById(product.id);
+
+    await expect(getDownloadURL(imageRef)).rejects.toThrow();
+  });
+
+  it("still deletes the product when the image is already gone", async () => {
+    const imageRef = ref(storage, `products/missing-${Date.now()}.txt`);
+    await uploadString(imageRef, "image");
+    const imageUrl = await getDownloadURL(imageRef);
+    const product = await makeProduct(deleteCategory.id, 1, { imageUrl });
+    await deleteObject(imageRef);
+
+    await deleteProductById(product.id);
+
+    await expect(getProductById(product.id)).rejects.toThrow();
+  });
+
+  it("rejects invalid input", async () => {
+    await expect(deleteProductById("")).rejects.toThrow(
+      "Product ID is required",
+    );
+    await expect(deleteProductById("unknown-product")).rejects.toThrow();
   });
 });
