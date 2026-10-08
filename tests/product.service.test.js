@@ -13,6 +13,7 @@ import {
   getProductById,
   getProductsByCategoryId,
   updateProductById,
+  validateProductCookingLevels,
   validateProductPricing,
 } from "../src/services/product.service";
 
@@ -161,6 +162,117 @@ describe("createProduct", () => {
   });
 });
 
+describe("product validation", () => {
+  let validationCategory;
+
+  beforeAll(async () => {
+    validationCategory = await createCategory(category.menuId, "Validation", 7);
+  });
+
+  it("rejects a position already used in the same category", async () => {
+    await createProduct(validationCategory.id, {
+      name: "First",
+      position: 1,
+      price: 1,
+    });
+    await expect(
+      createProduct(validationCategory.id, {
+        name: "Second",
+        position: 1,
+        price: 1,
+      }),
+    ).rejects.toThrow("Product position is already in use");
+  });
+
+  it("allows the same position in another category", async () => {
+    const other = await createCategory(category.menuId, "Other", 8);
+    const product = await createProduct(other.id, {
+      name: "Same position",
+      position: 1,
+      price: 1,
+    });
+    expect(product.position).toBe(1);
+  });
+
+  it("stores cooking levels and a default level", async () => {
+    const product = await createProduct(validationCategory.id, {
+      name: "Steak",
+      position: 2,
+      price: 18,
+      availableCookingLevels: [" rare ", "medium"],
+      defaultCookingLevel: "medium",
+    });
+    expect(product.availableCookingLevels).toEqual(["rare", "medium"]);
+    expect(product.defaultCookingLevel).toBe("medium");
+  });
+
+  it("rejects invalid cooking levels", async () => {
+    const invalid = (extra) =>
+      createProduct(validationCategory.id, {
+        name: "Invalid",
+        position: 9,
+        price: 1,
+        ...extra,
+      });
+
+    await expect(invalid({ availableCookingLevels: "rare" })).rejects.toThrow(
+      "Product cooking levels must be an array",
+    );
+    await expect(invalid({ availableCookingLevels: ["rare", " "] })).rejects.toThrow(
+      "Product cooking levels must not contain blank values",
+    );
+    await expect(
+      invalid({ availableCookingLevels: ["rare", "rare"] }),
+    ).rejects.toThrow("Product cooking levels must not contain duplicates");
+    await expect(invalid({ defaultCookingLevel: "rare" })).rejects.toThrow(
+      "Product default cooking level must be one of the available cooking levels",
+    );
+    await expect(
+      invalid({ availableCookingLevels: ["rare"], defaultCookingLevel: "well" }),
+    ).rejects.toThrow(
+      "Product default cooking level must be one of the available cooking levels",
+    );
+  });
+
+  it("rejects invalid optional fields and availability", async () => {
+    const invalid = (extra) =>
+      createProduct(validationCategory.id, {
+        name: "Invalid",
+        position: 9,
+        price: 1,
+        ...extra,
+      });
+
+    await expect(invalid({ description: 5 })).rejects.toThrow(
+      "Product description must be text",
+    );
+    await expect(invalid({ imageUrl: 5 })).rejects.toThrow(
+      "Product image URL must be text",
+    );
+    await expect(invalid({ ingredients: ["tomato", ""] })).rejects.toThrow(
+      "Product ingredients must not contain blank values",
+    );
+    await expect(invalid({ isAvailable: "yes" })).rejects.toThrow(
+      "Product availability must be a boolean",
+    );
+  });
+});
+
+describe("validateProductCookingLevels", () => {
+  it("normalizes levels and treats empty levels as none", () => {
+    expect(
+      validateProductCookingLevels({
+        availableCookingLevels: [" rare "],
+        defaultCookingLevel: " rare ",
+      }),
+    ).toEqual({ availableCookingLevels: ["rare"], defaultCookingLevel: "rare" });
+    expect(validateProductCookingLevels({ availableCookingLevels: [] })).toEqual({
+      availableCookingLevels: null,
+      defaultCookingLevel: null,
+    });
+  });
+});
+
 describe("product reading", () => {
   let readCategory;
 
@@ -199,6 +311,7 @@ describe("product reading", () => {
 describe("updateProductById", () => {
   let updateCategory;
   let product;
+  let nextPosition = 1;
 
   beforeAll(async () => {
     updateCategory = await createCategory(category.menuId, "Updates", 4);
@@ -207,7 +320,7 @@ describe("updateProductById", () => {
   beforeEach(async () => {
     product = await createProduct(updateCategory.id, {
       name: "Original",
-      position: 1,
+      position: nextPosition++,
       description: "Desc",
       price: 5,
     });
@@ -229,9 +342,9 @@ describe("updateProductById", () => {
   });
 
   it("updates position and availability", async () => {
-    await updateProductById(product.id, { position: 3, isAvailable: false });
+    await updateProductById(product.id, { position: 100, isAvailable: false });
     const updated = await getProductById(product.id);
-    expect(updated.position).toBe(3);
+    expect(updated.position).toBe(100);
     expect(updated.isAvailable).toBe(false);
     expect(updated.name).toBe("Original");
   });
@@ -258,6 +371,51 @@ describe("updateProductById", () => {
     await expect(
       updateProductById(product.id, { price: null }),
     ).rejects.toThrow("Product price is required when there are no sizes");
+  });
+
+  it("rejects a position used by another product but keeps its own", async () => {
+    const other = await createProduct(updateCategory.id, {
+      name: "Other",
+      position: nextPosition++,
+      price: 1,
+    });
+    await expect(
+      updateProductById(product.id, { position: other.position }),
+    ).rejects.toThrow("Product position is already in use");
+    await updateProductById(product.id, { position: product.position });
+  });
+
+  it("validates cooking levels on the merged result", async () => {
+    await updateProductById(product.id, {
+      availableCookingLevels: ["rare", "medium"],
+      defaultCookingLevel: "rare",
+    });
+    await expect(
+      updateProductById(product.id, { defaultCookingLevel: "well" }),
+    ).rejects.toThrow(
+      "Product default cooking level must be one of the available cooking levels",
+    );
+    await expect(
+      updateProductById(product.id, { availableCookingLevels: ["medium"] }),
+    ).rejects.toThrow(
+      "Product default cooking level must be one of the available cooking levels",
+    );
+    await updateProductById(product.id, {
+      availableCookingLevels: null,
+      defaultCookingLevel: null,
+    });
+    const updated = await getProductById(product.id);
+    expect(updated.availableCookingLevels).toBeNull();
+    expect(updated.defaultCookingLevel).toBeNull();
+  });
+
+  it("rejects invalid optional field types", async () => {
+    await expect(
+      updateProductById(product.id, { description: 5 }),
+    ).rejects.toThrow("Product description must be text");
+    await expect(
+      updateProductById(product.id, { ingredients: "tomato" }),
+    ).rejects.toThrow("Product ingredients must be an array");
   });
 
   it("does not change the category", async () => {

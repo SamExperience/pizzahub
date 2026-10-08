@@ -54,6 +54,97 @@ export const validateProductPricing = ({ sizes, price }) => {
   return { sizes: null, price };
 };
 
+const validateProductName = (name) => {
+  if (typeof name !== "string" || !name.trim())
+    throw new Error("Product name is required");
+
+  return name.trim();
+};
+
+const validateProductAvailability = (isAvailable) => {
+  if (typeof isAvailable !== "boolean")
+    throw new Error("Product availability must be a boolean");
+
+  return isAvailable;
+};
+
+const validateProductPositionFormat = (position) => {
+  if (!Number.isInteger(position) || position < 1)
+    throw new Error("Product position must be a positive integer");
+
+  return position;
+};
+
+// Position is unique within a category. `excludeProductId` lets a product
+// keep its own position on update.
+const validateProductPositionUnique = async (
+  categoryId,
+  position,
+  excludeProductId = null,
+) => {
+  const siblings = await getProductsByCategoryId(categoryId);
+
+  if (
+    siblings.some(
+      (product) =>
+        product.id !== excludeProductId && product.position === position,
+    )
+  )
+    throw new Error("Product position is already in use");
+};
+
+const normalizeStringList = (value, label) => {
+  if (value === null || value === undefined) return null;
+
+  if (!Array.isArray(value)) throw new Error(`Product ${label} must be an array`);
+
+  const items = value.map((item) => {
+    const text = typeof item === "string" ? item.trim() : "";
+    if (!text) throw new Error(`Product ${label} must not contain blank values`);
+    return text;
+  });
+
+  if (new Set(items).size !== items.length)
+    throw new Error(`Product ${label} must not contain duplicates`);
+
+  return items.length > 0 ? items : null;
+};
+
+// Returns the normalized { availableCookingLevels, defaultCookingLevel } pair.
+// A default level requires levels and must be one of them.
+export const validateProductCookingLevels = ({
+  availableCookingLevels,
+  defaultCookingLevel,
+}) => {
+  const levels = normalizeStringList(
+    availableCookingLevels,
+    "cooking levels",
+  );
+
+  if (defaultCookingLevel === null || defaultCookingLevel === undefined)
+    return { availableCookingLevels: levels, defaultCookingLevel: null };
+
+  const defaultLevel =
+    typeof defaultCookingLevel === "string" ? defaultCookingLevel.trim() : "";
+
+  if (!defaultLevel) throw new Error("Product default cooking level is invalid");
+
+  if (!levels || !levels.includes(defaultLevel))
+    throw new Error(
+      "Product default cooking level must be one of the available cooking levels",
+    );
+
+  return { availableCookingLevels: levels, defaultCookingLevel: defaultLevel };
+};
+
+const validateOptionalText = (value, label) => {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value !== "string") throw new Error(`Product ${label} must be text`);
+
+  return value;
+};
+
 export const createProduct = async (categoryId, data) => {
   if (!categoryId) throw new Error("Category ID is required");
 
@@ -63,30 +154,30 @@ export const createProduct = async (categoryId, data) => {
   const categorySnap = await getDoc(doc(db, "categories", categoryId));
   if (!categorySnap.exists()) throw new Error("Category not found");
 
-  if (typeof data.name !== "string" || !data.name.trim())
-    throw new Error("Product name is required");
-
-  if (!Number.isInteger(data.position) || data.position < 1)
-    throw new Error("Product position must be a positive integer");
-
-  const isAvailable = data.isAvailable ?? true;
-  if (typeof isAvailable !== "boolean")
-    throw new Error("Product availability must be a boolean");
-
+  const name = validateProductName(data.name);
+  const position = validateProductPositionFormat(data.position);
+  const isAvailable = validateProductAvailability(data.isAvailable ?? true);
   const { sizes, price } = validateProductPricing(data);
+  const { availableCookingLevels, defaultCookingLevel } =
+    validateProductCookingLevels(data);
+  const description = validateOptionalText(data.description, "description");
+  const imageUrl = validateOptionalText(data.imageUrl, "image URL");
+  const ingredients = normalizeStringList(data.ingredients, "ingredients");
+
+  await validateProductPositionUnique(categoryId, position);
 
   const productData = {
     categoryId,
-    name: data.name.trim(),
-    description: data.description ?? null,
-    ingredients: data.ingredients ?? null,
+    name,
+    description,
+    ingredients,
     sizes,
     price,
-    availableCookingLevels: data.availableCookingLevels ?? null,
-    defaultCookingLevel: data.defaultCookingLevel ?? null,
+    availableCookingLevels,
+    defaultCookingLevel,
     isAvailable,
-    imageUrl: data.imageUrl ?? null,
-    position: data.position,
+    imageUrl,
+    position,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -100,21 +191,17 @@ export const createProduct = async (categoryId, data) => {
   };
 };
 
-const OPTIONAL_UPDATE_FIELDS = [
-  "description",
-  "ingredients",
-  "availableCookingLevels",
-  "defaultCookingLevel",
-  "imageUrl",
-];
-
 const UPDATABLE_FIELDS = [
   "name",
   "position",
   "isAvailable",
   "sizes",
   "price",
-  ...OPTIONAL_UPDATE_FIELDS,
+  "description",
+  "ingredients",
+  "availableCookingLevels",
+  "defaultCookingLevel",
+  "imageUrl",
 ];
 
 export const updateProductById = async (productId, data) => {
@@ -134,26 +221,23 @@ export const updateProductById = async (productId, data) => {
   const currentProduct = productSnap.data();
   const updates = {};
 
-  if (has("name")) {
-    if (typeof data.name !== "string" || !data.name.trim())
-      throw new Error("Product name is required");
-
-    updates.name = data.name.trim();
-  }
+  if (has("name")) updates.name = validateProductName(data.name);
 
   if (has("position")) {
-    if (!Number.isInteger(data.position) || data.position < 1)
-      throw new Error("Product position must be a positive integer");
+    const position = validateProductPositionFormat(data.position);
 
-    updates.position = data.position;
+    if (position !== currentProduct.position)
+      await validateProductPositionUnique(
+        currentProduct.categoryId,
+        position,
+        productId,
+      );
+
+    updates.position = position;
   }
 
-  if (has("isAvailable")) {
-    if (typeof data.isAvailable !== "boolean")
-      throw new Error("Product availability must be a boolean");
-
-    updates.isAvailable = data.isAvailable;
-  }
+  if (has("isAvailable"))
+    updates.isAvailable = validateProductAvailability(data.isAvailable);
 
   // Pricing is validated on the merged result so the A1 rule always holds.
   if (has("sizes") || has("price")) {
@@ -166,9 +250,28 @@ export const updateProductById = async (productId, data) => {
     updates.price = price;
   }
 
-  OPTIONAL_UPDATE_FIELDS.filter(has).forEach((field) => {
-    updates[field] = data[field] ?? null;
-  });
+  // Cooking levels are validated on the merged result as well.
+  if (has("availableCookingLevels") || has("defaultCookingLevel")) {
+    const cookingLevels = validateProductCookingLevels({
+      availableCookingLevels: has("availableCookingLevels")
+        ? data.availableCookingLevels
+        : currentProduct.availableCookingLevels,
+      defaultCookingLevel: has("defaultCookingLevel")
+        ? data.defaultCookingLevel
+        : currentProduct.defaultCookingLevel,
+    });
+
+    Object.assign(updates, cookingLevels);
+  }
+
+  if (has("description"))
+    updates.description = validateOptionalText(data.description, "description");
+
+  if (has("imageUrl"))
+    updates.imageUrl = validateOptionalText(data.imageUrl, "image URL");
+
+  if (has("ingredients"))
+    updates.ingredients = normalizeStringList(data.ingredients, "ingredients");
 
   await updateDoc(productRef, {
     ...updates,
