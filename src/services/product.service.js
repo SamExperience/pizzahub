@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 
@@ -97,7 +98,83 @@ export const createProduct = async (categoryId, data) => {
   };
 };
 
-export const getProductsByCategoryId = async (categoryId) => {
+const OPTIONAL_UPDATE_FIELDS = [
+  "description",
+  "ingredients",
+  "availableCookingLevels",
+  "defaultCookingLevel",
+  "imageUrl",
+];
+
+const UPDATABLE_FIELDS = [
+  "name",
+  "position",
+  "isAvailable",
+  "sizes",
+  "price",
+  ...OPTIONAL_UPDATE_FIELDS,
+];
+
+export const updateProductById = async (productId, data) => {
+  if (!productId) throw new Error("Product ID is required");
+
+  if (!data || typeof data !== "object")
+    throw new Error("Product data is required");
+
+  const has = (field) => Object.prototype.hasOwnProperty.call(data, field);
+
+  if (!UPDATABLE_FIELDS.some(has)) throw new Error("Nothing to update");
+
+  const productRef = doc(db, "products", productId);
+  const productSnap = await getDoc(productRef);
+  if (!productSnap.exists()) throw new Error("Product not found");
+
+  const currentProduct = productSnap.data();
+  const updates = {};
+
+  if (has("name")) {
+    if (typeof data.name !== "string" || !data.name.trim())
+      throw new Error("Product name is required");
+
+    updates.name = data.name.trim();
+  }
+
+  if (has("position")) {
+    if (!Number.isInteger(data.position) || data.position < 1)
+      throw new Error("Product position must be a positive integer");
+
+    updates.position = data.position;
+  }
+
+  if (has("isAvailable")) {
+    if (typeof data.isAvailable !== "boolean")
+      throw new Error("Product availability must be a boolean");
+
+    updates.isAvailable = data.isAvailable;
+  }
+
+  // Pricing is validated on the merged result so the A1 rule always holds.
+  if (has("sizes") || has("price")) {
+    const { sizes, price } = validateProductPricing({
+      sizes: has("sizes") ? data.sizes : currentProduct.sizes,
+      price: has("price") ? data.price : currentProduct.price,
+    });
+
+    updates.sizes = sizes;
+    updates.price = price;
+  }
+
+  OPTIONAL_UPDATE_FIELDS.filter(has).forEach((field) => {
+    updates[field] = data[field] ?? null;
+  });
+
+  await updateDoc(productRef, {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getProductsByCategoryId =async (categoryId) => {
   if (!categoryId) throw new Error("Category ID is required");
 
   const q = query(

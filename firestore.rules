@@ -126,6 +126,20 @@ service cloud.firestore {
           get(
             /databases/$(database)/documents/users/$(request.auth.uid)
           ).data.storeId;
+
+      // Minimal update rule: same store, category cannot change.
+      allow update: if request.auth != null
+        && request.resource.data.categoryId == resource.data.categoryId
+        && get(
+          /databases/$(database)/documents/menus/$(
+            get(
+              /databases/$(database)/documents/categories/$(resource.data.categoryId)
+            ).data.menuId
+          )
+        ).data.storeId ==
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.storeId;
     }
   }
 }

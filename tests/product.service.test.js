@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { register } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { createMenu } from "../src/services/menu.service";
@@ -7,6 +7,7 @@ import {
   createProduct,
   getProductById,
   getProductsByCategoryId,
+  updateProductById,
   validateProductPricing,
 } from "../src/services/product.service";
 
@@ -187,5 +188,103 @@ describe("product reading", () => {
     );
     await expect(getProductById("")).rejects.toThrow("Product ID is required");
     await expect(getProductById("unknown-product")).rejects.toThrow();
+  });
+});
+
+describe("updateProductById", () => {
+  let updateCategory;
+  let product;
+
+  beforeAll(async () => {
+    updateCategory = await createCategory(category.menuId, "Updates", 4);
+  });
+
+  beforeEach(async () => {
+    product = await createProduct(updateCategory.id, {
+      name: "Original",
+      position: 1,
+      description: "Desc",
+      price: 5,
+    });
+  });
+
+  it("updates name and description and refreshes updatedAt", async () => {
+    await updateProductById(product.id, {
+      name: " Renamed ",
+      description: "New",
+    });
+    const updated = await getProductById(product.id);
+    expect(updated.name).toBe("Renamed");
+    expect(updated.description).toBe("New");
+    expect(updated.price).toBe(5);
+    expect(updated.categoryId).toBe(updateCategory.id);
+    expect(updated.updatedAt.toMillis()).toBeGreaterThanOrEqual(
+      updated.createdAt.toMillis(),
+    );
+  });
+
+  it("updates position and availability", async () => {
+    await updateProductById(product.id, { position: 3, isAvailable: false });
+    const updated = await getProductById(product.id);
+    expect(updated.position).toBe(3);
+    expect(updated.isAvailable).toBe(false);
+    expect(updated.name).toBe("Original");
+  });
+
+  it("switches between price and sizes", async () => {
+    await updateProductById(product.id, {
+      sizes: [{ name: " Large ", price: 9 }],
+      price: null,
+    });
+    let updated = await getProductById(product.id);
+    expect(updated.sizes).toEqual([{ name: "Large", price: 9 }]);
+    expect(updated.price).toBeNull();
+
+    await updateProductById(product.id, { sizes: null, price: 7 });
+    updated = await getProductById(product.id);
+    expect(updated.sizes).toBeNull();
+    expect(updated.price).toBe(7);
+  });
+
+  it("rejects invalid pricing combinations", async () => {
+    await expect(
+      updateProductById(product.id, { sizes: [{ name: "S", price: 1 }] }),
+    ).rejects.toThrow("Product price must be null when sizes are defined");
+    await expect(
+      updateProductById(product.id, { price: null }),
+    ).rejects.toThrow("Product price is required when there are no sizes");
+  });
+
+  it("does not change the category", async () => {
+    await updateProductById(product.id, {
+      categoryId: "other-category",
+      name: "Same category",
+    });
+    const updated = await getProductById(product.id);
+    expect(updated.categoryId).toBe(updateCategory.id);
+  });
+
+  it("rejects invalid input", async () => {
+    await expect(updateProductById("", { name: "X" })).rejects.toThrow(
+      "Product ID is required",
+    );
+    await expect(updateProductById(product.id, null)).rejects.toThrow(
+      "Product data is required",
+    );
+    await expect(updateProductById(product.id, {})).rejects.toThrow(
+      "Nothing to update",
+    );
+    await expect(
+      updateProductById(product.id, { name: "  " }),
+    ).rejects.toThrow("Product name is required");
+    await expect(
+      updateProductById(product.id, { position: 0 }),
+    ).rejects.toThrow("Product position must be a positive integer");
+    await expect(
+      updateProductById(product.id, { isAvailable: "yes" }),
+    ).rejects.toThrow("Product availability must be a boolean");
+    await expect(
+      updateProductById("unknown-product", { name: "X" }),
+    ).rejects.toThrow();
   });
 });
