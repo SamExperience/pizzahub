@@ -9,6 +9,14 @@ import {
   updateProductById,
   uploadProductImage,
 } from "../services/product.service";
+import {
+  alert,
+  button,
+  card,
+  dangerButton,
+  muted,
+  primaryButton,
+} from "../utils/styles";
 import ProductForm from "./ProductForm";
 
 const formatPrice = (value) => `€${value.toFixed(2)}`;
@@ -35,53 +43,84 @@ function ProductRow({
   };
 
   return (
-    <li>
-      <strong>{product.name}</strong> {formatPricing(product)}
-      {!available && <em> Unavailable</em>}
+    <li className={`${card} flex gap-4 ${available ? "" : "opacity-70"}`}>
       {product.imageUrl && (
-        <img src={product.imageUrl} alt={product.name} width="80" />
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className="size-20 shrink-0 rounded-lg object-cover"
+        />
       )}
-      {product.description && <p>{product.description}</p>}
-      {Array.isArray(product.ingredients) && product.ingredients.length > 0 && (
-        <p>Ingredients: {product.ingredients.join(", ")}</p>
-      )}
-      <button
-        type="button"
-        aria-label={`Move ${product.name} up`}
-        disabled={isFirst}
-        onClick={() => onMove(product.id, "up")}
-      >
-        Up
-      </button>
-      <button
-        type="button"
-        aria-label={`Move ${product.name} down`}
-        disabled={isLast}
-        onClick={() => onMove(product.id, "down")}
-      >
-        Down
-      </button>
-      <button
-        type="button"
-        aria-label={`Edit ${product.name}`}
-        onClick={() => onEdit(product.id)}
-      >
-        Edit
-      </button>
-      <button
-        type="button"
-        aria-label={`${available ? "Mark unavailable" : "Mark available"} ${product.name}`}
-        onClick={() => onToggleAvailability(product.id, !available)}
-      >
-        {available ? "Mark unavailable" : "Mark available"}
-      </button>
-      <button
-        type="button"
-        aria-label={`Delete ${product.name}`}
-        onClick={handleDelete}
-      >
-        Delete
-      </button>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <strong className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+            {product.name}
+          </strong>{" "}
+          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+            {formatPricing(product)}
+          </span>
+          {!available && (
+            <em className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+              Unavailable
+            </em>
+          )}
+        </div>
+        {product.description && (
+          <p className="text-sm text-neutral-700 dark:text-neutral-300">
+            {product.description}
+          </p>
+        )}
+        {Array.isArray(product.ingredients) &&
+          product.ingredients.length > 0 && (
+            <p className={muted}>
+              Ingredients: {product.ingredients.join(", ")}
+            </p>
+          )}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            aria-label={`Move ${product.name} up`}
+            className={button}
+            disabled={isFirst}
+            onClick={() => onMove(product.id, "up")}
+          >
+            Up
+          </button>
+          <button
+            type="button"
+            aria-label={`Move ${product.name} down`}
+            className={button}
+            disabled={isLast}
+            onClick={() => onMove(product.id, "down")}
+          >
+            Down
+          </button>
+          <button
+            type="button"
+            aria-label={`Edit ${product.name}`}
+            className={button}
+            onClick={() => onEdit(product.id)}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            aria-label={`${available ? "Mark unavailable" : "Mark available"} ${product.name}`}
+            className={button}
+            onClick={() => onToggleAvailability(product.id, !available)}
+          >
+            {available ? "Mark unavailable" : "Mark available"}
+          </button>
+          <button
+            type="button"
+            aria-label={`Delete ${product.name}`}
+            className={dangerButton}
+            onClick={handleDelete}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </li>
   );
 }
@@ -216,30 +255,43 @@ export default function ProductList({
   };
 
   return (
-    <div>
-      <h2>{categoryName}</h2>
-      {!loading && !error && !showForm && editingId === null && (
-        <button type="button" onClick={() => setShowForm(true)}>
-          Add product
-        </button>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="m-0 truncate text-2xl font-semibold">{categoryName}</h2>
+        {!loading && !error && !showForm && editingId === null && (
+          <button
+            type="button"
+            className={primaryButton}
+            onClick={() => setShowForm(true)}
+          >
+            Add product
+          </button>
+        )}
+      </div>
+      {actionError && (
+        <p role="alert" className={alert}>
+          {actionError.message}
+        </p>
       )}
-      {actionError && <p role="alert">{actionError.message}</p>}
       {showForm && <ProductForm onSubmit={handleCreate} onCancel={closeForm} />}
-      {loading && <p>Loading ...</p>}
+      {loading && <p className={muted}>Loading ...</p>}
       {error && (
-        <p>
+        <p className={`${alert} flex flex-wrap items-center gap-3`}>
           Unable to load the products.
-          <br />
-          <button type="button" onClick={handleRetry}>
+          <button type="button" className={button} onClick={handleRetry}>
             Try again
           </button>
         </p>
       )}
       {!loading && !error && products.length === 0 && (
-        <p>No products in this category yet.</p>
+        <p
+          className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center dark:border-neutral-700 ${muted}`}
+        >
+          No products in this category yet.
+        </p>
       )}
       {!loading && !error && products.length > 0 && (
-        <ul>
+        <ul className="flex flex-col gap-3">
           {products.map((product, index) =>
             product.id === editingId ? (
               <li key={product.id}>

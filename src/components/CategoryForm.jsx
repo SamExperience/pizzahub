@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { input, primaryButton } from "../utils/styles";
 
 // `onSubmit` resolves to true when the category was saved.
 export default function CategoryForm({ onSubmit }) {
@@ -14,15 +15,20 @@ export default function CategoryForm({ onSubmit }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="flex gap-2">
       <input
         type="text"
         aria-label="New category name"
         placeholder="New category"
+        className={input}
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
-      <button type="submit" disabled={!name.trim()}>
+      <button
+        type="submit"
+        className={`${primaryButton} shrink-0`}
+        disabled={!name.trim()}
+      >
         Add category
       </button>
     </form>

@@ -11,6 +11,7 @@ import {
   updateCategoryById,
 } from "../services/category.service";
 import { createMenu, getMenuByStoreId } from "../services/menu.service";
+import { alert, button, card, muted } from "../utils/styles";
 
 // Loads the Store's Menu (creating it on first access) and its categories.
 const loadMenu = async (store) => {
@@ -99,22 +100,26 @@ export default function Menu() {
     null;
 
   return (
-    <div>
-      <h1>Menu</h1>
-      {loading && <p>Loading ...</p>}
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 text-left">
+      <h1 className="mt-0 mb-6 text-3xl font-semibold tracking-tight">Menu</h1>
+      {loading && <p className={muted}>Loading ...</p>}
       {error && (
-        <p>
+        <p className={`${alert} flex flex-wrap items-center gap-3`}>
           Unable to load the menu.
-          <br />
-          <button type="button" onClick={handleRetry}>
+          <button type="button" className={button} onClick={handleRetry}>
             Try again
           </button>
         </p>
       )}
       {!loading && !error && (
-        <div className="menu-layout">
-          <aside className="menu-sidebar">
-            {actionError && <p role="alert">{actionError.message}</p>}
+        <div className="grid items-start gap-6 md:grid-cols-[18rem_1fr]">
+          <aside className={`${card} flex flex-col gap-4`}>
+            <h2 className="m-0 text-base font-semibold">Categories</h2>
+            {actionError && (
+              <p role="alert" className={alert}>
+                {actionError.message}
+              </p>
+            )}
             <CategoryForm onSubmit={handleCreate} />
             <CategoryList
               categories={categories}
@@ -125,7 +130,7 @@ export default function Menu() {
               onMove={handleMove}
             />
           </aside>
-          <section className="menu-main">
+          <section className="min-w-0">
             {selectedCategory ? (
               <ProductList
                 key={selectedCategory.id}
@@ -135,7 +140,11 @@ export default function Menu() {
                 onChange={refreshMenuReady}
               />
             ) : (
-              <p>Create a category to start adding products.</p>
+              <p
+                className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center dark:border-neutral-700 ${muted}`}
+              >
+                Create a category to start adding products.
+              </p>
             )}
           </section>
         </div>
