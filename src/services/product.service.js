@@ -11,7 +11,12 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { deleteObject, ref } from "firebase/storage";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 
 import { db, storage } from "./firebase";
 
@@ -93,6 +98,23 @@ const validateProductPositionUnique = async (
     throw new Error("Product position is already in use");
 };
 
+// Name is unique within a category (exact, case-sensitive match, as for
+// category names). `excludeProductId` lets a product keep its own name.
+const validateProductNameUnique = async (
+  categoryId,
+  name,
+  excludeProductId = null,
+) => {
+  const siblings = await getProductsByCategoryId(categoryId);
+
+  if (
+    siblings.some(
+      (product) => product.id !== excludeProductId && product.name === name,
+    )
+  )
+    throw new Error("Product name already exists");
+};
+
 const normalizeStringList = (value, label) => {
   if (value === null || value === undefined) return null;
 
@@ -111,7 +133,8 @@ const normalizeStringList = (value, label) => {
 };
 
 // Returns the normalized { availableCookingLevels, defaultCookingLevel } pair.
-// A default level requires levels and must be one of them.
+// Levels and default go together: without levels both are null; with levels
+// the default is required and must be one of them.
 export const validateProductCookingLevels = ({
   availableCookingLevels,
   defaultCookingLevel,
@@ -121,8 +144,14 @@ export const validateProductCookingLevels = ({
     "cooking levels",
   );
 
-  if (defaultCookingLevel === null || defaultCookingLevel === undefined)
-    return { availableCookingLevels: levels, defaultCookingLevel: null };
+  if (defaultCookingLevel === null || defaultCookingLevel === undefined) {
+    if (levels)
+      throw new Error(
+        "Product default cooking level is required when cooking levels are defined",
+      );
+
+    return { availableCookingLevels: null, defaultCookingLevel: null };
+  }
 
   const defaultLevel =
     typeof defaultCookingLevel === "string" ? defaultCookingLevel.trim() : "";
@@ -164,6 +193,7 @@ export const createProduct = async (categoryId, data) => {
   const imageUrl = validateOptionalText(data.imageUrl, "image URL");
   const ingredients = normalizeStringList(data.ingredients, "ingredients");
 
+  await validateProductNameUnique(categoryId, name);
   await validateProductPositionUnique(categoryId, position);
 
   const productData = {
@@ -221,7 +251,18 @@ export const updateProductById = async (productId, data) => {
   const currentProduct = productSnap.data();
   const updates = {};
 
-  if (has("name")) updates.name = validateProductName(data.name);
+  if (has("name")) {
+    const name = validateProductName(data.name);
+
+    if (name !== currentProduct.name)
+      await validateProductNameUnique(
+        currentProduct.categoryId,
+        name,
+        productId,
+      );
+
+    updates.name = name;
+  }
 
   if (has("position")) {
     const position = validateProductPositionFormat(data.position);
@@ -325,6 +366,27 @@ export const getProductById = async (productId) => {
   };
 };
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+// Uploads the product image to a fixed path, so replacing it overwrites the
+// previous file. Limits mirror storage.rules. Returns the download URL.
+export const uploadProductImage = async (storeId, productId, file) => {
+  if (!storeId) throw new Error("Store ID is required");
+  if (!productId) throw new Error("Product ID is required");
+  if (!file) throw new Error("Image file is required");
+
+  if (typeof file.type !== "string" || !file.type.startsWith("image/"))
+    throw new Error("Product image must be an image file");
+
+  if (file.size >= MAX_IMAGE_SIZE)
+    throw new Error("Product image must be smaller than 5 MB");
+
+  const imageRef = ref(storage, `products/${storeId}/${productId}`);
+  await uploadBytes(imageRef, file, { contentType: file.type });
+
+  return getDownloadURL(imageRef);
+};
+
 // Best-effort image removal: an orphaned file must never block a deletion.
 export const deleteProductImage = async (imageUrl) => {
   if (!imageUrl) return;
@@ -364,4 +426,34 @@ export const deleteProductById = async (productId) => {
   await batch.commit();
 
   await deleteProductImage(imageUrl);
+};
+
+// Swaps the position of a product with its neighbour in the category.
+// Does nothing at the first or last position.
+export const moveProductById = async (productId, direction) => {
+  if (!productId) throw new Error("Product ID is required");
+
+  if (direction !== "up" && direction !== "down")
+    throw new Error("Direction must be 'up' or 'down'");
+
+  const productSnap = await getDoc(doc(db, "products", productId));
+  if (!productSnap.exists()) throw new Error("Product not found");
+
+  const products = await getProductsByCategoryId(productSnap.data().categoryId);
+  const index = products.findIndex((product) => product.id === productId);
+  const neighbour = products[direction === "up" ? index - 1 : index + 1];
+
+  if (!neighbour) return;
+
+  const current = products[index];
+  const batch = writeBatch(db);
+  batch.update(doc(db, "products", current.id), {
+    position: neighbour.position,
+    updatedAt: serverTimestamp(),
+  });
+  batch.update(doc(db, "products", neighbour.id), {
+    position: current.position,
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
 };

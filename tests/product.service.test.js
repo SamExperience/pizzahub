@@ -12,8 +12,10 @@ import {
   deleteProductById,
   getProductById,
   getProductsByCategoryId,
+  moveProductById,
   setProductAvailability,
   updateProductById,
+  uploadProductImage,
   validateProductCookingLevels,
   validateProductPricing,
 } from "../src/services/product.service";
@@ -87,6 +89,24 @@ describe("validateProductPricing", () => {
 });
 
 describe("createProduct", () => {
+  it("rejects a duplicate name in the same category but allows other cases and categories", async () => {
+    const nameCategory = await createCategory(category.menuId, "Unique names", 90);
+    const otherCategory = await createCategory(category.menuId, "Other names", 91);
+
+    await createProduct(nameCategory.id, { name: "funghi", position: 1, price: 8 });
+
+    await expect(
+      createProduct(nameCategory.id, { name: " funghi ", position: 2, price: 8 }),
+    ).rejects.toThrow("Product name already exists");
+
+    await expect(
+      createProduct(nameCategory.id, { name: "Funghi", position: 2, price: 8 }),
+    ).resolves.toBeDefined();
+    await expect(
+      createProduct(otherCategory.id, { name: "funghi", position: 1, price: 8 }),
+    ).resolves.toBeDefined();
+  });
+
   it("creates a product with sizes and a null price", async () => {
     const product = await createProduct(category.id, {
       name: "Margherita",
@@ -235,6 +255,9 @@ describe("product validation", () => {
     ).rejects.toThrow(
       "Product default cooking level must be one of the available cooking levels",
     );
+    await expect(invalid({ availableCookingLevels: ["rare"] })).rejects.toThrow(
+      "Product default cooking level is required when cooking levels are defined",
+    );
   });
 
   it("rejects invalid optional fields and availability", async () => {
@@ -269,6 +292,9 @@ describe("validateProductCookingLevels", () => {
         defaultCookingLevel: " rare ",
       }),
     ).toEqual({ availableCookingLevels: ["rare"], defaultCookingLevel: "rare" });
+    expect(() =>
+      validateProductCookingLevels({ availableCookingLevels: ["rare"] }),
+    ).toThrow("Product default cooking level is required");
     expect(validateProductCookingLevels({ availableCookingLevels: [] })).toEqual({
       availableCookingLevels: null,
       defaultCookingLevel: null,
@@ -322,7 +348,7 @@ describe("updateProductById", () => {
 
   beforeEach(async () => {
     product = await createProduct(updateCategory.id, {
-      name: "Original",
+      name: `Original ${nextPosition}`,
       position: nextPosition++,
       description: "Desc",
       price: 5,
@@ -344,12 +370,30 @@ describe("updateProductById", () => {
     );
   });
 
+  it("rejects renaming to a name used in the category but keeps its own", async () => {
+    await createProduct(updateCategory.id, {
+      name: "Taken",
+      position: nextPosition++,
+      price: 5,
+    });
+
+    await expect(
+      updateProductById(product.id, { name: "Taken" }),
+    ).rejects.toThrow("Product name already exists");
+    await expect(
+      updateProductById(product.id, { name: product.name }),
+    ).resolves.toBeUndefined();
+    await expect(
+      updateProductById(product.id, { name: "taken" }),
+    ).resolves.toBeUndefined();
+  });
+
   it("updates position and availability", async () => {
     await updateProductById(product.id, { position: 100, isAvailable: false });
     const updated = await getProductById(product.id);
     expect(updated.position).toBe(100);
     expect(updated.isAvailable).toBe(false);
-    expect(updated.name).toBe("Original");
+    expect(updated.name).toBe(product.name);
   });
 
   it("switches between price and sizes", async () => {
@@ -613,5 +657,104 @@ describe("deleteProductById", () => {
       "Product ID is required",
     );
     await expect(deleteProductById("unknown-product")).rejects.toThrow();
+  });
+});
+
+describe("moveProductById", () => {
+  const makeProducts = async (categoryPosition, count = 3) => {
+    const cat = await createCategory(
+      category.menuId,
+      `Move ${categoryPosition}`,
+      categoryPosition,
+    );
+    const products = [];
+    for (let position = 1; position <= count; position += 1) {
+      products.push(
+        await createProduct(cat.id, {
+          name: `Product ${position}`,
+          position,
+          price: 5,
+        }),
+      );
+    }
+
+    return { cat, products };
+  };
+
+  const names = async (categoryId) =>
+    (await getProductsByCategoryId(categoryId)).map((p) => p.name);
+
+  it("moves a product up by swapping positions with its neighbour", async () => {
+    const { cat, products } = await makeProducts(40);
+
+    await moveProductById(products[2].id, "up");
+
+    expect(await names(cat.id)).toEqual(["Product 1", "Product 3", "Product 2"]);
+    const moved = await getProductsByCategoryId(cat.id);
+    expect(moved.map((p) => p.position)).toEqual([1, 2, 3]);
+  });
+
+  it("moves a product down by swapping positions with its neighbour", async () => {
+    const { cat, products } = await makeProducts(41);
+
+    await moveProductById(products[0].id, "down");
+
+    expect(await names(cat.id)).toEqual(["Product 2", "Product 1", "Product 3"]);
+  });
+
+  it("does nothing at the first and last position", async () => {
+    const { cat, products } = await makeProducts(42, 2);
+
+    await moveProductById(products[0].id, "up");
+    await moveProductById(products[1].id, "down");
+
+    expect(await names(cat.id)).toEqual(["Product 1", "Product 2"]);
+  });
+
+  it("rejects invalid input", async () => {
+    const { products } = await makeProducts(43, 1);
+
+    await expect(moveProductById("", "up")).rejects.toThrow(
+      "Product ID is required",
+    );
+    await expect(moveProductById(products[0].id, "left")).rejects.toThrow(
+      "Direction must be 'up' or 'down'",
+    );
+    await expect(moveProductById("unknown-product", "up")).rejects.toThrow();
+  });
+});
+
+describe("uploadProductImage", () => {
+  it("uploads under the store folder and returns the download URL", async () => {
+    const file = new Blob(["png"], { type: "image/png" });
+
+    const url = await uploadProductImage(storeId, "img-product", file);
+
+    expect(url).toContain(encodeURIComponent(`products/${storeId}/img-product`));
+    await deleteObject(ref(storage, url));
+  });
+
+  it("rejects missing arguments, non-image files and files of 5 MB or more", async () => {
+    const image = new Blob(["png"], { type: "image/png" });
+
+    await expect(uploadProductImage("", "p1", image)).rejects.toThrow(
+      "Store ID is required",
+    );
+    await expect(uploadProductImage(storeId, "", image)).rejects.toThrow(
+      "Product ID is required",
+    );
+    await expect(uploadProductImage(storeId, "p1", null)).rejects.toThrow(
+      "Image file is required",
+    );
+    await expect(
+      uploadProductImage(storeId, "p1", new Blob(["x"], { type: "text/plain" })),
+    ).rejects.toThrow("Product image must be an image file");
+    await expect(
+      uploadProductImage(
+        storeId,
+        "p1",
+        new Blob([new Uint8Array(5 * 1024 * 1024)], { type: "image/png" }),
+      ),
+    ).rejects.toThrow("Product image must be smaller than 5 MB");
   });
 });
