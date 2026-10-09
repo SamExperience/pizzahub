@@ -372,3 +372,33 @@ export const deleteProductById = async (productId) => {
 
   await deleteProductImage(imageUrl);
 };
+
+// Swaps the position of a product with its neighbour in the category.
+// Does nothing at the first or last position.
+export const moveProductById = async (productId, direction) => {
+  if (!productId) throw new Error("Product ID is required");
+
+  if (direction !== "up" && direction !== "down")
+    throw new Error("Direction must be 'up' or 'down'");
+
+  const productSnap = await getDoc(doc(db, "products", productId));
+  if (!productSnap.exists()) throw new Error("Product not found");
+
+  const products = await getProductsByCategoryId(productSnap.data().categoryId);
+  const index = products.findIndex((product) => product.id === productId);
+  const neighbour = products[direction === "up" ? index - 1 : index + 1];
+
+  if (!neighbour) return;
+
+  const current = products[index];
+  const batch = writeBatch(db);
+  batch.update(doc(db, "products", current.id), {
+    position: neighbour.position,
+    updatedAt: serverTimestamp(),
+  });
+  batch.update(doc(db, "products", neighbour.id), {
+    position: current.position,
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+};

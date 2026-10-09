@@ -6,6 +6,7 @@ import {
   createProduct,
   deleteProductById,
   getProductsByCategoryId,
+  moveProductById,
   setProductAvailability,
   updateProductById,
 } from "../src/services/product.service";
@@ -14,6 +15,7 @@ vi.mock("../src/services/product.service", () => ({
   createProduct: vi.fn(),
   deleteProductById: vi.fn(),
   getProductsByCategoryId: vi.fn(),
+  moveProductById: vi.fn(),
   setProductAvailability: vi.fn(),
   updateProductById: vi.fn(),
 }));
@@ -309,6 +311,56 @@ describe("ProductList", () => {
         "Product not found",
       );
       expect(screen.getByText("Margherita")).toBeTruthy();
+    });
+
+    it("moves a product and refreshes the list", async () => {
+      getProductsByCategoryId
+        .mockResolvedValueOnce(existing)
+        .mockResolvedValueOnce([existing[1], existing[0]]);
+      moveProductById.mockResolvedValue();
+
+      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Move Diavola up" }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("listitem")[0].textContent,
+        ).toContain("Diavola"),
+      );
+      expect(moveProductById).toHaveBeenCalledWith("p2", "up");
+    });
+
+    it("disables moving the first product up and the last one down", async () => {
+      getProductsByCategoryId.mockResolvedValue(existing);
+
+      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+
+      expect(
+        (await screen.findByRole("button", { name: "Move Margherita up" }))
+          .disabled,
+      ).toBe(true);
+      expect(
+        screen.getByRole("button", { name: "Move Diavola down" }).disabled,
+      ).toBe(true);
+      expect(
+        screen.getByRole("button", { name: "Move Margherita down" }).disabled,
+      ).toBe(false);
+    });
+
+    it("shows the error when moving fails", async () => {
+      getProductsByCategoryId.mockResolvedValue(existing);
+      moveProductById.mockRejectedValue(new Error("Product not found"));
+
+      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Move Diavola up" }),
+      );
+
+      expect((await screen.findByRole("alert")).textContent).toBe(
+        "Product not found",
+      );
     });
 
     it("toggles the availability to the opposite value", async () => {

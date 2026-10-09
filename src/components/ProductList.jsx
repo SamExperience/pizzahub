@@ -3,6 +3,7 @@ import {
   createProduct,
   deleteProductById,
   getProductsByCategoryId,
+  moveProductById,
   setProductAvailability,
   updateProductById,
 } from "../services/product.service";
@@ -16,7 +17,15 @@ const formatPricing = ({ price, sizes }) =>
     ? sizes.map((size) => `${size.name}: ${formatPrice(size.price)}`).join(" · ")
     : formatPrice(price);
 
-function ProductRow({ product, onEdit, onDelete, onToggleAvailability }) {
+function ProductRow({
+  product,
+  isFirst,
+  isLast,
+  onMove,
+  onEdit,
+  onDelete,
+  onToggleAvailability,
+}) {
   const available = product.isAvailable !== false;
 
   const handleDelete = () => {
@@ -31,6 +40,22 @@ function ProductRow({ product, onEdit, onDelete, onToggleAvailability }) {
       {Array.isArray(product.ingredients) && product.ingredients.length > 0 && (
         <p>Ingredients: {product.ingredients.join(", ")}</p>
       )}
+      <button
+        type="button"
+        aria-label={`Move ${product.name} up`}
+        disabled={isFirst}
+        onClick={() => onMove(product.id, "up")}
+      >
+        Up
+      </button>
+      <button
+        type="button"
+        aria-label={`Move ${product.name} down`}
+        disabled={isLast}
+        onClick={() => onMove(product.id, "down")}
+      >
+        Down
+      </button>
       <button
         type="button"
         aria-label={`Edit ${product.name}`}
@@ -120,6 +145,8 @@ export default function ProductList({ categoryId, categoryName }) {
     if (saved) setEditingId(null);
   };
 
+  const handleMove = (productId, direction) =>
+    runAction(() => moveProductById(productId, direction));
   const handleDelete = (productId) =>
     runAction(() => deleteProductById(productId));
   const handleToggleAvailability = (productId, isAvailable) =>
@@ -162,7 +189,7 @@ export default function ProductList({ categoryId, categoryName }) {
       )}
       {!loading && !error && products.length > 0 && (
         <ul>
-          {products.map((product) =>
+          {products.map((product, index) =>
             product.id === editingId ? (
               <li key={product.id}>
                 <ProductForm
@@ -175,6 +202,9 @@ export default function ProductList({ categoryId, categoryName }) {
               <ProductRow
                 key={product.id}
                 product={product}
+                isFirst={index === 0}
+                isLast={index === products.length - 1}
+                onMove={handleMove}
                 onEdit={openEdit}
                 onDelete={handleDelete}
                 onToggleAvailability={handleToggleAvailability}
