@@ -53,6 +53,22 @@ describe("TableauBoard", () => {
     expect(screen.queryByText("Pending")).toBeNull();
   });
 
+  it("shows a Create Ticket button that calls onCreateTicket", async () => {
+    const onCreateTicket = vi.fn();
+    render(<TableauBoard onCreateTicket={onCreateTicket} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create Ticket" }),
+    );
+    expect(onCreateTicket).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the Create Ticket button when orders are present", () => {
+    render(<TableauBoard orders={[{ id: "a", status: "Pending" }]} />);
+
+    expect(screen.getByRole("button", { name: "Create Ticket" })).toBeTruthy();
+  });
+
   it("shows the error with a working retry button", async () => {
     const onRetry = vi.fn();
     render(<TableauBoard error={new Error("boom")} onRetry={onRetry} />);

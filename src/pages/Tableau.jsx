@@ -52,6 +52,8 @@ export default function Tableau() {
       loading={loading}
       error={error}
       onRetry={() => setRetryKey((key) => key + 1)}
+      // Entry point only: milestone 9 opens the ticket creation sidebar here.
+      onCreateTicket={() => {}}
     />
   );
 }
