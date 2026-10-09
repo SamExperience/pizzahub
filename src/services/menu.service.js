@@ -2,11 +2,13 @@ import {
   addDoc,
   collection,
   getDocs,
+  limit,
   query,
   serverTimestamp,
   where,
 } from "firebase/firestore";
 
+import { getCategoriesByMenuId } from "./category.service";
 import { db } from "./firebase";
 
 export const getMenuByStoreId = async (storeId) => {
@@ -46,4 +48,24 @@ export const createMenu = async (storeId, nameMenu) => {
     id: menuSnap.id,
     ...data,
   };
+};
+
+// A Menu is ready when at least one Category holds at least one Product.
+export const isMenuReady = async (storeId) => {
+  const menu = await getMenuByStoreId(storeId);
+  if (!menu) return false;
+
+  const categories = await getCategoriesByMenuId(menu.id);
+
+  for (const category of categories) {
+    const q = query(
+      collection(db, "products"),
+      where("categoryId", "==", category.id),
+      limit(1),
+    );
+
+    if (!(await getDocs(q)).empty) return true;
+  }
+
+  return false;
 };

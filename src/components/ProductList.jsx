@@ -87,7 +87,12 @@ function ProductRow({
 }
 
 // Products of one category ordered by position, with a form to add new ones.
-export default function ProductList({ storeId, categoryId, categoryName }) {
+export default function ProductList({
+  storeId,
+  categoryId,
+  categoryName,
+  onChange,
+}) {
   const [products, setProducts] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -146,6 +151,8 @@ export default function ProductList({ storeId, categoryId, categoryName }) {
         succeeded = false;
       }
     }
+
+    onChange?.();
 
     return succeeded;
   };

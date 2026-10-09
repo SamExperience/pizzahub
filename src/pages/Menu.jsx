@@ -22,7 +22,7 @@ const loadMenu = async (store) => {
 };
 
 export default function Menu() {
-  const { selectedStore } = useStore();
+  const { selectedStore, refreshMenuReady } = useStore();
   const [menuId, setMenuId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -73,6 +73,7 @@ export default function Menu() {
     try {
       await action();
       setCategories(await getCategoriesByMenuId(menuId));
+      refreshMenuReady();
       return true;
     } catch (err) {
       console.log("Error updating categories -> ", err);
@@ -131,6 +132,7 @@ export default function Menu() {
                 storeId={selectedStore.id}
                 categoryId={selectedCategory.id}
                 categoryName={selectedCategory.name}
+                onChange={refreshMenuReady}
               />
             ) : (
               <p>Create a category to start adding products.</p>

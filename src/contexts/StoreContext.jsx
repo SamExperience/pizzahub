@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { isMenuReady } from "../services/menu.service";
 import { getAccessibleStore } from "../services/store.service";
 import { useAuth } from "./AuthContext";
 
@@ -15,6 +16,8 @@ export function StoreProvider({ children }) {
   const [selectedStore, setselectedStore] = useState(null);
   const [loadingStore, setLoadingStore] = useState(true);
   const [errorStore, setErrorStore] = useState(null);
+  // null until the selected Store's readiness is known.
+  const [menuReady, setMenuReady] = useState(null);
   const { authUser, loadingLogin, userProfile } = useAuth();
 
   const fetchAccesibleStore = useCallback(async () => {
@@ -33,6 +36,28 @@ export function StoreProvider({ children }) {
       setLoadingStore(false);
     }
   }, [authUser]);
+
+  // On failure the Menu counts as not ready, which keeps the user on /menu.
+  const refreshMenuReady = useCallback(async () => {
+    if (!selectedStore) return;
+
+    try {
+      setMenuReady(await isMenuReady(selectedStore.id));
+    } catch (error) {
+      console.log("Error checking menu readiness -> ", error);
+      setMenuReady(false);
+    }
+  }, [selectedStore]);
+
+  useEffect(() => {
+    if (!selectedStore) {
+      setMenuReady(null);
+      return;
+    }
+
+    setMenuReady(null);
+    refreshMenuReady();
+  }, [selectedStore, refreshMenuReady]);
 
   useEffect(() => {
     if (loadingLogin === true) return;
@@ -59,6 +84,8 @@ export function StoreProvider({ children }) {
         fetchAccesibleStore,
         selectedStore,
         setselectedStore,
+        menuReady,
+        refreshMenuReady,
       }}
     >
       {children}

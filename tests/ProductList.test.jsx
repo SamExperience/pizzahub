@@ -279,13 +279,18 @@ describe("ProductList", () => {
         .mockResolvedValueOnce([existing[1]]);
       deleteProductById.mockResolvedValue();
 
-      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+      const onChange = vi.fn();
+
+      render(
+        <ProductList categoryId="c1" categoryName="Pizze" onChange={onChange} />,
+      );
       await userEvent.click(
         await screen.findByRole("button", { name: "Delete Margherita" }),
       );
 
       await waitFor(() => expect(screen.queryByText("Margherita")).toBeNull());
       expect(deleteProductById).toHaveBeenCalledWith("p1");
+      expect(onChange).toHaveBeenCalled();
     });
 
     it("does not delete when the confirmation is declined", async () => {

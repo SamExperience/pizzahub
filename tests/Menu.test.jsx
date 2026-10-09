@@ -36,12 +36,13 @@ vi.mock("../src/services/product.service", () => ({
 }));
 
 const store = { id: "store-1", name: "Pizza Roma" };
+const refreshMenuReady = vi.fn();
 
 describe("Menu page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
-    useStore.mockReturnValue({ selectedStore: store });
+    useStore.mockReturnValue({ selectedStore: store, refreshMenuReady });
     getProductsByCategoryId.mockResolvedValue([]);
   });
 
@@ -136,6 +137,7 @@ describe("Menu page", () => {
 
       expect(await screen.findByLabelText("Select Dolci")).toBeTruthy();
       expect(createCategory).toHaveBeenCalledWith("menu-1", "Dolci", 3);
+      expect(refreshMenuReady).toHaveBeenCalled();
       expect(screen.getByLabelText("New category name").value).toBe("");
     });
 

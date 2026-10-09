@@ -196,6 +196,7 @@ describe("ProtectedRoute", () => {
     useStore.mockReturnValue({
       accessibleStore: { id: "store-1" },
       selectedStore: { id: "store-1" },
+      menuReady: true,
       loadingStore: false,
     });
 
@@ -206,5 +207,55 @@ describe("ProtectedRoute", () => {
     const result = ProtectedRoute();
 
     expect(result.type).toBe(Outlet);
+  });
+
+  describe("menu readiness", () => {
+    beforeEach(() => {
+      useAuth.mockReturnValue({
+        authUser: { uid: "user-1" },
+        userProfile: { uid: "user-1" },
+        loadingLogin: false,
+      });
+    });
+
+    const setMenuReady = (menuReady, pathname) => {
+      useStore.mockReturnValue({
+        accessibleStore: { id: "store-1" },
+        selectedStore: { id: "store-1" },
+        menuReady,
+        loadingStore: false,
+      });
+      useLocation.mockReturnValue({ pathname });
+    };
+
+    it("renders nothing while the readiness is unknown", () => {
+      setMenuReady(null, "/tableau");
+
+      expect(ProtectedRoute()).toBeNull();
+    });
+
+    it.each(["/tableau", "/dashboard", "/stores"])(
+      "redirects %s to the menu when the menu is not ready",
+      (pathname) => {
+        setMenuReady(false, pathname);
+
+        const result = ProtectedRoute();
+
+        expect(result.type).toBe(Navigate);
+        expect(result.props.to).toBe("/menu");
+      },
+    );
+
+    it("allows the menu page when the menu is not ready", () => {
+      setMenuReady(false, "/menu");
+
+      expect(ProtectedRoute().type).toBe(Outlet);
+    });
+
+    it("allows every page when the menu is ready", () => {
+      setMenuReady(true, "/dashboard");
+
+      expect(ProtectedRoute().type).toBe(Outlet);
+    });
   });
 });
