@@ -111,7 +111,8 @@ const normalizeStringList = (value, label) => {
 };
 
 // Returns the normalized { availableCookingLevels, defaultCookingLevel } pair.
-// A default level requires levels and must be one of them.
+// Levels and default go together: without levels both are null; with levels
+// the default is required and must be one of them.
 export const validateProductCookingLevels = ({
   availableCookingLevels,
   defaultCookingLevel,
@@ -121,8 +122,14 @@ export const validateProductCookingLevels = ({
     "cooking levels",
   );
 
-  if (defaultCookingLevel === null || defaultCookingLevel === undefined)
-    return { availableCookingLevels: levels, defaultCookingLevel: null };
+  if (defaultCookingLevel === null || defaultCookingLevel === undefined) {
+    if (levels)
+      throw new Error(
+        "Product default cooking level is required when cooking levels are defined",
+      );
+
+    return { availableCookingLevels: null, defaultCookingLevel: null };
+  }
 
   const defaultLevel =
     typeof defaultCookingLevel === "string" ? defaultCookingLevel.trim() : "";

@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { getProductsByCategoryId } from "../services/product.service";
+import {
+  createProduct,
+  getProductsByCategoryId,
+} from "../services/product.service";
+import ProductForm from "./ProductForm";
 
 const formatPrice = (value) => `€${value.toFixed(2)}`;
 
@@ -15,13 +19,18 @@ function ProductRow({ product }) {
       <strong>{product.name}</strong> {formatPricing(product)}
       {product.isAvailable === false && <em> Unavailable</em>}
       {product.description && <p>{product.description}</p>}
+      {Array.isArray(product.ingredients) && product.ingredients.length > 0 && (
+        <p>Ingredients: {product.ingredients.join(", ")}</p>
+      )}
     </li>
   );
 }
 
-// Read-only list of the products of one category, ordered by position.
+// Products of one category ordered by position, with a form to add new ones.
 export default function ProductList({ categoryId, categoryName }) {
   const [products, setProducts] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [actionError, setActionError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -53,9 +62,41 @@ export default function ProductList({ categoryId, categoryName }) {
     setAttempt((n) => n + 1);
   };
 
+  // The new product goes last: position is unique within the category.
+  const handleCreate = async (data) => {
+    setActionError(null);
+    try {
+      await createProduct(categoryId, {
+        ...data,
+        position: products.length + 1,
+      });
+      setProducts(await getProductsByCategoryId(categoryId));
+      setShowForm(false);
+    } catch (err) {
+      console.log("Error creating product -> ", err);
+      setActionError(err);
+    }
+  };
+
+  const closeForm = () => {
+    setActionError(null);
+    setShowForm(false);
+  };
+
   return (
     <div>
       <h2>{categoryName}</h2>
+      {!loading && !error && !showForm && (
+        <button type="button" onClick={() => setShowForm(true)}>
+          Add product
+        </button>
+      )}
+      {showForm && (
+        <>
+          {actionError && <p role="alert">{actionError.message}</p>}
+          <ProductForm onSubmit={handleCreate} onCancel={closeForm} />
+        </>
+      )}
       {loading && <p>Loading ...</p>}
       {error && (
         <p>

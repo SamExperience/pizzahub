@@ -235,6 +235,9 @@ describe("product validation", () => {
     ).rejects.toThrow(
       "Product default cooking level must be one of the available cooking levels",
     );
+    await expect(invalid({ availableCookingLevels: ["rare"] })).rejects.toThrow(
+      "Product default cooking level is required when cooking levels are defined",
+    );
   });
 
   it("rejects invalid optional fields and availability", async () => {
@@ -269,6 +272,9 @@ describe("validateProductCookingLevels", () => {
         defaultCookingLevel: " rare ",
       }),
     ).toEqual({ availableCookingLevels: ["rare"], defaultCookingLevel: "rare" });
+    expect(() =>
+      validateProductCookingLevels({ availableCookingLevels: ["rare"] }),
+    ).toThrow("Product default cooking level is required");
     expect(validateProductCookingLevels({ availableCookingLevels: [] })).toEqual({
       availableCookingLevels: null,
       defaultCookingLevel: null,
