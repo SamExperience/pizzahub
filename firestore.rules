@@ -119,5 +119,23 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && categoryStoreId(resource.data.categoryId) == userStoreId();
     }
+
+    // Company of the signed-in user, read from their profile.
+    function userCompanyId() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data.companyId;
+    }
+
+    // Orders and customers are read-only for clients until milestones 9-10.
+    match /orders/{orderId} {
+      allow read: if request.auth != null
+        && resource.data.storeId == userStoreId();
+    }
+
+    match /customers/{customerId} {
+      allow read: if request.auth != null
+        && resource.data.companyId == userCompanyId();
+    }
   }
 }
