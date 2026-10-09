@@ -128,6 +128,7 @@ export default function Menu() {
             {selectedCategory ? (
               <ProductList
                 key={selectedCategory.id}
+                storeId={selectedStore.id}
                 categoryId={selectedCategory.id}
                 categoryName={selectedCategory.name}
               />

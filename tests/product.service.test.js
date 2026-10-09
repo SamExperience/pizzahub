@@ -15,6 +15,7 @@ import {
   moveProductById,
   setProductAvailability,
   updateProductById,
+  uploadProductImage,
   validateProductCookingLevels,
   validateProductPricing,
 } from "../src/services/product.service";
@@ -684,5 +685,40 @@ describe("moveProductById", () => {
       "Direction must be 'up' or 'down'",
     );
     await expect(moveProductById("unknown-product", "up")).rejects.toThrow();
+  });
+});
+
+describe("uploadProductImage", () => {
+  it("uploads under the store folder and returns the download URL", async () => {
+    const file = new Blob(["png"], { type: "image/png" });
+
+    const url = await uploadProductImage(storeId, "img-product", file);
+
+    expect(url).toContain(encodeURIComponent(`products/${storeId}/img-product`));
+    await deleteObject(ref(storage, url));
+  });
+
+  it("rejects missing arguments, non-image files and files of 5 MB or more", async () => {
+    const image = new Blob(["png"], { type: "image/png" });
+
+    await expect(uploadProductImage("", "p1", image)).rejects.toThrow(
+      "Store ID is required",
+    );
+    await expect(uploadProductImage(storeId, "", image)).rejects.toThrow(
+      "Product ID is required",
+    );
+    await expect(uploadProductImage(storeId, "p1", null)).rejects.toThrow(
+      "Image file is required",
+    );
+    await expect(
+      uploadProductImage(storeId, "p1", new Blob(["x"], { type: "text/plain" })),
+    ).rejects.toThrow("Product image must be an image file");
+    await expect(
+      uploadProductImage(
+        storeId,
+        "p1",
+        new Blob([new Uint8Array(5 * 1024 * 1024)], { type: "image/png" }),
+      ),
+    ).rejects.toThrow("Product image must be smaller than 5 MB");
   });
 });

@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import {
   createProduct,
   deleteProductById,
+  deleteProductImage,
   getProductsByCategoryId,
   moveProductById,
   setProductAvailability,
   updateProductById,
+  uploadProductImage,
 } from "../services/product.service";
 import ProductForm from "./ProductForm";
 
@@ -36,6 +38,9 @@ function ProductRow({
     <li>
       <strong>{product.name}</strong> {formatPricing(product)}
       {!available && <em> Unavailable</em>}
+      {product.imageUrl && (
+        <img src={product.imageUrl} alt={product.name} width="80" />
+      )}
       {product.description && <p>{product.description}</p>}
       {Array.isArray(product.ingredients) && product.ingredients.length > 0 && (
         <p>Ingredients: {product.ingredients.join(", ")}</p>
@@ -82,7 +87,7 @@ function ProductRow({
 }
 
 // Products of one category ordered by position, with a form to add new ones.
-export default function ProductList({ categoryId, categoryName }) {
+export default function ProductList({ storeId, categoryId, categoryName }) {
   const [products, setProducts] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -119,29 +124,68 @@ export default function ProductList({ categoryId, categoryName }) {
   };
 
   // Runs a product change, then reloads the list. Resolves to true on success.
+  // The list is reloaded on failure too: a partial change (e.g. product saved,
+  // image upload failed) must not leave the list stale.
   const runAction = async (action) => {
     setActionError(null);
+    let succeeded = false;
     try {
       await action();
-      setProducts(await getProductsByCategoryId(categoryId));
-      return true;
+      succeeded = true;
     } catch (err) {
       console.log("Error updating products -> ", err);
       setActionError(err);
-      return false;
     }
+
+    try {
+      setProducts(await getProductsByCategoryId(categoryId));
+    } catch (err) {
+      console.log("Error reloading products -> ", err);
+      if (succeeded) {
+        setActionError(err);
+        succeeded = false;
+      }
+    }
+
+    return succeeded;
   };
 
   // The new product goes last: position is unique within the category.
-  const handleCreate = async (data) => {
-    const saved = await runAction(() =>
-      createProduct(categoryId, { ...data, position: products.length + 1 }),
-    );
+  // The image is uploaded once the product exists, as its path uses the id.
+  const handleCreate = async ({ imageFile, removeImage: _remove, ...data }) => {
+    const saved = await runAction(async () => {
+      const created = await createProduct(categoryId, {
+        ...data,
+        position: products.length + 1,
+      });
+
+      if (imageFile) {
+        const imageUrl = await uploadProductImage(storeId, created.id, imageFile);
+        await updateProductById(created.id, { imageUrl });
+      }
+    });
     if (saved) setShowForm(false);
   };
 
-  const handleUpdate = async (data) => {
-    const saved = await runAction(() => updateProductById(editingId, data));
+  // A new file overwrites the stored one (same path); removal clears the URL
+  // first and deletes the file best-effort afterwards.
+  const handleUpdate = async ({ imageFile, removeImage, ...data }) => {
+    const current = products.find((product) => product.id === editingId);
+    const saved = await runAction(async () => {
+      const updates = { ...data };
+
+      if (imageFile)
+        updates.imageUrl = await uploadProductImage(
+          storeId,
+          editingId,
+          imageFile,
+        );
+      else if (removeImage) updates.imageUrl = null;
+
+      await updateProductById(editingId, updates);
+
+      if (removeImage && !imageFile) await deleteProductImage(current?.imageUrl);
+    });
     if (saved) setEditingId(null);
   };
 

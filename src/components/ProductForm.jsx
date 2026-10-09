@@ -72,6 +72,11 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
     product?.defaultCookingLevel ?? "",
   );
   const [isAvailable, setIsAvailable] = useState(product?.isAvailable ?? true);
+  // A newly picked file replaces the current image; removal only applies when
+  // no file is picked.
+  const [imageFile, setImageFile] = useState(null);
+  const [removeImage, setRemoveImage] = useState(false);
+  const currentImageUrl = removeImage ? null : (product?.imageUrl ?? null);
 
   // Pricing: any size row switches the form to sizes (decision A1).
   const hasSizes = sizes.length > 0;
@@ -113,6 +118,8 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
       availableCookingLevels: levels,
       defaultCookingLevel: levels ? selectedDefault : null,
       isAvailable,
+      imageFile,
+      removeImage: removeImage && !imageFile,
     });
   };
 
@@ -218,6 +225,25 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           </select>
         </label>
       )}
+
+      <fieldset>
+        <legend>Image</legend>
+        {currentImageUrl && !imageFile && (
+          <>
+            <img src={currentImageUrl} alt="Current product" width="80" />
+            <button type="button" onClick={() => setRemoveImage(true)}>
+              Remove image
+            </button>
+          </>
+        )}
+        {removeImage && !imageFile && <p>The image will be removed.</p>}
+        <input
+          type="file"
+          accept="image/*"
+          aria-label="Product image"
+          onChange={(event) => setImageFile(event.target.files[0] ?? null)}
+        />
+      </fieldset>
 
       <label>
         <input

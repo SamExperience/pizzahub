@@ -5,19 +5,23 @@ import ProductList from "../src/components/ProductList";
 import {
   createProduct,
   deleteProductById,
+  deleteProductImage,
   getProductsByCategoryId,
   moveProductById,
   setProductAvailability,
   updateProductById,
+  uploadProductImage,
 } from "../src/services/product.service";
 
 vi.mock("../src/services/product.service", () => ({
   createProduct: vi.fn(),
   deleteProductById: vi.fn(),
+  deleteProductImage: vi.fn(),
   getProductsByCategoryId: vi.fn(),
   moveProductById: vi.fn(),
   setProductAvailability: vi.fn(),
   updateProductById: vi.fn(),
+  uploadProductImage: vi.fn(),
 }));
 
 describe("ProductList", () => {
@@ -379,6 +383,125 @@ describe("ProductList", () => {
       expect(
         screen.getByRole("button", { name: "Mark available Margherita" }),
       ).toBeTruthy();
+    });
+  });
+
+  describe("product images", () => {
+    const withImage = [
+      {
+        id: "p1",
+        name: "Margherita",
+        price: 7,
+        sizes: null,
+        position: 1,
+        imageUrl: "https://example.com/p1.png",
+      },
+    ];
+    const file = new File(["x"], "pizza.png", { type: "image/png" });
+    beforeEach(() => {
+      createProduct.mockResolvedValue({ id: "p9" });
+      updateProductById.mockResolvedValue(undefined);
+    });
+
+    const renderList = () =>
+      render(<ProductList storeId="s1" categoryId="c1" categoryName="Pizze" />);
+
+    it("shows the thumbnail of a product with an image", async () => {
+      getProductsByCategoryId.mockResolvedValue(withImage);
+
+      renderList();
+
+      const image = await screen.findByAltText("Margherita");
+      expect(image.getAttribute("src")).toBe("https://example.com/p1.png");
+    });
+
+    it("uploads the image after creating the product", async () => {
+      getProductsByCategoryId.mockResolvedValue([]);
+      createProduct.mockResolvedValue({ id: "p9" });
+      uploadProductImage.mockResolvedValue("https://example.com/p9.png");
+
+      renderList();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Add product" }),
+      );
+      await userEvent.type(screen.getByLabelText("Name"), "Diavola");
+      await userEvent.type(screen.getByLabelText("Price"), "9");
+      await userEvent.upload(screen.getByLabelText("Product image"), file);
+      await userEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+      await waitFor(() =>
+        expect(updateProductById).toHaveBeenCalledWith("p9", {
+          imageUrl: "https://example.com/p9.png",
+        }),
+      );
+      expect(createProduct.mock.calls[0][1]).not.toHaveProperty("imageFile");
+      expect(uploadProductImage).toHaveBeenCalledWith("s1", "p9", file);
+    });
+
+    it("reloads the list when the image upload fails after the product was created", async () => {
+      getProductsByCategoryId
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([
+          { id: "p9", name: "Diavola", price: 9, sizes: null, position: 1 },
+        ]);
+      uploadProductImage.mockRejectedValue(new Error("Upload failed"));
+
+      renderList();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Add product" }),
+      );
+      await userEvent.type(screen.getByLabelText("Name"), "Diavola");
+      await userEvent.type(screen.getByLabelText("Price"), "9");
+      await userEvent.upload(screen.getByLabelText("Product image"), file);
+      await userEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+      expect(await screen.findByText("Upload failed")).toBeTruthy();
+      expect(await screen.findByText("Diavola")).toBeTruthy();
+    });
+
+    it("replaces the image of an existing product", async () => {
+      getProductsByCategoryId.mockResolvedValue(withImage);
+      uploadProductImage.mockResolvedValue("https://example.com/new.png");
+
+      renderList();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Edit Margherita" }),
+      );
+      await userEvent.upload(screen.getByLabelText("Product image"), file);
+      await userEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+      await waitFor(() =>
+        expect(updateProductById).toHaveBeenCalledWith(
+          "p1",
+          expect.objectContaining({ imageUrl: "https://example.com/new.png" }),
+        ),
+      );
+      expect(uploadProductImage).toHaveBeenCalledWith("s1", "p1", file);
+      expect(deleteProductImage).not.toHaveBeenCalled();
+    });
+
+    it("clears the URL, then deletes the stored image on removal", async () => {
+      getProductsByCategoryId.mockResolvedValue(withImage);
+
+      renderList();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Edit Margherita" }),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Remove image" }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+      await waitFor(() =>
+        expect(deleteProductImage).toHaveBeenCalledWith(
+          "https://example.com/p1.png",
+        ),
+      );
+      expect(updateProductById).toHaveBeenCalledWith(
+        "p1",
+        expect.objectContaining({ imageUrl: null }),
+      );
+      expect(uploadProductImage).not.toHaveBeenCalled();
     });
   });
 });

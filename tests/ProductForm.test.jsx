@@ -53,6 +53,8 @@ describe("ProductForm", () => {
       availableCookingLevels: null,
       defaultCookingLevel: null,
       isAvailable: true,
+      imageFile: null,
+      removeImage: false,
     });
   });
 
@@ -247,6 +249,8 @@ describe("ProductForm", () => {
         availableCookingLevels: null,
         defaultCookingLevel: null,
         isAvailable: false,
+        imageFile: null,
+        removeImage: false,
       });
     });
 
@@ -285,6 +289,38 @@ describe("ProductForm", () => {
       await userEvent.clear(screen.getByLabelText("Name"));
 
       expect(saveButton().disabled).toBe(true);
+    });
+
+    it("shows the current image and submits its removal", async () => {
+      renderEdit({
+        name: "Margherita",
+        price: 7,
+        sizes: null,
+        imageUrl: "https://example.com/p1.png",
+      });
+
+      expect(screen.getByAltText("Current product")).toBeTruthy();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Remove image" }),
+      );
+      expect(screen.queryByAltText("Current product")).toBeNull();
+      await userEvent.click(saveButton());
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ imageFile: null, removeImage: true }),
+      );
+    });
+
+    it("submits a newly picked image file", async () => {
+      renderEdit({ name: "Margherita", price: 7, sizes: null });
+      const file = new File(["x"], "pizza.png", { type: "image/png" });
+
+      await userEvent.upload(screen.getByLabelText("Product image"), file);
+      await userEvent.click(saveButton());
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ imageFile: file, removeImage: false }),
+      );
     });
   });
 });

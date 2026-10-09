@@ -11,7 +11,12 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { deleteObject, ref } from "firebase/storage";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 
 import { db, storage } from "./firebase";
 
@@ -330,6 +335,27 @@ export const getProductById = async (productId) => {
     id: productSnap.id,
     ...productSnap.data(),
   };
+};
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+// Uploads the product image to a fixed path, so replacing it overwrites the
+// previous file. Limits mirror storage.rules. Returns the download URL.
+export const uploadProductImage = async (storeId, productId, file) => {
+  if (!storeId) throw new Error("Store ID is required");
+  if (!productId) throw new Error("Product ID is required");
+  if (!file) throw new Error("Image file is required");
+
+  if (typeof file.type !== "string" || !file.type.startsWith("image/"))
+    throw new Error("Product image must be an image file");
+
+  if (file.size >= MAX_IMAGE_SIZE)
+    throw new Error("Product image must be smaller than 5 MB");
+
+  const imageRef = ref(storage, `products/${storeId}/${productId}`);
+  await uploadBytes(imageRef, file, { contentType: file.type });
+
+  return getDownloadURL(imageRef);
 };
 
 // Best-effort image removal: an orphaned file must never block a deletion.
