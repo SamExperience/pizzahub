@@ -12,6 +12,7 @@ import {
   updateCategoryById,
 } from "../src/services/category.service";
 import { createMenu, getMenuByStoreId } from "../src/services/menu.service";
+import { getProductsByCategoryId } from "../src/services/product.service";
 
 vi.mock("../src/contexts/StoreContext", () => ({
   useStore: vi.fn(),
@@ -30,6 +31,10 @@ vi.mock("../src/services/category.service", () => ({
   moveCategory: vi.fn(),
 }));
 
+vi.mock("../src/services/product.service", () => ({
+  getProductsByCategoryId: vi.fn(),
+}));
+
 const store = { id: "store-1", name: "Pizza Roma" };
 
 describe("Menu page", () => {
@@ -37,6 +42,7 @@ describe("Menu page", () => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
     useStore.mockReturnValue({ selectedStore: store });
+    getProductsByCategoryId.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -61,7 +67,7 @@ describe("Menu page", () => {
 
     render(<Menu />);
 
-    await screen.findByText("Pizze");
+    await screen.findByLabelText("Select Pizze");
     const items = screen.getAllByRole("listitem");
     expect(items.map((item) => item.textContent.split(" ")[0])).toEqual([
       "Pizze",
@@ -100,7 +106,7 @@ describe("Menu page", () => {
 
     await userEvent.click(await screen.findByText("Try again"));
 
-    expect(await screen.findByText("Pizze")).toBeTruthy();
+    expect(await screen.findByLabelText("Select Pizze")).toBeTruthy();
     expect(screen.queryByText("Unable to load the menu.")).toBeNull();
     expect(getMenuByStoreId).toHaveBeenCalledTimes(2);
   });
@@ -128,7 +134,7 @@ describe("Menu page", () => {
       await userEvent.type(screen.getByLabelText("New category name"), "Dolci");
       await userEvent.click(screen.getByText("Add category"));
 
-      expect(await screen.findByText(/^Dolci/)).toBeTruthy();
+      expect(await screen.findByLabelText("Select Dolci")).toBeTruthy();
       expect(createCategory).toHaveBeenCalledWith("menu-1", "Dolci", 3);
       expect(screen.getByLabelText("New category name").value).toBe("");
     });
@@ -160,7 +166,7 @@ describe("Menu page", () => {
       await userEvent.type(input, "Pizze rosse");
       await userEvent.click(screen.getByText("Save"));
 
-      expect(await screen.findByText(/^Pizze rosse/)).toBeTruthy();
+      expect(await screen.findByLabelText("Select Pizze rosse")).toBeTruthy();
       expect(updateCategoryById).toHaveBeenCalledWith("c1", {
         name: "Pizze rosse",
       });
@@ -189,7 +195,9 @@ describe("Menu page", () => {
       getCategoriesByMenuId.mockResolvedValue([{ ...bevande, position: 1 }]);
       await userEvent.click(screen.getByLabelText("Delete Pizze"));
 
-      await waitFor(() => expect(screen.queryByText(/^Pizze/)).toBeNull());
+      await waitFor(() =>
+      expect(screen.queryByLabelText("Select Pizze")).toBeNull(),
+    );
       expect(deleteCategoryById).toHaveBeenCalledWith("c1");
     });
 
@@ -219,6 +227,69 @@ describe("Menu page", () => {
       expect(screen.getByLabelText("Move Pizze up").disabled).toBe(true);
       expect(screen.getByLabelText("Move Pizze down").disabled).toBe(false);
       expect(screen.getByLabelText("Move Bevande down").disabled).toBe(true);
+    });
+  });
+
+  describe("products of the selected category", () => {
+    const pizze = { id: "c1", name: "Pizze", position: 1 };
+    const bevande = { id: "c2", name: "Bevande", position: 2 };
+
+    const renderMenu = async (categories = [pizze, bevande]) => {
+      getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+      getCategoriesByMenuId.mockResolvedValue(categories);
+      render(<Menu />);
+      await screen.findByLabelText("New category name");
+    };
+
+    it("selects the first category automatically and loads its products", async () => {
+      getProductsByCategoryId.mockResolvedValue([
+        { id: "p1", name: "Margherita", price: 7, sizes: null },
+      ]);
+
+      await renderMenu();
+
+      expect(await screen.findByText("Margherita")).toBeTruthy();
+      expect(getProductsByCategoryId).toHaveBeenCalledWith("c1");
+      expect(
+        screen.getByLabelText("Select Pizze").getAttribute("aria-current"),
+      ).toBe("true");
+    });
+
+    it("loads the products of another selected category", async () => {
+      getProductsByCategoryId.mockImplementation(async (id) =>
+        id === "c2" ? [{ id: "p2", name: "Cola", price: 3, sizes: null }] : [],
+      );
+      await renderMenu();
+
+      await userEvent.click(screen.getByLabelText("Select Bevande"));
+
+      expect(await screen.findByText("Cola")).toBeTruthy();
+      expect(getProductsByCategoryId).toHaveBeenCalledWith("c2");
+    });
+
+    it("selects the first remaining category when the selected one is deleted", async () => {
+      await renderMenu();
+      deleteCategoryById.mockResolvedValue();
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      getCategoriesByMenuId.mockResolvedValue([{ ...bevande, position: 1 }]);
+
+      await userEvent.click(screen.getByLabelText("Delete Pizze"));
+
+      await waitFor(() =>
+        expect(getProductsByCategoryId).toHaveBeenLastCalledWith("c2"),
+      );
+      expect(
+        screen.getByLabelText("Select Bevande").getAttribute("aria-current"),
+      ).toBe("true");
+    });
+
+    it("asks to create a category when there are none", async () => {
+      await renderMenu([]);
+
+      expect(
+        screen.getByText("Create a category to start adding products."),
+      ).toBeTruthy();
+      expect(getProductsByCategoryId).not.toHaveBeenCalled();
     });
   });
 });

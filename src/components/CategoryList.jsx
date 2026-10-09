@@ -5,6 +5,8 @@ function CategoryRow({
   category,
   isFirst,
   isLast,
+  isSelected,
+  onSelect,
   onRename,
   onDelete,
   onMove,
@@ -56,7 +58,14 @@ function CategoryRow({
 
   return (
     <li>
-      {category.name}{" "}
+      <button
+        type="button"
+        aria-label={`Select ${category.name}`}
+        aria-current={isSelected ? "true" : undefined}
+        onClick={() => onSelect(category.id)}
+      >
+        {category.name}
+      </button>{" "}
       <button
         type="button"
         aria-label={`Move ${category.name} up`}
@@ -93,6 +102,8 @@ function CategoryRow({
 
 export default function CategoryList({
   categories,
+  selectedId,
+  onSelect,
   onRename,
   onDelete,
   onMove,
@@ -109,6 +120,8 @@ export default function CategoryList({
           category={category}
           isFirst={index === 0}
           isLast={index === categories.length - 1}
+          isSelected={category.id === selectedId}
+          onSelect={onSelect}
           onRename={onRename}
           onDelete={onDelete}
           onMove={onMove}
