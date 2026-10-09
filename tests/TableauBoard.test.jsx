@@ -46,6 +46,33 @@ describe("TableauBoard", () => {
     expect(within(pending).getAllByRole("article")).toHaveLength(2);
   });
 
+  it("keeps the received chronological order inside each column", () => {
+    const ticket = (id, status, productName) => ({
+      id,
+      status,
+      items: [{ productId: id, productName, quantity: 1, subtotal: 5 }],
+    });
+    render(
+      <TableauBoard
+        orders={[
+          ticket("a", "Pending", "First"),
+          ticket("b", "In progress", "Other"),
+          ticket("c", "Pending", "Second"),
+          ticket("d", "Pending", "Third"),
+        ]}
+      />,
+    );
+
+    const pending = screen
+      .getByRole("heading", { name: "Pending" })
+      .closest("section");
+    const names = within(pending)
+      .getAllByRole("article")
+      .map((article) => /1 x (\w+)/.exec(article.textContent)[1]);
+
+    expect(names).toEqual(["First", "Second", "Third"]);
+  });
+
   it("shows only the loading message while loading", () => {
     render(<TableauBoard loading />);
 
