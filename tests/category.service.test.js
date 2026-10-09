@@ -13,6 +13,7 @@ import {
   deleteCategoryById,
   updateCategoryById,
   reorderCategories,
+  moveCategory,
 } from "../src/services/category.service";
 
 const TEST_PASSWORD = "Password123!";
@@ -235,6 +236,55 @@ describe("reorderCategories", () => {
     const categories = await getCategoriesByMenuId(menu.id);
     expect(categories.map((c) => c.name)).toEqual(["Pizzas", "Desserts"]);
     expect(categories.every((c) => c.menuId === menu.id)).toBe(true);
+  });
+});
+
+describe("moveCategory", () => {
+  const names = async (menuId) =>
+    (await getCategoriesByMenuId(menuId)).map((c) => c.name);
+
+  it("moves a category up by swapping positions with its neighbour", async () => {
+    const menu = await createTestMenu("Move Up", "30");
+    await createCategory(menu.id, "Pizzas", 1);
+    await createCategory(menu.id, "Boissons", 2);
+    const desserts = await createCategory(menu.id, "Desserts", 3);
+
+    await moveCategory(desserts.id, "up");
+
+    expect(await names(menu.id)).toEqual(["Pizzas", "Desserts", "Boissons"]);
+    const categories = await getCategoriesByMenuId(menu.id);
+    expect(categories.map((c) => c.position)).toEqual([1, 2, 3]);
+  });
+  it("moves a category down by swapping positions with its neighbour", async () => {
+    const menu = await createTestMenu("Move Down", "31");
+    const pizzas = await createCategory(menu.id, "Pizzas", 1);
+    await createCategory(menu.id, "Boissons", 2);
+    await createCategory(menu.id, "Desserts", 3);
+
+    await moveCategory(pizzas.id, "down");
+
+    expect(await names(menu.id)).toEqual(["Boissons", "Pizzas", "Desserts"]);
+  });
+  it("does nothing at the first and last position", async () => {
+    const menu = await createTestMenu("Move Edges", "32");
+    const pizzas = await createCategory(menu.id, "Pizzas", 1);
+    const boissons = await createCategory(menu.id, "Boissons", 2);
+
+    await moveCategory(pizzas.id, "up");
+    await moveCategory(boissons.id, "down");
+
+    expect(await names(menu.id)).toEqual(["Pizzas", "Boissons"]);
+  });
+  it("rejects an invalid category id or direction", async () => {
+    const menu = await createTestMenu("Move Invalid", "33");
+    const pizzas = await createCategory(menu.id, "Pizzas", 1);
+
+    await expect(moveCategory("", "up")).rejects.toThrow(
+      "Category ID is required",
+    );
+    await expect(moveCategory(pizzas.id, "left")).rejects.toThrow(
+      "Direction must be 'up' or 'down'",
+    );
   });
 });
 

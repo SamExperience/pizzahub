@@ -160,6 +160,42 @@ export const deleteCategoryById = async (categoryId) => {
   );
 };
 
+// Swaps the position of a category with its previous ("up") or next ("down")
+// neighbour in a single batch. Does nothing at the first/last position.
+export const moveCategory = async (categoryId, direction) => {
+  if (!categoryId) {
+    throw new Error("Category ID is required");
+  }
+
+  if (direction !== "up" && direction !== "down") {
+    throw new Error("Direction must be 'up' or 'down'");
+  }
+
+  const categorySnap = await getDoc(doc(db, "categories", categoryId));
+
+  if (!categorySnap.exists()) {
+    throw new Error("Category not found");
+  }
+
+  const categories = await getCategoriesByMenuId(categorySnap.data().menuId);
+  const index = categories.findIndex((category) => category.id === categoryId);
+  const neighbour = categories[direction === "up" ? index - 1 : index + 1];
+
+  if (!neighbour) return;
+
+  const current = categories[index];
+  const batch = writeBatch(db);
+  batch.update(doc(db, "categories", current.id), {
+    position: neighbour.position,
+    updatedAt: serverTimestamp(),
+  });
+  batch.update(doc(db, "categories", neighbour.id), {
+    position: current.position,
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+};
+
 export const updateCategoryById = async (categoryId, data) => {
   // Check parameters
   if (!categoryId) {

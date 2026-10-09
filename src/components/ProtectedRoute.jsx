@@ -4,7 +4,8 @@ import { useStore } from "../contexts/StoreContext";
 
 export default function ProtectedRoute() {
   const { authUser, userProfile, loadingLogin } = useAuth();
-  const { accessibleStore, loadingStore, selectedStore } = useStore();
+  const { accessibleStore, loadingStore, selectedStore, menuReady } =
+    useStore();
   const location = useLocation();
 
   if (loadingLogin) return null;
@@ -30,6 +31,12 @@ export default function ProtectedRoute() {
   if (!selectedStore) {
     if (location.pathname === "/stores") return <Outlet />;
     return <Navigate to="/stores" replace />;
+  }
+
+  // Until the Menu is ready, only /menu is reachable.
+  if (menuReady === null) return null;
+  if (!menuReady && location.pathname !== "/menu") {
+    return <Navigate to="/menu" replace />;
   }
 
   return <Outlet />;
