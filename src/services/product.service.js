@@ -98,6 +98,23 @@ const validateProductPositionUnique = async (
     throw new Error("Product position is already in use");
 };
 
+// Name is unique within a category (exact, case-sensitive match, as for
+// category names). `excludeProductId` lets a product keep its own name.
+const validateProductNameUnique = async (
+  categoryId,
+  name,
+  excludeProductId = null,
+) => {
+  const siblings = await getProductsByCategoryId(categoryId);
+
+  if (
+    siblings.some(
+      (product) => product.id !== excludeProductId && product.name === name,
+    )
+  )
+    throw new Error("Product name already exists");
+};
+
 const normalizeStringList = (value, label) => {
   if (value === null || value === undefined) return null;
 
@@ -176,6 +193,7 @@ export const createProduct = async (categoryId, data) => {
   const imageUrl = validateOptionalText(data.imageUrl, "image URL");
   const ingredients = normalizeStringList(data.ingredients, "ingredients");
 
+  await validateProductNameUnique(categoryId, name);
   await validateProductPositionUnique(categoryId, position);
 
   const productData = {
@@ -233,7 +251,18 @@ export const updateProductById = async (productId, data) => {
   const currentProduct = productSnap.data();
   const updates = {};
 
-  if (has("name")) updates.name = validateProductName(data.name);
+  if (has("name")) {
+    const name = validateProductName(data.name);
+
+    if (name !== currentProduct.name)
+      await validateProductNameUnique(
+        currentProduct.categoryId,
+        name,
+        productId,
+      );
+
+    updates.name = name;
+  }
 
   if (has("position")) {
     const position = validateProductPositionFormat(data.position);

@@ -89,6 +89,24 @@ describe("validateProductPricing", () => {
 });
 
 describe("createProduct", () => {
+  it("rejects a duplicate name in the same category but allows other cases and categories", async () => {
+    const nameCategory = await createCategory(category.menuId, "Unique names", 90);
+    const otherCategory = await createCategory(category.menuId, "Other names", 91);
+
+    await createProduct(nameCategory.id, { name: "funghi", position: 1, price: 8 });
+
+    await expect(
+      createProduct(nameCategory.id, { name: " funghi ", position: 2, price: 8 }),
+    ).rejects.toThrow("Product name already exists");
+
+    await expect(
+      createProduct(nameCategory.id, { name: "Funghi", position: 2, price: 8 }),
+    ).resolves.toBeDefined();
+    await expect(
+      createProduct(otherCategory.id, { name: "funghi", position: 1, price: 8 }),
+    ).resolves.toBeDefined();
+  });
+
   it("creates a product with sizes and a null price", async () => {
     const product = await createProduct(category.id, {
       name: "Margherita",
@@ -330,7 +348,7 @@ describe("updateProductById", () => {
 
   beforeEach(async () => {
     product = await createProduct(updateCategory.id, {
-      name: "Original",
+      name: `Original ${nextPosition}`,
       position: nextPosition++,
       description: "Desc",
       price: 5,
@@ -352,12 +370,30 @@ describe("updateProductById", () => {
     );
   });
 
+  it("rejects renaming to a name used in the category but keeps its own", async () => {
+    await createProduct(updateCategory.id, {
+      name: "Taken",
+      position: nextPosition++,
+      price: 5,
+    });
+
+    await expect(
+      updateProductById(product.id, { name: "Taken" }),
+    ).rejects.toThrow("Product name already exists");
+    await expect(
+      updateProductById(product.id, { name: product.name }),
+    ).resolves.toBeUndefined();
+    await expect(
+      updateProductById(product.id, { name: "taken" }),
+    ).resolves.toBeUndefined();
+  });
+
   it("updates position and availability", async () => {
     await updateProductById(product.id, { position: 100, isAvailable: false });
     const updated = await getProductById(product.id);
     expect(updated.position).toBe(100);
     expect(updated.isAvailable).toBe(false);
-    expect(updated.name).toBe("Original");
+    expect(updated.name).toBe(product.name);
   });
 
   it("switches between price and sizes", async () => {
