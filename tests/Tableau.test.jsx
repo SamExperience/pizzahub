@@ -1,64 +1,103 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Tableau from "../src/pages/Tableau";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
 
-describe("Tableau page", () => {
+const mocks = vi.hoisted(() => ({
+  subscribe: vi.fn(),
+  store: { selectedStore: { id: "store-1" } },
+}));
+
+vi.mock("../src/services/order.service", async (importOriginal) => ({
+  ...(await importOriginal()),
+  subscribeToTodayOrders: mocks.subscribe,
+}));
+
+vi.mock("../src/contexts/StoreContext", () => ({
+  useStore: () => mocks.store,
+}));
+
+describe("Tableau page wiring", () => {
+  let unsubscribes;
+
+  beforeEach(() => {
+    unsubscribes = [];
+    mocks.store.selectedStore = { id: "store-1" };
+    mocks.subscribe.mockReset();
+    mocks.subscribe.mockImplementation(() => {
+      const unsubscribe = vi.fn();
+      unsubscribes.push(unsubscribe);
+      return unsubscribe;
+    });
+  });
+
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
-  it("renders the three status columns in order", () => {
+  it("subscribes for the active Store and groups the received orders", () => {
     render(<Tableau />);
 
-    const titles = screen
-      .getAllByRole("heading", { level: 2 })
-      .map((heading) => heading.textContent);
+    expect(mocks.subscribe).toHaveBeenCalledOnce();
+    expect(mocks.subscribe.mock.calls[0][0]).toBe("store-1");
+    expect(screen.getByText("Loading ...")).toBeTruthy();
 
-    expect(titles).toEqual(["Pending", "In progress", "Completed"]);
-  });
-
-  it("shows an empty message and a zero count in every empty column", () => {
-    render(<Tableau />);
-
-    expect(screen.getAllByText("No tickets")).toHaveLength(3);
-    expect(screen.getByLabelText("Pending tickets").textContent).toBe("0");
-  });
-
-  it("groups orders by status", () => {
-    render(
-      <Tableau
-        orders={[
-          { id: "a", status: "Pending" },
-          { id: "b", status: "Completed" },
-          { id: "c", status: "Pending" },
-        ]}
-      />,
+    act(() =>
+      mocks.subscribe.mock.calls[0][1]([
+        { id: "a", status: "Pending" },
+        { id: "b", status: "In progress" },
+      ]),
     );
 
-    expect(screen.getByLabelText("Pending tickets").textContent).toBe("2");
-    expect(screen.getByLabelText("In progress tickets").textContent).toBe("0");
-    expect(screen.getByLabelText("Completed tickets").textContent).toBe("1");
-    const pending = screen.getByRole("heading", { name: "Pending" })
-      .closest("section");
-    expect(within(pending).getByText("a")).toBeTruthy();
+    expect(screen.getByLabelText("Pending tickets").textContent).toBe("1");
+    expect(screen.getByLabelText("In progress tickets").textContent).toBe("1");
+    expect(screen.getByLabelText("Completed tickets").textContent).toBe("0");
   });
 
-  it("shows only the loading message while loading", () => {
-    render(<Tableau loading />);
+  it("shows the error and resubscribes on retry", async () => {
+    render(<Tableau />);
 
-    expect(screen.getByText("Loading ...")).toBeTruthy();
-    expect(screen.queryByText("Pending")).toBeNull();
-  });
-
-  it("shows the error with a working retry button", async () => {
-    const onRetry = vi.fn();
-    render(<Tableau error={new Error("boom")} onRetry={onRetry} />);
-
+    act(() => mocks.subscribe.mock.calls[0][2](new Error("boom")));
     expect(screen.getByText(/Unable to load the tickets/)).toBeTruthy();
+
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(onRetry).toHaveBeenCalledOnce();
+
+    expect(unsubscribes[0]).toHaveBeenCalledOnce();
+    expect(mocks.subscribe).toHaveBeenCalledTimes(2);
+  });
+
+  it("unsubscribes on unmount", () => {
+    const { unmount } = render(<Tableau />);
+
+    unmount();
+
+    expect(unsubscribes[0]).toHaveBeenCalledOnce();
+  });
+
+  it("resubscribes when the active Store changes", () => {
+    const { rerender } = render(<Tableau />);
+
+    mocks.store.selectedStore = { id: "store-2" };
+    rerender(<Tableau />);
+
+    expect(unsubscribes[0]).toHaveBeenCalledOnce();
+    expect(mocks.subscribe).toHaveBeenCalledTimes(2);
+    expect(mocks.subscribe.mock.calls[1][0]).toBe("store-2");
+  });
+
+  it("renews the listener at midnight", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 9, 23, 59, 0));
+    render(<Tableau />);
+
+    act(() => {
+      vi.advanceTimersByTime(61 * 1000);
+    });
+
+    expect(unsubscribes[0]).toHaveBeenCalledOnce();
+    expect(mocks.subscribe).toHaveBeenCalledTimes(2);
   });
 });

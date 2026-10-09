@@ -1,40 +1,57 @@
-import TableauColumn from "../components/TableauColumn";
-import { ORDER_STATUSES } from "../services/order.service";
-import { alert, button, muted } from "../utils/styles";
+import { useEffect, useState } from "react";
+import TableauBoard from "../components/TableauBoard";
+import { useStore } from "../contexts/StoreContext";
+import { getTodayRange, subscribeToTodayOrders } from "../services/order.service";
 
-// Layout only: orders, loading and error come from props until the real-time
-// wiring is added.
-export default function Tableau({
-  orders = [],
-  loading = false,
-  error = null,
-  onRetry,
-}) {
+// Real-time orders of the active Store for the current day.
+export default function Tableau() {
+  const { selectedStore } = useStore();
+  const storeId = selectedStore?.id;
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  // Bumped to resubscribe: on retry and when the day changes.
+  const [retryKey, setRetryKey] = useState(0);
+  const [dayKey, setDayKey] = useState(0);
+
+  useEffect(() => {
+    if (!storeId) return;
+
+    setOrders([]);
+    setError(null);
+    setLoading(true);
+
+    const unsubscribe = subscribeToTodayOrders(
+      storeId,
+      (list) => {
+        setOrders(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.log("Error loading orders -> ", err);
+        setError(err);
+        setLoading(false);
+      },
+    );
+
+    // The listener covers a fixed day range: renew it at midnight.
+    const midnightTimer = setTimeout(
+      () => setDayKey((key) => key + 1),
+      getTodayRange().end - Date.now(),
+    );
+
+    return () => {
+      clearTimeout(midnightTimer);
+      unsubscribe();
+    };
+  }, [storeId, retryKey, dayKey]);
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 text-left">
-      <h1 className="mt-0 mb-6 text-3xl font-semibold tracking-tight">
-        Tableau
-      </h1>
-      {loading && <p className={muted}>Loading ...</p>}
-      {error && (
-        <p className={`${alert} flex flex-wrap items-center gap-3`}>
-          Unable to load the tickets.
-          <button type="button" className={button} onClick={onRetry}>
-            Try again
-          </button>
-        </p>
-      )}
-      {!loading && !error && (
-        <div className="grid items-start gap-4 md:grid-cols-3">
-          {ORDER_STATUSES.map((status) => (
-            <TableauColumn
-              key={status}
-              title={status}
-              orders={orders.filter((order) => order.status === status)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    <TableauBoard
+      orders={orders}
+      loading={loading}
+      error={error}
+      onRetry={() => setRetryKey((key) => key + 1)}
+    />
   );
 }
