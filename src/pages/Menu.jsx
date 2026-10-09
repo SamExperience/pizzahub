@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import CategoryForm from "../components/CategoryForm";
 import CategoryList from "../components/CategoryList";
 import { useStore } from "../contexts/StoreContext";
-import { getCategoriesByMenuId } from "../services/category.service";
+import {
+  createCategory,
+  deleteCategoryById,
+  getCategoriesByMenuId,
+  moveCategory,
+  updateCategoryById,
+} from "../services/category.service";
 import { createMenu, getMenuByStoreId } from "../services/menu.service";
 
 // Loads the Store's Menu (creating it on first access) and its categories.
@@ -10,12 +17,14 @@ const loadMenu = async (store) => {
     (await getMenuByStoreId(store.id)) ??
     (await createMenu(store.id, store.name));
 
-  return getCategoriesByMenuId(menu.id);
+  return { menuId: menu.id, categories: await getCategoriesByMenuId(menu.id) };
 };
 
 export default function Menu() {
   const { selectedStore } = useStore();
+  const [menuId, setMenuId] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [actionError, setActionError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -34,7 +43,8 @@ export default function Menu() {
     inFlight.current.promise
       .then((result) => {
         if (cancelled) return;
-        setCategories(result);
+        setMenuId(result.menuId);
+        setCategories(result.categories);
         setLoading(false);
       })
       .catch((err) => {
@@ -55,6 +65,29 @@ export default function Menu() {
     setAttempt((n) => n + 1);
   };
 
+  // Runs a category change, then reloads the list. Resolves to true on success.
+  const runAction = async (action) => {
+    setActionError(null);
+    try {
+      await action();
+      setCategories(await getCategoriesByMenuId(menuId));
+      return true;
+    } catch (err) {
+      console.log("Error updating categories -> ", err);
+      setActionError(err);
+      return false;
+    }
+  };
+
+  const handleCreate = (name) =>
+    runAction(() => createCategory(menuId, name, categories.length + 1));
+  const handleRename = (categoryId, name) =>
+    runAction(() => updateCategoryById(categoryId, { name }));
+  const handleDelete = (categoryId) =>
+    runAction(() => deleteCategoryById(categoryId));
+  const handleMove = (categoryId, direction) =>
+    runAction(() => moveCategory(categoryId, direction));
+
   return (
     <div>
       <h1>Menu</h1>
@@ -68,7 +101,18 @@ export default function Menu() {
           </button>
         </p>
       )}
-      {!loading && !error && <CategoryList categories={categories} />}
+      {!loading && !error && (
+        <>
+          {actionError && <p role="alert">{actionError.message}</p>}
+          <CategoryForm onSubmit={handleCreate} />
+          <CategoryList
+            categories={categories}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onMove={handleMove}
+          />
+        </>
+      )}
     </div>
   );
 }
