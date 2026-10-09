@@ -1,6 +1,6 @@
 # PizzaHub
 
-PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu. The project is an MVP under active development; this document describes only what is implemented today.
+PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu and follow the Store's orders of the day in real time on the Tableau. The project is an MVP under active development; this document describes only what is implemented today.
 
 ## Implemented features
 
@@ -33,13 +33,22 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - Product image upload, replacement and deletion.
 - Menu readiness guard: until the Menu has at least one Category containing at least one valid Product, only `/menu` is reachable, including via direct URL.
 
+### Tableau (real-time orders)
+
+- Three status columns: Pending, In progress, Completed.
+- Real-time listener on the active Store's orders of the current day (device time zone), sorted by creation time. It is renewed when the active Store changes and at midnight.
+- Loading, empty and error states (with a retry action) and a responsive layout.
+- Ticket card: order type (Takeaway or Delivery), scheduled time, items (quantity, size, cooking level, customizations, subtotal), customer info (phone and address for delivery), total and status.
+- The **Create Ticket** button is only an entry point: ticket creation is not implemented yet. Tickets are read-only; they cannot be created, edited or moved between columns from the UI.
+
 ### Other pages
 
-- **Tableau** and **Dashboard** exist as routes with placeholder content only.
+- **Dashboard** exists as a route with placeholder content only.
 
 ### Security
 
 - Firestore and Storage security rules restrict access to authenticated Users and isolate data per Company and Store.
+- Orders are read-only for Users of the Order's Store; Customers are read-only for Users of the Customer's Company.
 
 ## Tech stack
 
@@ -99,13 +108,14 @@ npx firebase-tools emulators:exec --only auth,firestore,storage "npm test -- --r
 ```text
 src/
   pages/        Route-level pages (Login, Onboarding, StoreSelection, Menu, Tableau, Dashboard)
-  components/   Reusable UI components (layout, route guards, category and product UI)
+  components/   Reusable UI components (layout, route guards, category and product UI, Tableau board and ticket cards)
   contexts/     React contexts for auth state and the active Store
   services/     Firebase data layer, one service per entity; components never call Firebase directly
   utils/        Shared helpers
   routes.jsx    Route definitions
 tests/          Unit, UI and security-rules tests
 firestore.rules Firestore security rules
+firestore.indexes.json Firestore composite indexes (orders of the day)
 storage.rules   Storage security rules
 firebase.json   Firebase Hosting, rules and emulator configuration
 ```
