@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import {
   createProduct,
+  deleteProductById,
   getProductsByCategoryId,
+  setProductAvailability,
+  updateProductById,
 } from "../services/product.service";
 import ProductForm from "./ProductForm";
 
@@ -13,15 +16,42 @@ const formatPricing = ({ price, sizes }) =>
     ? sizes.map((size) => `${size.name}: ${formatPrice(size.price)}`).join(" · ")
     : formatPrice(price);
 
-function ProductRow({ product }) {
+function ProductRow({ product, onEdit, onDelete, onToggleAvailability }) {
+  const available = product.isAvailable !== false;
+
+  const handleDelete = () => {
+    if (window.confirm(`Delete "${product.name}"?`)) onDelete(product.id);
+  };
+
   return (
     <li>
       <strong>{product.name}</strong> {formatPricing(product)}
-      {product.isAvailable === false && <em> Unavailable</em>}
+      {!available && <em> Unavailable</em>}
       {product.description && <p>{product.description}</p>}
       {Array.isArray(product.ingredients) && product.ingredients.length > 0 && (
         <p>Ingredients: {product.ingredients.join(", ")}</p>
       )}
+      <button
+        type="button"
+        aria-label={`Edit ${product.name}`}
+        onClick={() => onEdit(product.id)}
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        aria-label={`${available ? "Mark unavailable" : "Mark available"} ${product.name}`}
+        onClick={() => onToggleAvailability(product.id, !available)}
+      >
+        {available ? "Mark unavailable" : "Mark available"}
+      </button>
+      <button
+        type="button"
+        aria-label={`Delete ${product.name}`}
+        onClick={handleDelete}
+      >
+        Delete
+      </button>
     </li>
   );
 }
@@ -30,6 +60,7 @@ function ProductRow({ product }) {
 export default function ProductList({ categoryId, categoryName }) {
   const [products, setProducts] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -62,41 +93,60 @@ export default function ProductList({ categoryId, categoryName }) {
     setAttempt((n) => n + 1);
   };
 
-  // The new product goes last: position is unique within the category.
-  const handleCreate = async (data) => {
+  // Runs a product change, then reloads the list. Resolves to true on success.
+  const runAction = async (action) => {
     setActionError(null);
     try {
-      await createProduct(categoryId, {
-        ...data,
-        position: products.length + 1,
-      });
+      await action();
       setProducts(await getProductsByCategoryId(categoryId));
-      setShowForm(false);
+      return true;
     } catch (err) {
-      console.log("Error creating product -> ", err);
+      console.log("Error updating products -> ", err);
       setActionError(err);
+      return false;
     }
+  };
+
+  // The new product goes last: position is unique within the category.
+  const handleCreate = async (data) => {
+    const saved = await runAction(() =>
+      createProduct(categoryId, { ...data, position: products.length + 1 }),
+    );
+    if (saved) setShowForm(false);
+  };
+
+  const handleUpdate = async (data) => {
+    const saved = await runAction(() => updateProductById(editingId, data));
+    if (saved) setEditingId(null);
+  };
+
+  const handleDelete = (productId) =>
+    runAction(() => deleteProductById(productId));
+  const handleToggleAvailability = (productId, isAvailable) =>
+    runAction(() => setProductAvailability(productId, isAvailable));
+
+  const openEdit = (productId) => {
+    setActionError(null);
+    setShowForm(false);
+    setEditingId(productId);
   };
 
   const closeForm = () => {
     setActionError(null);
     setShowForm(false);
+    setEditingId(null);
   };
 
   return (
     <div>
       <h2>{categoryName}</h2>
-      {!loading && !error && !showForm && (
+      {!loading && !error && !showForm && editingId === null && (
         <button type="button" onClick={() => setShowForm(true)}>
           Add product
         </button>
       )}
-      {showForm && (
-        <>
-          {actionError && <p role="alert">{actionError.message}</p>}
-          <ProductForm onSubmit={handleCreate} onCancel={closeForm} />
-        </>
-      )}
+      {actionError && <p role="alert">{actionError.message}</p>}
+      {showForm && <ProductForm onSubmit={handleCreate} onCancel={closeForm} />}
       {loading && <p>Loading ...</p>}
       {error && (
         <p>
@@ -112,9 +162,25 @@ export default function ProductList({ categoryId, categoryName }) {
       )}
       {!loading && !error && products.length > 0 && (
         <ul>
-          {products.map((product) => (
-            <ProductRow key={product.id} product={product} />
-          ))}
+          {products.map((product) =>
+            product.id === editingId ? (
+              <li key={product.id}>
+                <ProductForm
+                  product={product}
+                  onSubmit={handleUpdate}
+                  onCancel={closeForm}
+                />
+              </li>
+            ) : (
+              <ProductRow
+                key={product.id}
+                product={product}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onToggleAvailability={handleToggleAvailability}
+              />
+            ),
+          )}
         </ul>
       )}
     </div>

@@ -48,17 +48,30 @@ function TextListField({ legend, itemLabel, addLabel, items, onChange }) {
 }
 
 // `onSubmit(data)` saves the product; the parent closes the form on success.
+// With `product` the form starts from its values (edit mode).
 // Validation rules live in the Product service; the checks here only decide
 // whether the submit button is enabled.
-export default function ProductForm({ onSubmit, onCancel }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
-  const [sizes, setSizes] = useState([]);
-  const [ingredients, setIngredients] = useState([]);
-  const [cookingLevels, setCookingLevels] = useState([]);
-  const [defaultCookingLevel, setDefaultCookingLevel] = useState("");
-  const [isAvailable, setIsAvailable] = useState(true);
+export default function ProductForm({ product, onSubmit, onCancel }) {
+  const [name, setName] = useState(product?.name ?? "");
+  const [description, setDescription] = useState(product?.description ?? "");
+  const [price, setPrice] = useState(
+    typeof product?.price === "number" ? String(product.price) : "",
+  );
+  const [sizes, setSizes] = useState(
+    () =>
+      product?.sizes?.map((size) => ({
+        name: size.name,
+        price: String(size.price),
+      })) ?? [],
+  );
+  const [ingredients, setIngredients] = useState(product?.ingredients ?? []);
+  const [cookingLevels, setCookingLevels] = useState(
+    product?.availableCookingLevels ?? [],
+  );
+  const [defaultCookingLevel, setDefaultCookingLevel] = useState(
+    product?.defaultCookingLevel ?? "",
+  );
+  const [isAvailable, setIsAvailable] = useState(product?.isAvailable ?? true);
 
   // Pricing: any size row switches the form to sizes (decision A1).
   const hasSizes = sizes.length > 0;

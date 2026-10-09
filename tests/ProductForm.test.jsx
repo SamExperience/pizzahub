@@ -210,4 +210,81 @@ describe("ProductForm", () => {
 
     expect(onCancel).toHaveBeenCalled();
   });
+
+  describe("edit mode", () => {
+    const renderEdit = (product) =>
+      render(
+        <ProductForm product={product} onSubmit={onSubmit} onCancel={onCancel} />,
+      );
+
+    it("starts from a single-price product and submits the changes", async () => {
+      renderEdit({
+        name: "Margherita",
+        description: "Tomato",
+        price: 7,
+        sizes: null,
+        ingredients: ["tomato"],
+        availableCookingLevels: null,
+        defaultCookingLevel: null,
+        isAvailable: false,
+      });
+
+      expect(screen.getByLabelText("Name").value).toBe("Margherita");
+      expect(screen.getByLabelText("Price").value).toBe("7");
+      expect(screen.getByLabelText("Available").checked).toBe(false);
+      expect(saveButton().disabled).toBe(false);
+
+      await userEvent.clear(screen.getByLabelText("Price"));
+      await userEvent.type(screen.getByLabelText("Price"), "8.5");
+      await userEvent.click(saveButton());
+
+      expect(onSubmit).toHaveBeenCalledWith({
+        name: "Margherita",
+        description: "Tomato",
+        price: 8.5,
+        sizes: null,
+        ingredients: ["tomato"],
+        availableCookingLevels: null,
+        defaultCookingLevel: null,
+        isAvailable: false,
+      });
+    });
+
+    it("starts from a product with sizes and cooking levels", async () => {
+      renderEdit({
+        name: "Steak",
+        description: null,
+        price: null,
+        sizes: [{ name: "Large", price: 20 }],
+        ingredients: null,
+        availableCookingLevels: ["rare", "well done"],
+        defaultCookingLevel: "rare",
+        isAvailable: true,
+      });
+
+      expect(screen.queryByLabelText("Price")).toBeNull();
+      expect(screen.getByLabelText("Size 1 name").value).toBe("Large");
+      expect(screen.getByLabelText("Size 1 price").value).toBe("20");
+      expect(screen.getByLabelText("Default cooking level").value).toBe("rare");
+
+      await userEvent.click(saveButton());
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          price: null,
+          sizes: [{ name: "Large", price: 20 }],
+          availableCookingLevels: ["rare", "well done"],
+          defaultCookingLevel: "rare",
+        }),
+      );
+    });
+
+    it("disables saving when the edited data becomes invalid", async () => {
+      renderEdit({ name: "Margherita", price: 7, sizes: null });
+
+      await userEvent.clear(screen.getByLabelText("Name"));
+
+      expect(saveButton().disabled).toBe(true);
+    });
+  });
 });
