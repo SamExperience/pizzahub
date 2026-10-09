@@ -11,14 +11,40 @@ import { useAuth } from "./AuthContext";
 
 const StoreContext = createContext();
 
+// Keeps the active Store across page reloads. Storage can be unavailable
+// (private mode, blocked data), so every access is guarded.
+const SELECTED_STORE_KEY = "pizzahub.selectedStoreId";
+
+const readSelectedStoreId = () => {
+  try {
+    return localStorage.getItem(SELECTED_STORE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeSelectedStoreId = (storeId) => {
+  try {
+    if (storeId) localStorage.setItem(SELECTED_STORE_KEY, storeId);
+    else localStorage.removeItem(SELECTED_STORE_KEY);
+  } catch {
+    // Persistence is a convenience: ignore storage failures.
+  }
+};
+
 export function StoreProvider({ children }) {
   const [accessibleStore, setAccessibleStore] = useState(null);
-  const [selectedStore, setselectedStore] = useState(null);
+  const [selectedStore, setSelectedStoreState] = useState(null);
   const [loadingStore, setLoadingStore] = useState(true);
   const [errorStore, setErrorStore] = useState(null);
   // null until the selected Store's readiness is known.
   const [menuReady, setMenuReady] = useState(null);
   const { authUser, loadingLogin, userProfile } = useAuth();
+
+  const setselectedStore = useCallback((store) => {
+    writeSelectedStoreId(store?.id ?? null);
+    setSelectedStoreState(store);
+  }, []);
 
   const fetchAccesibleStore = useCallback(async () => {
     setErrorStore(null);
@@ -28,6 +54,8 @@ export function StoreProvider({ children }) {
       const store = await getAccessibleStore(authUser.uid);
       setLoadingStore(false);
       setAccessibleStore(store);
+      // Restore the Store chosen before a reload, if it is still accessible.
+      if (readSelectedStoreId() === store.id) setSelectedStoreState(store);
       console.log(">>>Store: ", store);
     } catch (error) {
       console.log("Error fetch store-> ", error);
@@ -73,7 +101,13 @@ export function StoreProvider({ children }) {
     if (!userProfile) return;
 
     fetchAccesibleStore();
-  }, [authUser, loadingLogin, userProfile, fetchAccesibleStore]);
+  }, [
+    authUser,
+    loadingLogin,
+    userProfile,
+    fetchAccesibleStore,
+    setselectedStore,
+  ]);
 
   return (
     <StoreContext.Provider
