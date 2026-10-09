@@ -43,7 +43,7 @@ describe("TableauBoard", () => {
     expect(screen.getByLabelText("Completed tickets").textContent).toBe("1");
     const pending = screen.getByRole("heading", { name: "Pending" })
       .closest("section");
-    expect(within(pending).getByText("a")).toBeTruthy();
+    expect(within(pending).getAllByRole("article")).toHaveLength(2);
   });
 
   it("shows only the loading message while loading", () => {

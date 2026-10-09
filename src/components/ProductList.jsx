@@ -9,6 +9,7 @@ import {
   updateProductById,
   uploadProductImage,
 } from "../services/product.service";
+import { formatPrice } from "../utils/format";
 import {
   alert,
   button,
@@ -18,8 +19,6 @@ import {
   primaryButton,
 } from "../utils/styles";
 import ProductForm from "./ProductForm";
-
-const formatPrice = (value) => `€${value.toFixed(2)}`;
 
 // Single price, or one "Size: price" entry per size (decision A1).
 const formatPricing = ({ price, sizes }) =>

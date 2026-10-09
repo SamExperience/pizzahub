@@ -1,4 +1,5 @@
 import { card, muted } from "../utils/styles";
+import TicketCard from "./TicketCard";
 
 // One status column of the Tableau: header with ticket count, then the tickets.
 export default function TableauColumn({ title, orders }) {
@@ -22,8 +23,8 @@ export default function TableauColumn({ title, orders }) {
       ) : (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {orders.map((order) => (
-            <li key={order.id} className={muted}>
-              {order.id}
+            <li key={order.id}>
+              <TicketCard order={order} />
             </li>
           ))}
         </ul>
