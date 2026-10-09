@@ -5,10 +5,13 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { beforeAll, describe, expect, it } from "vitest";
-import { db } from "../src/services/firebase";
+import { app, auth, db } from "../src/services/firebase";
 import { login, register, signout } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { createMenu } from "../src/services/menu.service";
@@ -161,6 +164,103 @@ describe("products rules", () => {
     await expect(
       updateDoc(ref, { categoryId: storeB.categoryId }),
     ).rejects.toThrow();
+  });
+});
+
+// Orders and customers are read-only for clients, so they are seeded through
+// the Firestore emulator REST API, which bypasses the rules ("Bearer owner").
+const seedDoc = async (collectionName, fields) => {
+  const url = `http://localhost:8080/v1/projects/${app.options.projectId}/databases/(default)/documents/${collectionName}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer owner",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fields: Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [
+          key,
+          { stringValue: value },
+        ]),
+      ),
+    }),
+  });
+  if (!response.ok) throw new Error(`Seeding ${collectionName} failed`);
+  const { name } = await response.json();
+  return name.split("/").pop();
+};
+
+describe("orders and customers rules", () => {
+  let orderAId;
+  let orderBId;
+  let customerAId;
+
+  beforeAll(async () => {
+    await signInAs(storeA);
+    const profile = await getDoc(doc(db, "users", auth.currentUser.uid));
+    const companyId = profile.data().companyId;
+    orderAId = await seedDoc("orders", { storeId: storeA.storeId });
+    orderBId = await seedDoc("orders", { storeId: storeB.storeId });
+    customerAId = await seedDoc("customers", { companyId });
+  });
+
+  it("lets the owner read and query their store's orders", async () => {
+    await signInAs(storeA);
+    expect((await getDoc(doc(db, "orders", orderAId))).exists()).toBe(true);
+    const snapshot = await getDocs(
+      query(collection(db, "orders"), where("storeId", "==", storeA.storeId)),
+    );
+    expect(snapshot.docs.map((d) => d.id)).toEqual([orderAId]);
+  });
+
+  it("denies another store reading or querying the orders", async () => {
+    await signInAs(storeB);
+    await expect(getDoc(doc(db, "orders", orderAId))).rejects.toThrow();
+    await expect(
+      getDocs(
+        query(collection(db, "orders"), where("storeId", "==", storeA.storeId)),
+      ),
+    ).rejects.toThrow();
+    expect((await getDoc(doc(db, "orders", orderBId))).exists()).toBe(true);
+  });
+
+  it("denies the owner creating, updating and deleting orders", async () => {
+    await signInAs(storeA);
+    const ref = doc(db, "orders", orderAId);
+    await expect(
+      addDoc(collection(db, "orders"), { storeId: storeA.storeId }),
+    ).rejects.toThrow();
+    await expect(updateDoc(ref, { status: "Completed" })).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("lets the owner read their company's customers", async () => {
+    await signInAs(storeA);
+    expect(
+      (await getDoc(doc(db, "customers", customerAId))).exists(),
+    ).toBe(true);
+  });
+
+  it("denies another company reading the customers", async () => {
+    await signInAs(storeB);
+    await expect(getDoc(doc(db, "customers", customerAId))).rejects.toThrow();
+  });
+
+  it("denies the owner writing customers", async () => {
+    await signInAs(storeA);
+    const ref = doc(db, "customers", customerAId);
+    await expect(
+      addDoc(collection(db, "customers"), { firstName: "X" }),
+    ).rejects.toThrow();
+    await expect(updateDoc(ref, { firstName: "X" })).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies unauthenticated reads", async () => {
+    await signout();
+    await expect(getDoc(doc(db, "orders", orderAId))).rejects.toThrow();
+    await expect(getDoc(doc(db, "customers", customerAId))).rejects.toThrow();
   });
 });
 
