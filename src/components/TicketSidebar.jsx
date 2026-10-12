@@ -54,15 +54,15 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   const [customersRetryKey, setCustomersRetryKey] = useState(0);
   const [customerForm, setCustomerForm] = useState(EMPTY_CUSTOMER_FORM);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  // Inline field errors, the saving state and the error of a failed save.
-  const [errors, setErrors] = useState({});
+  // Inline field errors appear after the first save attempt and then follow the form.
+  const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const found = validateTicketForm({ orderType, form: customerForm, scheduledTime, items });
+  const errors = submitted ? found : {};
 
   const handleSave = async () => {
-    const found = validateTicketForm({ orderType, form: customerForm, scheduledTime, items });
-
-    setErrors(found);
+    setSubmitted(true);
     setSaveError(null);
 
     if (Object.keys(found).length > 0) return;

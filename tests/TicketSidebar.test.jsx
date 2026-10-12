@@ -258,6 +258,18 @@ describe("TicketSidebar", () => {
     expect(createOrder).not.toHaveBeenCalled();
   });
 
+  it("clears an inline error as soon as the field is fixed", async () => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+    expect(screen.getByText("First name is required")).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+
+    expect(screen.queryByText("First name is required")).toBeNull();
+    expect(screen.getByText("Add at least one product")).toBeTruthy();
+  });
+
   it("saves a valid ticket and closes the sidebar", async () => {
     const onClose = vi.fn();
     createOrder.mockResolvedValue("order-1");
