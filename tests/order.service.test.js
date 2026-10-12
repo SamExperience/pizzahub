@@ -29,6 +29,7 @@ import {
   cancelOrder,
   createOrder,
   getTodayRange,
+  sortColumnOrders,
   subscribeToTodayOrders,
   updateItemQuantity,
   updateOrder,
@@ -415,8 +416,8 @@ describe("updateOrder", () => {
 });
 
 describe("updateOrderStatus", () => {
-  it.each(["Pending", "In progress", "Completed"])(
-    "writes the %s status and updatedAt",
+  it.each(["Pending", "In progress"])(
+    "writes the %s status, clears completedAt and sets updatedAt",
     async (status) => {
       firestore.updateDoc.mockResolvedValue(undefined);
 
@@ -424,10 +425,21 @@ describe("updateOrderStatus", () => {
 
       expect(firestore.updateDoc).toHaveBeenCalledWith(
         { collectionName: "orders", id: "o1" },
-        { status, updatedAt: "server-time" },
+        { status, completedAt: null, updatedAt: "server-time" },
       );
     },
   );
+
+  it("records completedAt when the Order moves to Completed", async () => {
+    firestore.updateDoc.mockResolvedValue(undefined);
+
+    await updateOrderStatus("o1", "Completed");
+
+    expect(firestore.updateDoc).toHaveBeenCalledWith(
+      { collectionName: "orders", id: "o1" },
+      { status: "Completed", completedAt: "server-time", updatedAt: "server-time" },
+    );
+  });
 
   it("rejects Cancelled and unknown statuses", async () => {
     await expect(updateOrderStatus("o1", "Cancelled")).rejects.toThrow(
@@ -443,6 +455,58 @@ describe("updateOrderStatus", () => {
     await expect(updateOrderStatus("", "Pending")).rejects.toThrow(
       "Order ID is required",
     );
+  });
+});
+
+describe("sortColumnOrders", () => {
+  // Firestore-like Timestamp at the given hour of a fixed day.
+  const at = (hour, minute = 0) => {
+    const millis = new Date(2026, 9, 12, hour, minute).getTime();
+    return { toMillis: () => millis };
+  };
+  const ids = (orders) => orders.map((order) => order.id);
+
+  it("orders Pending and In progress by scheduled time, earliest first", () => {
+    const orders = [
+      { id: "a", scheduledTime: at(20) },
+      { id: "b", scheduledTime: at(19, 30) },
+      { id: "c", scheduledTime: new Date(2026, 9, 12, 19, 45) },
+    ];
+
+    expect(ids(sortColumnOrders("Pending", orders))).toEqual(["b", "c", "a"]);
+    expect(ids(sortColumnOrders("In progress", orders))).toEqual(["b", "c", "a"]);
+  });
+
+  it("orders Completed by completion time, latest first", () => {
+    const orders = [
+      { id: "a", completedAt: at(19), updatedAt: at(21) },
+      { id: "b", completedAt: at(20) },
+      { id: "c", completedAt: at(19, 30) },
+    ];
+
+    expect(ids(sortColumnOrders("Completed", orders))).toEqual(["b", "c", "a"]);
+  });
+
+  it("falls back to updatedAt and puts pending completion times first", () => {
+    const orders = [
+      { id: "old", updatedAt: at(18) },
+      { id: "done", completedAt: at(19) },
+      { id: "local", completedAt: null, updatedAt: null },
+    ];
+
+    expect(ids(sortColumnOrders("Completed", orders))).toEqual(["local", "done", "old"]);
+  });
+
+  it("keeps the received order on ties and does not mutate the input", () => {
+    const orders = [
+      { id: "a", scheduledTime: at(20) },
+      { id: "b", scheduledTime: at(20) },
+      { id: "c" },
+      { id: "d" },
+    ];
+
+    expect(ids(sortColumnOrders("Pending", orders))).toEqual(["a", "b", "c", "d"]);
+    expect(ids(orders)).toEqual(["a", "b", "c", "d"]);
   });
 });
 

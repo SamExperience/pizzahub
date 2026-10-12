@@ -192,7 +192,8 @@ export const updateOrder = async ({
   await batch.commit();
 };
 
-// Moves an Order to one of the active Tableau statuses.
+// Moves an Order to one of the active Tableau statuses. completedAt records
+// when the Order moved to Completed and is cleared when it moves back.
 export const updateOrderStatus = async (orderId, status) => {
   if (!orderId) throw new Error("Order ID is required");
 
@@ -200,8 +201,36 @@ export const updateOrderStatus = async (orderId, status) => {
 
   await updateDoc(doc(db, "orders", orderId), {
     status,
+    completedAt: status === ORDER_STATUS.COMPLETED ? serverTimestamp() : null,
     updatedAt: serverTimestamp(),
   });
+};
+
+// Milliseconds of a Firestore Timestamp or Date; null when missing.
+const toMillis = (value) => {
+  if (typeof value?.toMillis === "function") return value.toMillis();
+
+  return value instanceof Date ? value.getTime() : null;
+};
+
+// Orders of one Tableau column in display order: Pending and In progress by
+// scheduled time (earliest first); Completed by completion time (latest
+// first, falling back to updatedAt). A pending server timestamp (null right
+// after the local write) counts as the latest; ties keep the received order
+// (creation time). Returns a new array.
+export const sortColumnOrders = (status, orders) => {
+  const compare = (x, y) => (x === y ? 0 : x - y);
+
+  if (status === ORDER_STATUS.COMPLETED) {
+    const completedAt = (order) =>
+      toMillis(order.completedAt) ?? toMillis(order.updatedAt) ?? Infinity;
+
+    return [...orders].sort((a, b) => compare(completedAt(b), completedAt(a)));
+  }
+
+  const scheduledAt = (order) => toMillis(order.scheduledTime) ?? Infinity;
+
+  return [...orders].sort((a, b) => compare(scheduledAt(a), scheduledAt(b)));
 };
 
 // Cancels an Order (soft delete): the Order is kept with status Cancelled.
