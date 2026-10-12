@@ -13,6 +13,7 @@ const firestore = vi.hoisted(() => ({
       : { collectionName: name, id },
   ),
   serverTimestamp: vi.fn(() => "server-time"),
+  updateDoc: vi.fn(),
   writeBatch: vi.fn(),
 }));
 
@@ -25,10 +26,16 @@ import {
   ORDER_TYPE,
   buildItemSnapshot,
   calculateOrderTotal,
+  cancelOrder,
   createOrder,
+  editRestrictedItem,
   getTodayRange,
+  reconfigureItem,
+  sortColumnOrders,
   subscribeToTodayOrders,
   updateItemQuantity,
+  updateOrder,
+  updateOrderStatus,
   validateOrder,
 } from "../src/services/order.service";
 
@@ -131,6 +138,86 @@ describe("buildItemSnapshot", () => {
       expect(() => buildItemSnapshot(drink, { quantity })).toThrow(
         "Item quantity must be a positive integer",
       );
+  });
+});
+
+describe("reconfigureItem", () => {
+  // Saved when Large cost 12; the menu now says 13.2.
+  const saved = {
+    ...buildItemSnapshot(pizza, { size: "Large", quantity: 1 }),
+    unitPrice: 12,
+    subtotal: 12,
+  };
+
+  it("keeps the saved price when the size does not change", () => {
+    const item = reconfigureItem(pizza, saved, {
+      size: "Large",
+      cookingLevel: "Rare",
+      customizations: [" No basil "],
+      quantity: 3,
+    });
+
+    expect(item).toMatchObject({
+      size: "Large",
+      cookingLevel: "Rare",
+      customizations: ["No basil"],
+      quantity: 3,
+      unitPrice: 12,
+      subtotal: 36,
+    });
+  });
+
+  it("uses the current menu price when the size changes", () => {
+    const item = reconfigureItem(pizza, saved, { size: "Small", quantity: 2 });
+
+    expect(item).toMatchObject({ size: "Small", unitPrice: 9.5, subtotal: 19 });
+  });
+
+  it("keeps the saved price of a product without sizes", () => {
+    const savedCola = { ...buildItemSnapshot(drink, { quantity: 1 }), unitPrice: 3, subtotal: 3 };
+
+    expect(reconfigureItem(drink, savedCola, { quantity: 2 })).toMatchObject({
+      unitPrice: 3,
+      subtotal: 6,
+    });
+  });
+
+  it("validates the options like a new Item", () => {
+    expect(() => reconfigureItem(pizza, saved, { size: "XL", quantity: 1 })).toThrow(
+      "Item size is required",
+    );
+  });
+});
+
+describe("editRestrictedItem", () => {
+  const saved = {
+    productId: "p1",
+    productName: "Margherita",
+    size: "Large",
+    unitPrice: 12,
+    quantity: 3,
+    cookingLevel: "Rare",
+    customizations: ["No basil"],
+    subtotal: 36,
+  };
+
+  it("changes only customizations and quantity, keeping size, cooking level and price", () => {
+    expect(
+      editRestrictedItem(saved, { customizations: [" Well cut ", ""], quantity: 2 }, 3),
+    ).toEqual({ ...saved, customizations: ["Well cut"], quantity: 2, subtotal: 24 });
+  });
+
+  it("allows the saved quantity but not more", () => {
+    expect(editRestrictedItem(saved, { customizations: [], quantity: 3 }, 3).quantity).toBe(3);
+    expect(() => editRestrictedItem(saved, { customizations: [], quantity: 4 }, 3)).toThrow(
+      "Item quantity cannot exceed the quantity in the ticket",
+    );
+  });
+
+  it("requires a positive integer quantity", () => {
+    expect(() => editRestrictedItem(saved, { customizations: [], quantity: 0 }, 3)).toThrow(
+      "Item quantity must be a positive integer",
+    );
   });
 });
 
@@ -305,12 +392,244 @@ describe("createOrder", () => {
   });
 });
 
+describe("updateOrder", () => {
+  const createBatch = () => ({
+    set: vi.fn(),
+    update: vi.fn(),
+    commit: vi.fn().mockResolvedValue(undefined),
+  });
+
+  const params = (overrides = {}) => ({
+    companyId: "company1",
+    orderId: "o1",
+    customerData: { firstName: "Mario" },
+    existingCustomer: { id: "c1", firstName: "Mario" },
+    ...validOrder(),
+    ...overrides,
+  });
+
+  it("updates only the Order content fields with the recalculated total", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await expect(updateOrder(params())).resolves.toBeUndefined();
+
+    expect(batch.set).not.toHaveBeenCalled();
+    expect(batch.update).toHaveBeenCalledTimes(1);
+    expect(batch.update).toHaveBeenCalledWith(
+      { collectionName: "orders", id: "o1" },
+      {
+        customerId: "c1",
+        items: validOrder().items,
+        orderType: "takeaway",
+        scheduledTime: validOrder().scheduledTime,
+        total: 6.6,
+        updatedAt: "server-time",
+      },
+    );
+    expect(batch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates a new Customer in the same batch and references it", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await updateOrder(params({ existingCustomer: null, customerData: { firstName: "Anna" } }));
+
+    expect(batch.set).toHaveBeenCalledWith(
+      { collectionName: "customers", id: "new-customers" },
+      expect.objectContaining({ companyId: "company1", firstName: "Anna" }),
+    );
+    expect(batch.update).toHaveBeenCalledWith(
+      { collectionName: "orders", id: "o1" },
+      expect.objectContaining({ customerId: "new-customers" }),
+    );
+    expect(batch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates an edited existing Customer in the same batch", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await updateOrder(params({ customerData: { firstName: "Mario", phone: "123" } }));
+
+    expect(batch.update).toHaveBeenCalledWith(
+      { collectionName: "customers", id: "c1" },
+      expect.objectContaining({ phone: "123", updatedAt: "server-time" }),
+    );
+    expect(batch.update).toHaveBeenCalledTimes(2);
+    expect(batch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("never writes status, storeId or createdAt", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await updateOrder(params({ status: "Completed", storeId: "s2", createdAt: "x" }));
+
+    const data = batch.update.mock.calls[0][1];
+    expect(data).not.toHaveProperty("status");
+    expect(data).not.toHaveProperty("storeId");
+    expect(data).not.toHaveProperty("createdAt");
+  });
+
+  it("does not write anything when the order or the Customer is invalid", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await expect(updateOrder(params({ items: [] }))).rejects.toThrow(
+      "Order must have at least one item",
+    );
+    await expect(
+      updateOrder(params({ orderType: ORDER_TYPE.DELIVERY })),
+    ).rejects.toThrow("Customer phone is required for delivery");
+
+    expect(batch.commit).not.toHaveBeenCalled();
+  });
+
+  it("requires the Company and the Order", async () => {
+    await expect(updateOrder(params({ companyId: "" }))).rejects.toThrow(
+      "Company ID is required",
+    );
+    await expect(updateOrder(params({ orderId: "" }))).rejects.toThrow(
+      "Order ID is required",
+    );
+  });
+});
+
+describe("updateOrderStatus", () => {
+  it.each(["Pending", "In progress"])(
+    "writes the %s status, clears completedAt and sets updatedAt",
+    async (status) => {
+      firestore.updateDoc.mockResolvedValue(undefined);
+
+      await updateOrderStatus("o1", status);
+
+      expect(firestore.updateDoc).toHaveBeenCalledWith(
+        { collectionName: "orders", id: "o1" },
+        { status, completedAt: null, updatedAt: "server-time" },
+      );
+    },
+  );
+
+  it("records completedAt when the Order moves to Completed", async () => {
+    firestore.updateDoc.mockResolvedValue(undefined);
+
+    await updateOrderStatus("o1", "Completed");
+
+    expect(firestore.updateDoc).toHaveBeenCalledWith(
+      { collectionName: "orders", id: "o1" },
+      { status: "Completed", completedAt: "server-time", updatedAt: "server-time" },
+    );
+  });
+
+  it("rejects Cancelled and unknown statuses", async () => {
+    await expect(updateOrderStatus("o1", "Cancelled")).rejects.toThrow(
+      "Order status is invalid",
+    );
+    await expect(updateOrderStatus("o1", "Done")).rejects.toThrow(
+      "Order status is invalid",
+    );
+    expect(firestore.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("requires the Order ID", async () => {
+    await expect(updateOrderStatus("", "Pending")).rejects.toThrow(
+      "Order ID is required",
+    );
+  });
+});
+
+describe("sortColumnOrders", () => {
+  // Firestore-like Timestamp at the given hour of a fixed day.
+  const at = (hour, minute = 0) => {
+    const millis = new Date(2026, 9, 12, hour, minute).getTime();
+    return { toMillis: () => millis };
+  };
+  const ids = (orders) => orders.map((order) => order.id);
+
+  it("orders Pending and In progress by scheduled time, earliest first", () => {
+    const orders = [
+      { id: "a", scheduledTime: at(20) },
+      { id: "b", scheduledTime: at(19, 30) },
+      { id: "c", scheduledTime: new Date(2026, 9, 12, 19, 45) },
+    ];
+
+    expect(ids(sortColumnOrders("Pending", orders))).toEqual(["b", "c", "a"]);
+    expect(ids(sortColumnOrders("In progress", orders))).toEqual(["b", "c", "a"]);
+  });
+
+  it("orders Completed by completion time, latest first", () => {
+    const orders = [
+      { id: "a", completedAt: at(19), updatedAt: at(21) },
+      { id: "b", completedAt: at(20) },
+      { id: "c", completedAt: at(19, 30) },
+    ];
+
+    expect(ids(sortColumnOrders("Completed", orders))).toEqual(["b", "c", "a"]);
+  });
+
+  it("puts pending completion times first and Orders without completedAt last", () => {
+    const orders = [
+      { id: "old1", updatedAt: at(21) },
+      { id: "done", completedAt: at(19), updatedAt: at(22) },
+      { id: "old2", updatedAt: at(18) },
+      { id: "local", completedAt: null, updatedAt: null },
+    ];
+
+    // updatedAt is ignored: an edit never moves a ticket.
+    expect(ids(sortColumnOrders("Completed", orders))).toEqual([
+      "local",
+      "done",
+      "old1",
+      "old2",
+    ]);
+  });
+
+  it("keeps the received order on ties and does not mutate the input", () => {
+    const orders = [
+      { id: "a", scheduledTime: at(20) },
+      { id: "b", scheduledTime: at(20) },
+      { id: "c" },
+      { id: "d" },
+    ];
+
+    expect(ids(sortColumnOrders("Pending", orders))).toEqual(["a", "b", "c", "d"]);
+    expect(ids(orders)).toEqual(["a", "b", "c", "d"]);
+  });
+});
+
+describe("cancelOrder", () => {
+  it("sets the status to Cancelled instead of deleting", async () => {
+    firestore.updateDoc.mockResolvedValue(undefined);
+
+    await cancelOrder("o1");
+
+    expect(firestore.updateDoc).toHaveBeenCalledWith(
+      { collectionName: "orders", id: "o1" },
+      { status: "Cancelled", updatedAt: "server-time" },
+    );
+  });
+
+  it("requires the Order ID", async () => {
+    await expect(cancelOrder("")).rejects.toThrow("Order ID is required");
+    expect(firestore.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("propagates write errors", async () => {
+    firestore.updateDoc.mockRejectedValue(new Error("permission-denied"));
+
+    await expect(cancelOrder("o1")).rejects.toThrow("permission-denied");
+  });
+});
+
 describe("order constants", () => {
   it("defines the English statuses in Tableau column order", () => {
     expect(ORDER_STATUSES).toEqual(["Pending", "In progress", "Completed"]);
     expect(ORDER_STATUS.PENDING).toBe("Pending");
     expect(ORDER_STATUS.IN_PROGRESS).toBe("In progress");
     expect(ORDER_STATUS.COMPLETED).toBe("Completed");
+    expect(ORDER_STATUS.CANCELLED).toBe("Cancelled");
   });
 
   it("defines the order types", () => {
@@ -420,6 +739,23 @@ describe("subscribeToTodayOrders", () => {
       { id: "o1", status: "In progress" },
       { id: "o2", status: "Pending" },
     ]);
+  });
+
+  it("leaves out Cancelled orders", () => {
+    const onChange = vi.fn();
+    firestore.onSnapshot.mockImplementation((q, next) => {
+      next({
+        docs: [
+          { id: "o1", data: () => ({ status: "Pending" }) },
+          { id: "o2", data: () => ({ status: "Cancelled" }) },
+        ],
+      });
+      return vi.fn();
+    });
+
+    subscribeToTodayOrders("store-1", onChange);
+
+    expect(onChange).toHaveBeenCalledWith([{ id: "o1", status: "Pending" }]);
   });
 
   it("delivers an empty list when there are no orders", () => {

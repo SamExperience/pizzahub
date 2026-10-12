@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { getCustomer } from "../services/customer.service";
-import { ORDER_TYPE } from "../services/order.service";
+import { subscribeToCustomer } from "../services/customer.service";
+import { ORDER_STATUSES, ORDER_TYPE } from "../services/order.service";
 import { formatPrice, formatTime } from "../utils/format";
-import { muted } from "../utils/styles";
+import { alert, button, dangerButton, muted } from "../utils/styles";
 
 const ORDER_TYPE_LABEL = {
   [ORDER_TYPE.TAKEAWAY]: "Takeaway",
@@ -17,25 +17,22 @@ const formatAddress = (address) =>
     .filter(Boolean)
     .join(", ");
 
-// Loads the Customer referenced by the Order; null while loading or when unavailable.
+// Customer referenced by the Order, kept up to date in real time (it can be
+// edited from any ticket); null while loading or when unavailable.
 function useCustomer(customerId) {
   const [result, setResult] = useState({ id: null, customer: null });
 
   useEffect(() => {
     if (!customerId) return;
 
-    let cancelled = false;
-
-    getCustomer(customerId)
-      .then((customer) => !cancelled && setResult({ id: customerId, customer }))
-      .catch((error) => {
+    return subscribeToCustomer(
+      customerId,
+      (customer) => setResult({ id: customerId, customer }),
+      (error) => {
         console.log("Error loading customer -> ", error);
-        if (!cancelled) setResult({ id: customerId, customer: null });
-      });
-
-    return () => {
-      cancelled = true;
-    };
+        setResult({ id: customerId, customer: null });
+      },
+    );
   }, [customerId]);
 
   return {
@@ -87,8 +84,40 @@ function TicketItem({ item }) {
   );
 }
 
-// One ticket of the Tableau: order type and time, customer, items, total, status.
-export default function TicketCard({ order }) {
+// One ticket of the Tableau: order type and time, customer, items, total,
+// status, the arrows that move it one status back or forward and the edit
+// and cancel actions.
+export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const statusIndex = ORDER_STATUSES.indexOf(order.status);
+  const previousStatus = statusIndex > 0 ? ORDER_STATUSES[statusIndex - 1] : null;
+  const nextStatus =
+    statusIndex >= 0 && statusIndex < ORDER_STATUSES.length - 1
+      ? ORDER_STATUSES[statusIndex + 1]
+      : null;
+
+  // Runs a ticket action; the real-time listener then updates the Tableau.
+  const run = async (action) => {
+    setSaving(true);
+    setError(null);
+
+    try {
+      await action();
+    } catch (err) {
+      console.log("Error updating ticket -> ", err);
+      setError(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (window.confirm("Cancel this ticket? This cannot be undone."))
+      run(() => onCancel(order));
+  };
+
   return (
     <article className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
       <header className="flex items-center justify-between gap-2 text-sm font-semibold">
@@ -107,6 +136,65 @@ export default function TicketCard({ order }) {
         </span>
         <strong>{formatPrice(order.total)}</strong>
       </footer>
+      {onChangeStatus && (previousStatus || nextStatus) && (
+        <div className="flex items-center justify-between gap-2">
+          {previousStatus ? (
+            <button
+              type="button"
+              className={button}
+              aria-label={`Move to ${previousStatus}`}
+              disabled={saving}
+              onClick={() => run(() => onChangeStatus(order, previousStatus))}
+            >
+              ← {previousStatus}
+            </button>
+          ) : (
+            <span />
+          )}
+          {nextStatus && (
+            <button
+              type="button"
+              className={button}
+              aria-label={`Move to ${nextStatus}`}
+              disabled={saving}
+              onClick={() => run(() => onChangeStatus(order, nextStatus))}
+            >
+              {nextStatus} →
+            </button>
+          )}
+        </div>
+      )}
+      {(onEdit || onCancel) && (
+        <div className="flex justify-end gap-2">
+          {onEdit && (
+            <button
+              type="button"
+              className={button}
+              aria-label="Edit ticket"
+              disabled={saving}
+              onClick={() => onEdit(order)}
+            >
+              Edit
+            </button>
+          )}
+          {onCancel && (
+            <button
+              type="button"
+              className={dangerButton}
+              aria-label="Cancel ticket"
+              disabled={saving}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+      {error && (
+        <p role="alert" className={`${alert} m-0`}>
+          Could not update the ticket. Try again.
+        </p>
+      )}
     </article>
   );
 }

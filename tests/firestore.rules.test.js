@@ -227,7 +227,7 @@ describe("orders and customers rules", () => {
     expect((await getDoc(doc(db, "orders", orderBId))).exists()).toBe(true);
   });
 
-  it("denies the owner updating and deleting orders", async () => {
+  it("denies the owner deleting orders or updating them without updatedAt", async () => {
     await signInAs(storeA);
     const ref = doc(db, "orders", orderAId);
     await expect(updateDoc(ref, { status: "Completed" })).rejects.toThrow();
@@ -438,6 +438,166 @@ describe("orders and customers write rules", () => {
     await writeBatch(db).set(ref, customerFields(companyB)).commit();
     return ref.id;
   };
+
+  // Takeaway Order of store A for a new Customer; returns its reference.
+  const createOrderA = async () => {
+    await signInAs(storeA);
+    const id = await commitOrder(
+      (customerId) => orderFields(storeA.storeId, customerId),
+      customerFields(companyA, { phone: null, address: null }),
+    );
+    return doc(db, "orders", id);
+  };
+
+  // Status change as written by updateOrderStatus and cancelOrder.
+  const setStatus = (ref, status) =>
+    updateDoc(ref, {
+      status,
+      updatedAt: serverTimestamp(),
+      ...(status === "Completed" && { completedAt: serverTimestamp() }),
+      ...((status === "Pending" || status === "In progress") && { completedAt: null }),
+    });
+
+  // Content edit as written by updateOrder.
+  const editContent = (ref, customerId, extra = {}) =>
+    updateDoc(ref, {
+      customerId,
+      orderType: "takeaway",
+      scheduledTime: new Date(Date.now() + 60 * 60 * 1000),
+      items: [{ productId: "p1", productName: "Margherita", quantity: 2 }],
+      total: 20,
+      updatedAt: serverTimestamp(),
+      ...extra,
+    });
+
+  it("lets the owner change the status of an order and cancel it", async () => {
+    const ref = await createOrderA();
+    await setStatus(ref, "In progress");
+    await setStatus(ref, "Completed");
+    await setStatus(ref, "Pending");
+    await setStatus(ref, "Cancelled");
+    expect((await getDoc(ref)).data().status).toBe("Cancelled");
+  });
+
+  it("records completedAt on completion and clears it when moving back", async () => {
+    const ref = await createOrderA();
+    await setStatus(ref, "In progress");
+    await setStatus(ref, "Completed");
+    expect((await getDoc(ref)).data().completedAt).toBeTruthy();
+    await setStatus(ref, "In progress");
+    expect((await getDoc(ref)).data().completedAt).toBeNull();
+    await setStatus(ref, "Completed");
+    await setStatus(ref, "Cancelled");
+    expect((await getDoc(ref)).data().completedAt).toBeTruthy();
+  });
+
+  it("denies an invalid completedAt", async () => {
+    const ref = await createOrderA();
+    const update = (data) => updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+
+    await expect(update({ status: "Completed" })).rejects.toThrow();
+    await expect(
+      update({ status: "Completed", completedAt: new Date(2020, 0, 1) }),
+    ).rejects.toThrow();
+    await expect(
+      update({ status: "In progress", completedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await expect(
+      update({ status: "Cancelled", completedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await setStatus(ref, "Completed");
+    await expect(update({ status: "In progress" })).rejects.toThrow();
+  });
+
+  it("denies an unknown status and a status change with other fields", async () => {
+    const ref = await createOrderA();
+    await expect(setStatus(ref, "Done")).rejects.toThrow();
+    await expect(
+      updateDoc(ref, { status: "Completed", total: 1, updatedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+  });
+
+  it("denies any update of a cancelled order", async () => {
+    const ref = await createOrderA();
+    const { customerId } = (await getDoc(ref)).data();
+    await setStatus(ref, "Cancelled");
+    await expect(setStatus(ref, "Pending")).rejects.toThrow();
+    await expect(editContent(ref, customerId)).rejects.toThrow();
+  });
+
+  it("lets the owner edit an order with an existing customer", async () => {
+    const ref = await createOrderA();
+    const customerId = await createCustomer();
+    await editContent(ref, customerId, { orderType: "delivery" });
+    const order = (await getDoc(ref)).data();
+    expect(order).toMatchObject({ customerId, orderType: "delivery", total: 20 });
+    expect(order.status).toBe("Pending");
+  });
+
+  it("lets the owner edit an order with a new customer in one batch", async () => {
+    const ref = await createOrderA();
+    const customerRef = doc(collection(db, "customers"));
+    await writeBatch(db)
+      .set(customerRef, customerFields(companyA))
+      .update(ref, {
+        customerId: customerRef.id,
+        orderType: "delivery",
+        updatedAt: serverTimestamp(),
+      })
+      .commit();
+    expect((await getDoc(ref)).data().customerId).toBe(customerRef.id);
+  });
+
+  it("denies invalid order edits", async () => {
+    const ref = await createOrderA();
+    const { customerId } = (await getDoc(ref)).data();
+    const noDetails = await createCustomer({ phone: null, address: null });
+
+    await expect(
+      editContent(ref, noDetails, { orderType: "delivery" }),
+    ).rejects.toThrow();
+    await expect(editContent(ref, customerId, { items: [] })).rejects.toThrow();
+    await expect(editContent(ref, customerId, { orderType: "dinein" })).rejects.toThrow();
+    await expect(editContent(ref, customerId, { extra: "x" })).rejects.toThrow();
+    await expect(
+      editContent(ref, customerId, { storeId: storeB.storeId }),
+    ).rejects.toThrow();
+    await expect(
+      editContent(ref, customerId, { createdAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await expect(
+      editContent(ref, customerId, { status: "Completed" }),
+    ).rejects.toThrow();
+  });
+
+  it("denies editing an order with another company's customer", async () => {
+    const ref = await createOrderA();
+    await signInAs(storeB);
+    const customerB = await createCustomerForB();
+    await signInAs(storeA);
+    await expect(editContent(ref, customerB)).rejects.toThrow();
+  });
+
+  it("denies another store updating or deleting an order", async () => {
+    const ref = await createOrderA();
+    const { customerId } = (await getDoc(ref)).data();
+    await signInAs(storeB);
+    await expect(setStatus(ref, "Completed")).rejects.toThrow();
+    await expect(setStatus(ref, "Cancelled")).rejects.toThrow();
+    await expect(editContent(ref, customerId)).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies the owner deleting an order", async () => {
+    const ref = await createOrderA();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies unauthenticated order updates", async () => {
+    const ref = await createOrderA();
+    await signout();
+    await expect(setStatus(ref, "Completed")).rejects.toThrow();
+  });
 });
 
 describe("unauthenticated access", () => {

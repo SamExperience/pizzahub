@@ -366,6 +366,35 @@ export const getProductById = async (productId) => {
   };
 };
 
+export const ITEM_PRODUCT_STATUS = {
+  SELLABLE: "sellable",
+  UNAVAILABLE: "unavailable",
+  DELETED: "deleted",
+};
+
+// Current Product of an Order Item with its status: sellable (exists and
+// available), unavailable, or deleted (product null). Reading a deleted
+// Product, or one whose Category was deleted, is denied by the rules
+// because they check its Category, so permission-denied also means deleted.
+export const getItemProduct = async (productId) => {
+  try {
+    const product = await getProductById(productId);
+
+    return {
+      status:
+        product.isAvailable === false
+          ? ITEM_PRODUCT_STATUS.UNAVAILABLE
+          : ITEM_PRODUCT_STATUS.SELLABLE,
+      product,
+    };
+  } catch (err) {
+    if (err?.message === "Product not found" || err?.code === "permission-denied")
+      return { status: ITEM_PRODUCT_STATUS.DELETED, product: null };
+
+    throw err;
+  }
+};
+
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 // Uploads the product image to a fixed path, so replacing it overwrites the

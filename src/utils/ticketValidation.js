@@ -13,11 +13,14 @@ const DELIVERY_ADDRESS_LABELS = {
 const isBlank = (value) => typeof value !== "string" || value.trim() === "";
 
 // Returns an object with one message per invalid field; empty when valid.
+// originalTime (edit mode): an unchanged scheduled time is accepted even
+// when it is already past.
 export const validateTicketForm = ({
   orderType,
   form,
   scheduledTime,
   items,
+  originalTime = null,
   now = new Date(),
 }) => {
   const errors = {};
@@ -36,7 +39,11 @@ export const validateTicketForm = ({
 
   if (!date) errors.scheduledTime = "Scheduled time is required";
   // The time input has minute precision: the current minute is still valid.
-  else if (date.getTime() < Math.floor(now.getTime() / 60000) * 60000) errors.scheduledTime = "Scheduled time is in the past";
+  else if (
+    scheduledTime !== originalTime &&
+    date.getTime() < Math.floor(now.getTime() / 60000) * 60000
+  )
+    errors.scheduledTime = "Scheduled time is in the past";
 
   if (!items?.length) errors.items = "Add at least one product";
 

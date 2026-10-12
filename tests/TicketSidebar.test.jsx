@@ -1,12 +1,12 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketSidebar from "../src/components/TicketSidebar";
 import { getCategoriesByMenuId } from "../src/services/category.service";
-import { getCustomersByCompanyId } from "../src/services/customer.service";
+import { getCustomer, getCustomersByCompanyId } from "../src/services/customer.service";
 import { getMenuByStoreId } from "../src/services/menu.service";
-import { createOrder } from "../src/services/order.service";
-import { getProductsByCategoryId } from "../src/services/product.service";
+import { createOrder, updateOrder } from "../src/services/order.service";
+import { getItemProduct, getProductsByCategoryId } from "../src/services/product.service";
 import { formatPrice } from "../src/utils/format";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
@@ -15,16 +15,20 @@ vi.mock("../src/services/category.service", () => ({
   getCategoriesByMenuId: vi.fn(),
 }));
 vi.mock("../src/services/product.service", () => ({
+  ITEM_PRODUCT_STATUS: { SELLABLE: "sellable", UNAVAILABLE: "unavailable", DELETED: "deleted" },
+  getItemProduct: vi.fn(),
   getProductsByCategoryId: vi.fn(),
 }));
 vi.mock("../src/services/customer.service", async (importOriginal) => ({
   ...(await importOriginal()),
+  getCustomer: vi.fn(),
   getCustomersByCompanyId: vi.fn(),
 }));
 
 vi.mock("../src/services/order.service", async (importOriginal) => ({
   ...(await importOriginal()),
   createOrder: vi.fn(),
+  updateOrder: vi.fn(),
 }));
 
 const WATER = {
@@ -337,6 +341,254 @@ describe("TicketSidebar", () => {
     expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save ticket" }).disabled).toBe(false);
     expect(screen.getByLabelText(/First name/).value).toBe("Anna");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("TicketSidebar item reconfiguration", () => {
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const renderWithWater = async (onClose = vi.fn()) => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+    await addWater();
+  };
+
+  it("reopens the full configuration step for a sellable product, keeping the price", async () => {
+    const onClose = vi.fn();
+    // The menu price changed from 2 to 2.5 since the Item was added.
+    getItemProduct.mockResolvedValue({ status: "sellable", product: { ...WATER, price: 2.5 } });
+    await renderWithWater(onClose);
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(getItemProduct).toHaveBeenCalledWith("p1");
+    expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+
+    // Escape closes only the configuration step.
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Increase quantity" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €4.00" }));
+
+    expect(screen.getAllByLabelText("Quantity of Water")).toHaveLength(1);
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("2");
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(4));
+  });
+
+  it("opens the restricted edit for an unavailable product and caps the quantity", async () => {
+    getItemProduct.mockResolvedValue({
+      status: "unavailable",
+      product: { ...WATER, isAvailable: false },
+    });
+    await renderWithWater();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(await screen.findByText(/no longer sellable/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(true);
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByText("Unavailable")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Increase quantity of Water" }).disabled).toBe(true);
+  });
+
+  it("opens the restricted edit for a deleted product", async () => {
+    getItemProduct.mockResolvedValue({ status: "deleted", product: null });
+    await renderWithWater();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+    expect(screen.getByText(/no longer sellable/)).toBeTruthy();
+    expect(screen.getByText("No longer on the menu")).toBeTruthy();
+  });
+
+  it("shows a load error when the product cannot be read", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    getItemProduct.mockRejectedValue(new Error("offline"));
+    await renderWithWater();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(await screen.findByText("Could not load the product. Try again.")).toBeTruthy();
+  });
+});
+
+describe("TicketSidebar edit mode", () => {
+  // Delivery Order scheduled today at 20:30 for Mario (CUSTOMERS[0]).
+  const scheduled = new Date();
+  scheduled.setHours(20, 30, 0, 0);
+  const ORDER = {
+    id: "o1",
+    customerId: "c1",
+    orderType: "delivery",
+    scheduledTime: { toDate: () => scheduled },
+    status: "In progress",
+    items: [
+      {
+        productId: "p1",
+        productName: "Water",
+        size: null,
+        unitPrice: 2,
+        quantity: 3,
+        cookingLevel: null,
+        customizations: [],
+        subtotal: 6,
+      },
+    ],
+    total: 6,
+  };
+
+  const renderEdit = (props = {}) =>
+    render(
+      <TicketSidebar
+        companyId="co1"
+        storeId="store-1"
+        order={ORDER}
+        onClose={vi.fn()}
+        {...props}
+      />,
+    );
+
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+    getCustomer.mockResolvedValue(CUSTOMERS[0]);
+    getItemProduct.mockResolvedValue({ status: "sellable", product: WATER });
+  });
+
+  it("loads the Products' status and caps Items no longer sellable", async () => {
+    getItemProduct.mockResolvedValue({ status: "unavailable", product: WATER });
+    renderEdit();
+
+    expect(await screen.findByText("Unavailable")).toBeTruthy();
+    expect(getItemProduct).toHaveBeenCalledWith("p1");
+
+    const increase = screen.getByRole("button", { name: "Increase quantity of Water" });
+
+    expect(increase.disabled).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Decrease quantity of Water" }));
+    expect(increase.disabled).toBe(false);
+    await userEvent.click(increase);
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("3");
+    expect(increase.disabled).toBe(true);
+  });
+
+  it("does not cap Items whose Product is sellable", async () => {
+    renderEdit();
+
+    await screen.findByDisplayValue("Mario");
+    await waitFor(() => expect(getItemProduct).toHaveBeenCalled());
+    expect(screen.queryByText("Unavailable")).toBeNull();
+    expect(screen.getByRole("button", { name: "Increase quantity of Water" }).disabled).toBe(
+      false,
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it("prefills the sidebar from the Order and its Customer", async () => {
+    renderEdit();
+
+    expect(screen.getByRole("dialog", { name: "Edit ticket" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Edit Ticket" })).toBeTruthy();
+    expect(screen.getByLabelText("Delivery").checked).toBe(true);
+    expect(screen.getByLabelText("Delivery time").value).toBe("20:30");
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("3");
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(6));
+    expect(await screen.findByDisplayValue("Mario")).toBeTruthy();
+    expect(getCustomer).toHaveBeenCalledWith("c1");
+    expect(screen.getByLabelText(/Phone/).value).toBe("333");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
+  });
+
+  it("saves the changes with updateOrder on the Order's day and closes", async () => {
+    const onClose = vi.fn();
+    updateOrder.mockResolvedValue();
+    renderEdit({ onClose });
+
+    await screen.findByDisplayValue("Mario");
+    await userEvent.click(screen.getByLabelText("Takeaway"));
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(createOrder).not.toHaveBeenCalled();
+    expect(updateOrder).toHaveBeenCalledTimes(1);
+
+    const args = updateOrder.mock.calls[0][0];
+
+    expect(args).toMatchObject({
+      companyId: "co1",
+      orderId: "o1",
+      orderType: "takeaway",
+      existingCustomer: CUSTOMERS[0],
+    });
+    expect(args.items[0]).toMatchObject({ quantity: 4, subtotal: 8 });
+    expect(args.scheduledTime).toEqual(scheduled);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts an unchanged past time but rejects a changed one", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(scheduled.getTime() + 2 * 60 * 60 * 1000));
+    updateOrder.mockResolvedValue();
+    renderEdit();
+
+    await screen.findByDisplayValue("Mario");
+    fireEvent.change(screen.getByLabelText("Delivery time"), { target: { value: "20:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.getByText("Scheduled time is in the past")).toBeTruthy();
+    expect(updateOrder).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Delivery time"), { target: { value: "20:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.queryByText("Scheduled time is in the past")).toBeNull();
+    expect(updateOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks saving until the Customer loads and retries after an error", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    getCustomer.mockRejectedValueOnce(new Error("boom"));
+    renderEdit();
+
+    expect(screen.getByText("Loading customer ...")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save changes" }).disabled).toBe(true);
+    expect(await screen.findByText("Could not load the ticket's customer.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save changes" }).disabled).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByDisplayValue("Mario")).toBeTruthy();
+    expect(getCustomer).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Save changes" }).disabled).toBe(false);
+  });
+
+  it("keeps the sidebar open and shows an error when the update fails", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const onClose = vi.fn();
+    updateOrder.mockRejectedValue(new Error("denied"));
+    renderEdit({ onClose });
+
+    await screen.findByDisplayValue("Mario");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
   });
 });

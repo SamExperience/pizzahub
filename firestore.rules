@@ -161,6 +161,20 @@ service cloud.firestore {
         && customer.address.city.size() > 0;
     }
 
+    // Order content editable on creation and on edit: customer, order type,
+    // scheduled time, items and total.
+    function isValidOrderContent(data) {
+      return data.customerId is string
+        && data.orderType in ["takeaway", "delivery"]
+        && data.items is list
+        && data.items.size() > 0
+        && data.total is number
+        && data.scheduledTime is timestamp
+        && orderCustomer(data.customerId).companyId == userCompanyId()
+        && (data.orderType != "delivery"
+          || hasDeliveryDetails(orderCustomer(data.customerId)));
+    }
+
     function isValidOrder(data) {
       return data.keys().hasOnly([
           "storeId", "customerId", "orderType", "scheduledTime", "status",
@@ -171,27 +185,55 @@ service cloud.firestore {
           "items", "total", "createdAt", "updatedAt"
         ])
         && data.storeId == userStoreId()
-        && data.customerId is string
-        && data.orderType in ["takeaway", "delivery"]
         && data.status == "Pending"
-        && data.items is list
-        && data.items.size() > 0
-        && data.total is number
-        && data.scheduledTime is timestamp
         && data.createdAt == request.time
         && data.updatedAt == request.time
-        && orderCustomer(data.customerId).companyId == userCompanyId()
-        && (data.orderType != "delivery"
-          || hasDeliveryDetails(orderCustomer(data.customerId)));
+        && isValidOrderContent(data);
     }
 
-    // Orders: update and delete are not allowed until milestone 10.
+    // Fields changed by the current Order update.
+    function orderChangedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Status change (Cancelled = soft delete). completedAt is the request time
+    // when the Order moves to Completed, null when it moves back, and
+    // unchanged on cancellation.
+    function isOrderStatusChange() {
+      let data = request.resource.data;
+
+      return orderChangedKeys().hasOnly(["status", "updatedAt", "completedAt"])
+        && (
+          (data.status == "Completed" && data.completedAt == request.time)
+          || (data.status in ["Pending", "In progress"]
+            && data.get("completedAt", null) == null)
+          || (data.status == "Cancelled"
+            && !orderChangedKeys().hasAny(["completedAt"]))
+        );
+    }
+
+    // Content edit; status, storeId and createdAt stay unchanged.
+    function isOrderContentEdit() {
+      return orderChangedKeys().hasOnly([
+          "customerId", "orderType", "scheduledTime", "items", "total",
+          "updatedAt"
+        ])
+        && isValidOrderContent(request.resource.data);
+    }
+
+    // Orders are never deleted; a Cancelled Order is final.
     match /orders/{orderId} {
       allow read: if request.auth != null
         && resource.data.storeId == userStoreId();
 
       allow create: if request.auth != null
         && isValidOrder(request.resource.data);
+
+      allow update: if request.auth != null
+        && resource.data.storeId == userStoreId()
+        && resource.data.status != "Cancelled"
+        && request.resource.data.updatedAt == request.time
+        && (isOrderStatusChange() || isOrderContentEdit());
     }
 
     match /customers/{customerId} {

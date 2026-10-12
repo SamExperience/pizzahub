@@ -1,6 +1,6 @@
 # PizzaHub
 
-PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu, create tickets (orders) and follow the Store's orders of the day in real time on the Tableau. The project is an MVP under active development; this document describes only what is implemented today.
+PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu, create, edit and cancel tickets (orders), move them through their statuses and follow the Store's orders of the day in real time on the Tableau. The project is an MVP under active development; this document describes only what is implemented today.
 
 ## Implemented features
 
@@ -36,10 +36,13 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 ### Tableau (real-time orders)
 
 - Three status columns: Pending, In progress, Completed.
-- Real-time listener on the active Store's orders of the current day (device time zone), sorted by creation time. It is renewed when the active Store changes and at midnight.
+- Real-time listener on the active Store's orders of the current day (device time zone). It is renewed when the active Store changes and at midnight. Cancelled Orders are not shown.
+- Column ordering: Pending and In progress by scheduled time (earliest first); Completed by completion time (latest first), with Orders that have no completion time last. Editing a ticket never changes its position.
 - Loading, empty and error states (with a retry action) and a responsive layout.
 - Ticket card: order type (Takeaway or Delivery), scheduled time, items (quantity, size, cooking level, customizations, subtotal), customer info (phone and address for delivery), total and status.
-- The **Create Ticket** button opens the ticket creation sidebar (see below). Existing tickets cannot be edited, deleted or moved between columns from the UI yet.
+- Each card reads its Customer in real time, so a customer change saved from any ticket updates every card of that Customer.
+- Card actions: status arrows, **Edit** and **Cancel** (see Ticket management).
+- The **Create Ticket** button opens the ticket creation sidebar (see below).
 
 ### Ticket creation
 
@@ -53,6 +56,16 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - Validation with inline errors, a saving state and error handling. On success the sidebar closes and the ticket appears in the Pending column.
 - The Customer and the Order are written atomically in a single batch. The Order stores item snapshots, the Customer reference, the order type, the scheduled time and the Pending status.
 
+### Ticket management
+
+- **Status changes** with back and forward arrows on the card: Pending can only move forward, In progress both ways, Completed only back. The card shows a saving state and an error message if the change fails. The completion time is recorded when a ticket moves to Completed and cleared when it moves back.
+- **Cancel** asks for confirmation and sets the status to Cancelled (soft delete). A cancelled ticket is final: it disappears from the Tableau, is kept in Firestore and can no longer be edited.
+- **Edit** reopens the ticket sidebar prefilled with the Order, in any status. Customer, order type, scheduled time and items can be changed; the Customer and the Order are saved in a single batch and the total is recalculated. Store, status and creation time are not changed by an edit. Concurrent edits follow a last-write-wins rule.
+- Items in the summary can be reconfigured by reopening the item configuration step:
+  - Product still on sale (exists and is available): full edit. The saved unit price is kept unless the size changes, in which case the current menu price applies.
+  - Product no longer on sale (unavailable or deleted): only customizations and a lower quantity can be changed; size, cooking level and price are locked, and **+** in the summary cannot exceed the quantity saved in the ticket.
+- Items always keep their snapshot: deleting a Product from the Menu never removes it from existing tickets. **Add product** still shows unavailable products as disabled.
+
 ### Other pages
 
 - **Dashboard** exists as a route with placeholder content only.
@@ -60,9 +73,9 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 ### Security
 
 - Firestore and Storage security rules restrict access to authenticated Users and isolate data per Company and Store.
-- Users can read and create the Orders of their Store; Orders cannot be updated or deleted yet.
+- Users can read, create and update the Orders of their Store. An update is either a status change (with the matching completion time) or a content edit (customer, order type, scheduled time, items, total); Store and creation time are immutable, cancelled Orders cannot be updated and Orders can never be deleted.
 - Users can read, create and update the Customers of their Company.
-- Created Orders and written Customers are checked for allowed and required fields.
+- Written Orders and Customers are checked for allowed and required fields.
 
 ## Tech stack
 
@@ -122,7 +135,7 @@ npx firebase-tools emulators:exec --only auth,firestore,storage "npm test -- --r
 ```text
 src/
   pages/        Route-level pages (Login, Onboarding, StoreSelection, Menu, Tableau, Dashboard)
-  components/   Reusable UI components (layout, route guards, category and product UI, Tableau board and ticket cards, ticket creation sidebar, customer section, menu panel, item configuration and ticket summary)
+  components/   Reusable UI components (layout, route guards, category and product UI, Tableau board and ticket cards, ticket sidebar for creation and editing, customer section, menu panel, item configuration and ticket summary)
   contexts/     React contexts for auth state and the active Store
   services/     Firebase data layer, one service per entity; components never call Firebase directly
   utils/        Shared helpers
