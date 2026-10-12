@@ -1,9 +1,18 @@
 import { calculateOrderTotal } from "../services/order.service";
 import { formatPrice } from "../utils/format";
 import { button, dangerButton, muted } from "../utils/styles";
+import FieldError from "./FieldError";
 
-// Ticket summary: the added Items with quantity controls and the automatic total.
-export default function TicketSummary({ items, onChangeQuantity, onRemove }) {
+// Ticket summary: the added Items with quantity controls, reconfiguration,
+// removal and the automatic total. itemMessages shows a message under an
+// Item, by index.
+export default function TicketSummary({
+  items,
+  onChangeQuantity,
+  onRemove,
+  onEdit,
+  itemMessages = {},
+}) {
   return (
     <section aria-label="Ticket summary">
       <h3 className="m-0 mb-2 text-sm font-medium">Ticket summary</h3>
@@ -60,15 +69,28 @@ export default function TicketSummary({ items, onChangeQuantity, onRemove }) {
                       +
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    className={dangerButton}
-                    aria-label={`Remove ${item.productName}`}
-                    onClick={() => onRemove(index)}
-                  >
-                    Remove
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {onEdit && (
+                      <button
+                        type="button"
+                        className={button}
+                        aria-label={`Edit ${item.productName}`}
+                        onClick={() => onEdit(index)}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={dangerButton}
+                      aria-label={`Remove ${item.productName}`}
+                      onClick={() => onRemove(index)}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
+                <FieldError message={itemMessages[index]} />
               </li>
             );
           })}

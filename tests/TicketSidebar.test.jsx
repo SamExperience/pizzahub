@@ -6,7 +6,7 @@ import { getCategoriesByMenuId } from "../src/services/category.service";
 import { getCustomer, getCustomersByCompanyId } from "../src/services/customer.service";
 import { getMenuByStoreId } from "../src/services/menu.service";
 import { createOrder, updateOrder } from "../src/services/order.service";
-import { getProductsByCategoryId } from "../src/services/product.service";
+import { getProductById, getProductsByCategoryId } from "../src/services/product.service";
 import { formatPrice } from "../src/utils/format";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
@@ -15,6 +15,7 @@ vi.mock("../src/services/category.service", () => ({
   getCategoriesByMenuId: vi.fn(),
 }));
 vi.mock("../src/services/product.service", () => ({
+  getProductById: vi.fn(),
   getProductsByCategoryId: vi.fn(),
 }));
 vi.mock("../src/services/customer.service", async (importOriginal) => ({
@@ -340,6 +341,79 @@ describe("TicketSidebar", () => {
     expect(screen.getByRole("button", { name: "Save ticket" }).disabled).toBe(false);
     expect(screen.getByLabelText(/First name/).value).toBe("Anna");
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("TicketSidebar item reconfiguration", () => {
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const renderWithWater = async (onClose = vi.fn()) => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+    await addWater();
+  };
+
+  it("reopens the configuration step and replaces the Item repriced", async () => {
+    const onClose = vi.fn();
+    getProductById.mockResolvedValue({ ...WATER, price: 2.5 });
+    await renderWithWater(onClose);
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(getProductById).toHaveBeenCalledWith("p1");
+    expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+
+    // Escape closes only the configuration step.
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Increase quantity" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €5.00" }));
+
+    expect(screen.getAllByLabelText("Quantity of Water")).toHaveLength(1);
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("2");
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(5));
+  });
+
+  it("keeps the Item and shows a message when the product is unavailable", async () => {
+    getProductById.mockResolvedValue({ ...WATER, isAvailable: false });
+    await renderWithWater();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(await screen.findByText("Product no longer available")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("1");
+  });
+
+  it("shows the same message when the product was deleted", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    getProductById.mockRejectedValue(
+      Object.assign(new Error("denied"), { code: "permission-denied" }),
+    );
+    await renderWithWater();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(await screen.findByText("Product no longer available")).toBeTruthy();
+  });
+
+  it("shows a load error for other failures", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    getProductById.mockRejectedValue(new Error("offline"));
+    await renderWithWater();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
+
+    expect(await screen.findByText("Could not load the product. Try again.")).toBeTruthy();
   });
 });
 

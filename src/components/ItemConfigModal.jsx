@@ -9,19 +9,27 @@ const pillBase =
 // Item configuration step of the ticket creation. Step 1 (only when the
 // product has sizes) picks the size; step 2 picks cooking level,
 // customizations and quantity, then adds the Item snapshot to the ticket.
-export default function ItemConfigModal({ product, onAdd, onClose }) {
+// With initialItem it reconfigures that Item: options still offered by the
+// current product are prefilled.
+export default function ItemConfigModal({ product, initialItem = null, onAdd, onClose }) {
   const sizes = Array.isArray(product.sizes) ? product.sizes : [];
   const cookingLevels = Array.isArray(product.availableCookingLevels)
     ? product.availableCookingLevels
     : [];
 
-  const [size, setSize] = useState(null);
-  const [cookingLevel, setCookingLevel] = useState(
-    product.defaultCookingLevel ?? cookingLevels[0] ?? null,
+  const [size, setSize] = useState(() =>
+    sizes.some((item) => item.name === initialItem?.size) ? initialItem.size : null,
   );
-  const [customizations, setCustomizations] = useState([]);
+  const [cookingLevel, setCookingLevel] = useState(() =>
+    cookingLevels.includes(initialItem?.cookingLevel)
+      ? initialItem.cookingLevel
+      : (product.defaultCookingLevel ?? cookingLevels[0] ?? null),
+  );
+  const [customizations, setCustomizations] = useState(
+    initialItem?.customizations ?? [],
+  );
   const [customizationText, setCustomizationText] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(initialItem?.quantity ?? 1);
 
   const choosingSize = sizes.length > 0 && size === null;
 
@@ -223,7 +231,7 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
                 className={`${primaryButton} w-full py-2.5`}
                 onClick={() => onAdd(buildItem())}
               >
-                Add to ticket · {formatPrice(lineTotal)}
+                {initialItem ? "Update item" : "Add to ticket"} · {formatPrice(lineTotal)}
               </button>
             </footer>
           </>

@@ -6,6 +6,7 @@ import {
   updateItemQuantity,
   updateOrder,
 } from "../services/order.service";
+import { getProductById } from "../services/product.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { alert, button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 import { dateToTime, getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
@@ -35,11 +36,26 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   const closeMenuPanel = useCallback(() => {
     if (!configProduct) setMenuOpen(false);
   }, [configProduct]);
-  const closeConfig = useCallback(() => setConfigProduct(null), []);
-  const addItem = useCallback((item) => {
-    setItems((list) => [...list, item]);
+  // Index of the Item being reconfigured; null when adding a new Item.
+  const [configIndex, setConfigIndex] = useState(null);
+  // Message under one Item of the summary: { index, text } or null.
+  const [itemMessage, setItemMessage] = useState(null);
+  const closeConfig = useCallback(() => {
     setConfigProduct(null);
+    setConfigIndex(null);
   }, []);
+  const addItem = useCallback(
+    (item) => {
+      setItems((list) =>
+        configIndex === null
+          ? [...list, item]
+          : list.map((current, i) => (i === configIndex ? item : current)),
+      );
+      setConfigProduct(null);
+      setConfigIndex(null);
+    },
+    [configIndex],
+  );
   const changeQuantity = useCallback((index, quantity) => {
     setItems((list) =>
       list.map((item, i) => (i === index ? updateItemQuantity(item, quantity) : item)),
@@ -47,7 +63,38 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   }, []);
   const removeItem = useCallback((index) => {
     setItems((list) => list.filter((_, i) => i !== index));
+    setItemMessage(null);
   }, []);
+  // Reopens the configuration step for an Item with the current Product, so
+  // it is repriced from the menu. A deleted or unavailable Product keeps the
+  // Item as it is.
+  const editItem = useCallback(
+    async (index) => {
+      setItemMessage(null);
+
+      try {
+        const product = await getProductById(items[index].productId);
+
+        if (product.isAvailable === false) {
+          setItemMessage({ index, text: "Product no longer available" });
+          return;
+        }
+
+        setConfigIndex(index);
+        setConfigProduct(product);
+      } catch (err) {
+        console.log("Error loading product -> ", err);
+        const missing =
+          err?.message === "Product not found" || err?.code === "permission-denied";
+
+        setItemMessage({
+          index,
+          text: missing ? "Product no longer available" : "Could not load the product. Try again.",
+        });
+      }
+    },
+    [items],
+  );
   const [scheduledTime, setScheduledTime] = useState(
     () => originalTime ?? getDefaultScheduledTime(),
   );
@@ -190,14 +237,15 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      // While the menu panel is open, Escape closes only the panel.
-      if (event.key === "Escape" && !menuOpen && !saving) onClose();
+      // While the menu panel or the configuration step is open, Escape
+      // closes only that layer.
+      if (event.key === "Escape" && !menuOpen && !configProduct && !saving) onClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, menuOpen, saving]);
+  }, [onClose, menuOpen, configProduct, saving]);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -308,6 +356,8 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
             items={items}
             onChangeQuantity={changeQuantity}
             onRemove={removeItem}
+            onEdit={editItem}
+            itemMessages={itemMessage ? { [itemMessage.index]: itemMessage.text } : {}}
           />
           <FieldError id="items-error" message={errors.items} />
           {saveError && (
@@ -341,6 +391,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       {configProduct && (
         <ItemConfigModal
           product={configProduct}
+          initialItem={configIndex === null ? null : items[configIndex]}
           onAdd={addItem}
           onClose={closeConfig}
         />

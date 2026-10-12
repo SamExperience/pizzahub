@@ -133,3 +133,55 @@ describe("ItemConfigModal", () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("ItemConfigModal reconfiguration", () => {
+  afterEach(cleanup);
+
+  const ITEM = {
+    productId: "p1",
+    productName: "Margherita",
+    size: "Small",
+    unitPrice: 5,
+    quantity: 2,
+    cookingLevel: "Rare",
+    customizations: ["No basil"],
+    subtotal: 10,
+  };
+
+  it("prefills the Item options and reprices it from the current product", async () => {
+    const { onAdd } = renderModal(PIZZA, { initialItem: ITEM });
+
+    expect(screen.getByRole("heading", { name: "Margherita · Small" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Rare" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("No basil")).toBeTruthy();
+    expect(screen.getByLabelText("Quantity").textContent).toBe("2");
+
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €12.00" }));
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        size: "Small",
+        unitPrice: 6,
+        quantity: 2,
+        cookingLevel: "Rare",
+        customizations: ["No basil"],
+        subtotal: 12,
+      }),
+    );
+  });
+
+  it("asks for the size again when the Item's size is no longer offered", () => {
+    renderModal(PIZZA, { initialItem: { ...ITEM, size: "Medium" } });
+
+    expect(screen.getByRole("button", { name: /Large/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Update item/ })).toBeNull();
+  });
+
+  it("falls back to the default cooking level when the Item's one is gone", () => {
+    renderModal(PIZZA, { initialItem: { ...ITEM, cookingLevel: "Burnt" } });
+
+    expect(screen.getByRole("button", { name: "Medium" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+});
