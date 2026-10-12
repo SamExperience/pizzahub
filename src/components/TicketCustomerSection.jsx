@@ -1,6 +1,7 @@
 import { filterCustomersByFirstName } from "../services/customer.service";
 import { ORDER_TYPE } from "../services/order.service";
 import { alert, button, ghostButton, input, muted } from "../utils/styles";
+import FieldError from "./FieldError";
 
 const ADDRESS_INPUTS = [
   { field: "street", label: "Street", required: true },
@@ -33,6 +34,7 @@ export default function TicketCustomerSection({
   selectedCustomer,
   onSelect,
   onClear,
+  errors = {},
 }) {
   const isDelivery = orderType === ORDER_TYPE.DELIVERY;
   const results = selectedCustomer
@@ -76,8 +78,11 @@ export default function TicketCustomerSection({
           className={input}
           placeholder="Search or enter a new customer"
           value={form.firstName}
+          aria-invalid={Boolean(errors.firstName)}
+          aria-describedby={errors.firstName ? "customerFirstName-error" : undefined}
           onChange={(event) => setField("firstName", event.target.value)}
         />
+        <FieldError id="customerFirstName-error" message={errors.firstName} />
 
         {searching && loading && <p className={`${muted} mt-1`}>Loading customers…</p>}
 
@@ -130,8 +135,11 @@ export default function TicketCustomerSection({
           type="tel"
           className={input}
           value={form.phone}
+          aria-invalid={Boolean(errors.phone)}
+          aria-describedby={errors.phone ? "customerPhone-error" : undefined}
           onChange={(event) => setField("phone", event.target.value)}
         />
+        <FieldError id="customerPhone-error" message={errors.phone} />
       </div>
 
       {isDelivery &&
@@ -149,8 +157,11 @@ export default function TicketCustomerSection({
               type="text"
               className={input}
               value={form.address[field]}
+              aria-invalid={Boolean(errors[field])}
+              aria-describedby={errors[field] ? `customer-${field}-error` : undefined}
               onChange={(event) => setAddressField(field, event.target.value)}
             />
+            <FieldError id={`customer-${field}-error`} message={errors[field]} />
           </div>
         ))}
     </fieldset>

@@ -5,6 +5,7 @@ import TicketSidebar from "../src/components/TicketSidebar";
 import { getCategoriesByMenuId } from "../src/services/category.service";
 import { getCustomersByCompanyId } from "../src/services/customer.service";
 import { getMenuByStoreId } from "../src/services/menu.service";
+import { createOrder } from "../src/services/order.service";
 import { getProductsByCategoryId } from "../src/services/product.service";
 import { formatPrice } from "../src/utils/format";
 
@@ -20,6 +21,32 @@ vi.mock("../src/services/customer.service", async (importOriginal) => ({
   ...(await importOriginal()),
   getCustomersByCompanyId: vi.fn(),
 }));
+
+vi.mock("../src/services/order.service", async (importOriginal) => ({
+  ...(await importOriginal()),
+  createOrder: vi.fn(),
+}));
+
+const WATER = {
+  id: "p1",
+  name: "Water",
+  price: 2,
+  sizes: null,
+  availableCookingLevels: [],
+  defaultCookingLevel: null,
+  isAvailable: true,
+};
+
+// Opens the menu panel and adds Water to the ticket.
+const addWater = async () => {
+  getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+  getCategoriesByMenuId.mockResolvedValue([{ id: "cat1", name: "Drinks" }]);
+  getProductsByCategoryId.mockResolvedValue([WATER]);
+  await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+  await userEvent.click(await screen.findByRole("button", { name: /Water/ }));
+  await userEvent.click(screen.getByRole("button", { name: /Add to ticket/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Close menu" }));
+};
 
 const CUSTOMERS = [
   {
@@ -215,5 +242,89 @@ describe("TicketSidebar", () => {
     await userEvent.click(screen.getByTestId("ticket-backdrop"));
 
     expect(onClose).toHaveBeenCalledTimes(4);
+  });
+
+  it("shows inline errors and does not save an invalid ticket", async () => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText("Delivery"));
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(screen.getByText("First name is required")).toBeTruthy();
+    expect(screen.getByText("Phone is required for delivery")).toBeTruthy();
+    expect(screen.getByText("City is required")).toBeTruthy();
+    expect(screen.getByText("Add at least one product")).toBeTruthy();
+    expect(screen.getByLabelText(/First name/).getAttribute("aria-invalid")).toBe("true");
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it("saves a valid ticket and closes the sidebar", async () => {
+    const onClose = vi.fn();
+    createOrder.mockResolvedValue("order-1");
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(createOrder).toHaveBeenCalledTimes(1);
+
+    const args = createOrder.mock.calls[0][0];
+
+    expect(args).toMatchObject({
+      companyId: "co1",
+      storeId: "store-1",
+      orderType: "takeaway",
+      existingCustomer: null,
+    });
+    expect(args.customerData.firstName).toBe("Anna");
+    expect(args.items).toHaveLength(1);
+    expect(args.scheduledTime).toBeInstanceOf(Date);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the selected existing customer to createOrder", async () => {
+    createOrder.mockResolvedValue("order-1");
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "mar");
+    await userEvent.click(await screen.findByRole("button", { name: /Mario/ }));
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(createOrder.mock.calls[0][0].existingCustomer).toEqual(CUSTOMERS[0]);
+  });
+
+  it("blocks a scheduled time in the past", async () => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    fireEvent.change(screen.getByLabelText("Pickup time"), { target: { value: "00:00" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(screen.getByText("Scheduled time is in the past")).toBeTruthy();
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it("shows the saving state and keeps the sidebar open when saving fails", async () => {
+    const onClose = vi.fn();
+    let rejectSave;
+    createOrder.mockReturnValue(new Promise((_, reject) => (rejectSave = reject)));
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(screen.getByRole("button", { name: "Saving…" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Cancel" }).disabled).toBe(true);
+
+    rejectSave(new Error("boom"));
+
+    expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save ticket" }).disabled).toBe(false);
+    expect(screen.getByLabelText(/First name/).value).toBe("Anna");
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

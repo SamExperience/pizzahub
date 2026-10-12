@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCustomersByCompanyId } from "../services/customer.service";
-import { ORDER_TYPE, updateItemQuantity } from "../services/order.service";
+import {
+  createOrder,
+  ORDER_TYPE,
+  updateItemQuantity,
+} from "../services/order.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
-import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
-import { getDefaultScheduledTime } from "../utils/ticketTime";
+import { alert, button, ghostButton, input, muted, primaryButton } from "../utils/styles";
+import { getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
+import { validateTicketForm } from "../utils/ticketValidation";
+import FieldError from "./FieldError";
 import ItemConfigModal from "./ItemConfigModal";
 import MenuTableauPanel from "./MenuTableauPanel";
 import TicketCustomerSection from "./TicketCustomerSection";
@@ -48,6 +54,38 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   const [customersRetryKey, setCustomersRetryKey] = useState(0);
   const [customerForm, setCustomerForm] = useState(EMPTY_CUSTOMER_FORM);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  // Inline field errors, the saving state and the error of a failed save.
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const handleSave = async () => {
+    const found = validateTicketForm({ orderType, form: customerForm, scheduledTime, items });
+
+    setErrors(found);
+    setSaveError(null);
+
+    if (Object.keys(found).length > 0) return;
+
+    setSaving(true);
+
+    try {
+      await createOrder({
+        companyId,
+        storeId,
+        orderType,
+        scheduledTime: timeToDate(scheduledTime),
+        items,
+        customerData: customerForm,
+        existingCustomer: selectedCustomer,
+      });
+      onClose();
+    } catch (err) {
+      console.log("Error saving ticket -> ", err);
+      setSaveError(err);
+      setSaving(false);
+    }
+  };
 
   const retryCustomers = useCallback(
     () => setCustomersRetryKey((key) => key + 1),
@@ -90,20 +128,20 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       // While the menu panel is open, Escape closes only the panel.
-      if (event.key === "Escape" && !menuOpen) onClose();
+      if (event.key === "Escape" && !menuOpen && !saving) onClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, menuOpen]);
+  }, [onClose, menuOpen, saving]);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div
         className="absolute inset-0 bg-black/40"
         data-testid="ticket-backdrop"
-        onClick={onClose}
+        onClick={saving ? undefined : onClose}
       />
       <aside
         role="dialog"
@@ -116,6 +154,7 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
             type="button"
             className={ghostButton}
             aria-label="Close"
+            disabled={saving}
             onClick={onClose}
           >
             ✕
@@ -160,6 +199,7 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
             selectedCustomer={selectedCustomer}
             onSelect={selectCustomer}
             onClear={clearCustomer}
+            errors={errors}
           />
 
           <div>
@@ -171,8 +211,11 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
               type="time"
               className={input}
               value={scheduledTime}
+              aria-invalid={Boolean(errors.scheduledTime)}
+              aria-describedby={errors.scheduledTime ? "scheduledTime-error" : undefined}
               onChange={(event) => setScheduledTime(event.target.value)}
             />
+            <FieldError id="scheduledTime-error" message={errors.scheduledTime} />
             <p className={`${muted} mt-1`}>Today. Defaults to 30 minutes from now.</p>
           </div>
 
@@ -188,11 +231,25 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
             onChangeQuantity={changeQuantity}
             onRemove={removeItem}
           />
+          <FieldError id="items-error" message={errors.items} />
+          {saveError && (
+            <div role="alert" className={alert}>
+              Could not save the ticket. Try again.
+            </div>
+          )}
         </div>
 
-        <footer className="flex justify-end border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
-          <button type="button" className={button} onClick={onClose}>
+        <footer className="flex justify-end gap-2 border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
+          <button type="button" className={button} disabled={saving} onClick={onClose}>
             Cancel
+          </button>
+          <button
+            type="button"
+            className={primaryButton}
+            disabled={saving}
+            onClick={handleSave}
+          >
+            {saving ? "Saving…" : "Save ticket"}
           </button>
         </footer>
       </aside>
