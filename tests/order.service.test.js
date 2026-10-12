@@ -28,7 +28,9 @@ import {
   calculateOrderTotal,
   cancelOrder,
   createOrder,
+  editRestrictedItem,
   getTodayRange,
+  reconfigureItem,
   sortColumnOrders,
   subscribeToTodayOrders,
   updateItemQuantity,
@@ -136,6 +138,86 @@ describe("buildItemSnapshot", () => {
       expect(() => buildItemSnapshot(drink, { quantity })).toThrow(
         "Item quantity must be a positive integer",
       );
+  });
+});
+
+describe("reconfigureItem", () => {
+  // Saved when Large cost 12; the menu now says 13.2.
+  const saved = {
+    ...buildItemSnapshot(pizza, { size: "Large", quantity: 1 }),
+    unitPrice: 12,
+    subtotal: 12,
+  };
+
+  it("keeps the saved price when the size does not change", () => {
+    const item = reconfigureItem(pizza, saved, {
+      size: "Large",
+      cookingLevel: "Rare",
+      customizations: [" No basil "],
+      quantity: 3,
+    });
+
+    expect(item).toMatchObject({
+      size: "Large",
+      cookingLevel: "Rare",
+      customizations: ["No basil"],
+      quantity: 3,
+      unitPrice: 12,
+      subtotal: 36,
+    });
+  });
+
+  it("uses the current menu price when the size changes", () => {
+    const item = reconfigureItem(pizza, saved, { size: "Small", quantity: 2 });
+
+    expect(item).toMatchObject({ size: "Small", unitPrice: 9.5, subtotal: 19 });
+  });
+
+  it("keeps the saved price of a product without sizes", () => {
+    const savedCola = { ...buildItemSnapshot(drink, { quantity: 1 }), unitPrice: 3, subtotal: 3 };
+
+    expect(reconfigureItem(drink, savedCola, { quantity: 2 })).toMatchObject({
+      unitPrice: 3,
+      subtotal: 6,
+    });
+  });
+
+  it("validates the options like a new Item", () => {
+    expect(() => reconfigureItem(pizza, saved, { size: "XL", quantity: 1 })).toThrow(
+      "Item size is required",
+    );
+  });
+});
+
+describe("editRestrictedItem", () => {
+  const saved = {
+    productId: "p1",
+    productName: "Margherita",
+    size: "Large",
+    unitPrice: 12,
+    quantity: 3,
+    cookingLevel: "Rare",
+    customizations: ["No basil"],
+    subtotal: 36,
+  };
+
+  it("changes only customizations and quantity, keeping size, cooking level and price", () => {
+    expect(
+      editRestrictedItem(saved, { customizations: [" Well cut ", ""], quantity: 2 }, 3),
+    ).toEqual({ ...saved, customizations: ["Well cut"], quantity: 2, subtotal: 24 });
+  });
+
+  it("allows the saved quantity but not more", () => {
+    expect(editRestrictedItem(saved, { customizations: [], quantity: 3 }, 3).quantity).toBe(3);
+    expect(() => editRestrictedItem(saved, { customizations: [], quantity: 4 }, 3)).toThrow(
+      "Item quantity cannot exceed the quantity in the ticket",
+    );
+  });
+
+  it("requires a positive integer quantity", () => {
+    expect(() => editRestrictedItem(saved, { customizations: [], quantity: 0 }, 3)).toThrow(
+      "Item quantity must be a positive integer",
+    );
   });
 });
 

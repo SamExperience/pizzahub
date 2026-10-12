@@ -35,6 +35,13 @@ export const ORDER_TYPE = {
 
 const roundPrice = (value) => Math.round(value * 100) / 100;
 
+// Trimmed, non-empty customization texts.
+const normalizeCustomizations = (customizations = []) =>
+  customizations
+    .filter((text) => typeof text === "string")
+    .map((text) => text.trim())
+    .filter(Boolean);
+
 // Item snapshot for a Product and the options chosen on the ticket. The
 // Product data is copied so historical Orders stay correct.
 export const buildItemSnapshot = (
@@ -80,11 +87,41 @@ export const buildItemSnapshot = (
     unitPrice,
     quantity,
     cookingLevel: selectedCookingLevel,
-    customizations: customizations
-      .filter((text) => typeof text === "string")
-      .map((text) => text.trim())
-      .filter(Boolean),
+    customizations: normalizeCustomizations(customizations),
     subtotal: roundPrice(unitPrice * quantity),
+  };
+};
+
+// Reconfigured copy of an existing Item for its sellable Product. The saved
+// unit price is kept unless the size changes; then the current menu price
+// of the new size applies.
+export const reconfigureItem = (product, item, options) => {
+  const next = buildItemSnapshot(product, options);
+
+  if (next.size !== item.size) return next;
+
+  return {
+    ...next,
+    unitPrice: item.unitPrice,
+    subtotal: roundPrice(item.unitPrice * next.quantity),
+  };
+};
+
+// Restricted edit of an Item whose Product is no longer sellable: only the
+// customizations and a quantity between 1 and maxQuantity (the quantity
+// saved in the ticket) can change; size, cooking level and price are kept.
+export const editRestrictedItem = (item, { customizations, quantity }, maxQuantity) => {
+  if (!Number.isInteger(quantity) || quantity < 1)
+    throw new Error("Item quantity must be a positive integer");
+
+  if (quantity > maxQuantity)
+    throw new Error("Item quantity cannot exceed the quantity in the ticket");
+
+  return {
+    ...item,
+    customizations: normalizeCustomizations(customizations),
+    quantity,
+    subtotal: roundPrice(item.unitPrice * quantity),
   };
 };
 

@@ -6,10 +6,12 @@ import { storage } from "../src/services/firebase";
 import { register } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { createMenu } from "../src/services/menu.service";
-import { createCategory } from "../src/services/category.service";
+import { createCategory, deleteCategoryById } from "../src/services/category.service";
 import {
+  ITEM_PRODUCT_STATUS,
   createProduct,
   deleteProductById,
+  getItemProduct,
   getProductById,
   getProductsByCategoryId,
   moveProductById,
@@ -756,5 +758,56 @@ describe("uploadProductImage", () => {
         new Blob([new Uint8Array(5 * 1024 * 1024)], { type: "image/png" }),
       ),
     ).rejects.toThrow("Product image must be smaller than 5 MB");
+  });
+});
+
+// Last: deleting a category renumbers the others, which earlier blocks rely on.
+describe("getItemProduct", () => {
+  let itemCategory;
+
+  beforeAll(async () => {
+    itemCategory = await createCategory(category.menuId, "Item status", 20);
+  });
+
+  const makeProduct = (categoryId, position) =>
+    createProduct(categoryId, { name: `Item ${position}`, position, price: 4 });
+
+  it("returns a sellable product", async () => {
+    const product = await makeProduct(itemCategory.id, 1);
+
+    const result = await getItemProduct(product.id);
+
+    expect(result.status).toBe(ITEM_PRODUCT_STATUS.SELLABLE);
+    expect(result.product).toMatchObject({ id: product.id, price: 4 });
+  });
+
+  it("returns an unavailable product with its data", async () => {
+    const product = await makeProduct(itemCategory.id, 2);
+    await setProductAvailability(product.id, false);
+
+    const result = await getItemProduct(product.id);
+
+    expect(result.status).toBe(ITEM_PRODUCT_STATUS.UNAVAILABLE);
+    expect(result.product.id).toBe(product.id);
+  });
+
+  it("reports a deleted product, also when its category was deleted", async () => {
+    const product = await makeProduct(itemCategory.id, 3);
+    await deleteProductById(product.id);
+
+    expect(await getItemProduct(product.id)).toEqual({
+      status: ITEM_PRODUCT_STATUS.DELETED,
+      product: null,
+    });
+
+    const otherCategory = await createCategory(category.menuId, "Item gone", 21);
+    const orphan = await makeProduct(otherCategory.id, 1);
+    await deleteCategoryById(otherCategory.id);
+
+    expect((await getItemProduct(orphan.id)).status).toBe(ITEM_PRODUCT_STATUS.DELETED);
+  });
+
+  it("rethrows other errors", async () => {
+    await expect(getItemProduct("")).rejects.toThrow("Product ID is required");
   });
 });
