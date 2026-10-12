@@ -196,11 +196,20 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
-    // Status change (Cancelled = soft delete).
+    // Status change (Cancelled = soft delete). completedAt is the request time
+    // when the Order moves to Completed, null when it moves back, and
+    // unchanged on cancellation.
     function isOrderStatusChange() {
-      return orderChangedKeys().hasOnly(["status", "updatedAt"])
-        && request.resource.data.status
-          in ["Pending", "In progress", "Completed", "Cancelled"];
+      let data = request.resource.data;
+
+      return orderChangedKeys().hasOnly(["status", "updatedAt", "completedAt"])
+        && (
+          (data.status == "Completed" && data.completedAt == request.time)
+          || (data.status in ["Pending", "In progress"]
+            && data.get("completedAt", null) == null)
+          || (data.status == "Cancelled"
+            && !orderChangedKeys().hasAny(["completedAt"]))
+        );
     }
 
     // Content edit; status, storeId and createdAt stay unchanged.

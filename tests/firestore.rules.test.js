@@ -449,8 +449,14 @@ describe("orders and customers write rules", () => {
     return doc(db, "orders", id);
   };
 
+  // Status change as written by updateOrderStatus and cancelOrder.
   const setStatus = (ref, status) =>
-    updateDoc(ref, { status, updatedAt: serverTimestamp() });
+    updateDoc(ref, {
+      status,
+      updatedAt: serverTimestamp(),
+      ...(status === "Completed" && { completedAt: serverTimestamp() }),
+      ...((status === "Pending" || status === "In progress") && { completedAt: null }),
+    });
 
   // Content edit as written by updateOrder.
   const editContent = (ref, customerId, extra = {}) =>
@@ -471,6 +477,36 @@ describe("orders and customers write rules", () => {
     await setStatus(ref, "Pending");
     await setStatus(ref, "Cancelled");
     expect((await getDoc(ref)).data().status).toBe("Cancelled");
+  });
+
+  it("records completedAt on completion and clears it when moving back", async () => {
+    const ref = await createOrderA();
+    await setStatus(ref, "In progress");
+    await setStatus(ref, "Completed");
+    expect((await getDoc(ref)).data().completedAt).toBeTruthy();
+    await setStatus(ref, "In progress");
+    expect((await getDoc(ref)).data().completedAt).toBeNull();
+    await setStatus(ref, "Completed");
+    await setStatus(ref, "Cancelled");
+    expect((await getDoc(ref)).data().completedAt).toBeTruthy();
+  });
+
+  it("denies an invalid completedAt", async () => {
+    const ref = await createOrderA();
+    const update = (data) => updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+
+    await expect(update({ status: "Completed" })).rejects.toThrow();
+    await expect(
+      update({ status: "Completed", completedAt: new Date(2020, 0, 1) }),
+    ).rejects.toThrow();
+    await expect(
+      update({ status: "In progress", completedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await expect(
+      update({ status: "Cancelled", completedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await setStatus(ref, "Completed");
+    await expect(update({ status: "In progress" })).rejects.toThrow();
   });
 
   it("denies an unknown status and a status change with other fields", async () => {
