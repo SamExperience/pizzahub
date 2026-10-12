@@ -127,15 +127,87 @@ service cloud.firestore {
       ).data.companyId;
     }
 
-    // Orders and customers are read-only for clients until milestones 9-10.
+    // Customer fields a client may write, and common shape checks.
+    function isValidCustomer(data) {
+      return data.keys().hasOnly([
+          "companyId", "firstName", "lastName", "phone", "address",
+          "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll(["companyId", "firstName", "createdAt", "updatedAt"])
+        && data.firstName is string
+        && data.firstName.size() > 0
+        && data.updatedAt == request.time;
+    }
+
+    // Customer written in the same request (or already stored), after the write.
+    function orderCustomer(customerId) {
+      return getAfter(
+        /databases/$(database)/documents/customers/$(customerId)
+      ).data;
+    }
+
+    // Delivery needs phone and street, streetNumber, postalCode, city.
+    function hasDeliveryDetails(customer) {
+      return customer.phone is string
+        && customer.phone.size() > 0
+        && customer.address is map
+        && customer.address.street is string
+        && customer.address.street.size() > 0
+        && customer.address.streetNumber is string
+        && customer.address.streetNumber.size() > 0
+        && customer.address.postalCode is string
+        && customer.address.postalCode.size() > 0
+        && customer.address.city is string
+        && customer.address.city.size() > 0;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasOnly([
+          "storeId", "customerId", "orderType", "scheduledTime", "status",
+          "items", "total", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "storeId", "customerId", "orderType", "scheduledTime", "status",
+          "items", "total", "createdAt", "updatedAt"
+        ])
+        && data.storeId == userStoreId()
+        && data.customerId is string
+        && data.orderType in ["takeaway", "delivery"]
+        && data.status == "Pending"
+        && data.items is list
+        && data.items.size() > 0
+        && data.total is number
+        && data.scheduledTime is timestamp
+        && data.createdAt == request.time
+        && data.updatedAt == request.time
+        && orderCustomer(data.customerId).companyId == userCompanyId()
+        && (data.orderType != "delivery"
+          || hasDeliveryDetails(orderCustomer(data.customerId)));
+    }
+
+    // Orders: update and delete are not allowed until milestone 10.
     match /orders/{orderId} {
       allow read: if request.auth != null
         && resource.data.storeId == userStoreId();
+
+      allow create: if request.auth != null
+        && isValidOrder(request.resource.data);
     }
 
     match /customers/{customerId} {
       allow read: if request.auth != null
         && resource.data.companyId == userCompanyId();
+
+      allow create: if request.auth != null
+        && request.resource.data.companyId == userCompanyId()
+        && isValidCustomer(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if request.auth != null
+        && resource.data.companyId == userCompanyId()
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isValidCustomer(request.resource.data);
     }
   }
 }
