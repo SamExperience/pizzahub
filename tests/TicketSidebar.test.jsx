@@ -115,6 +115,43 @@ describe("TicketSidebar", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("configures a product, adds it to the ticket and keeps the menu panel open", async () => {
+    const onClose = vi.fn();
+    getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+    getCategoriesByMenuId.mockResolvedValue([{ id: "cat1", name: "Drinks" }]);
+    getProductsByCategoryId.mockResolvedValue([
+      {
+        id: "p1",
+        name: "Water",
+        price: 2,
+        sizes: null,
+        availableCookingLevels: [],
+        defaultCookingLevel: null,
+        isAvailable: true,
+      },
+    ]);
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+    await userEvent.click(await screen.findByRole("button", { name: /Water/ }));
+
+    expect(screen.getByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+
+    // Escape closes only the configuration modal.
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: /Water/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Add to ticket/ }));
+
+    expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
+    expect(screen.getByText("1 item added")).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("closes from the close button, Cancel, Escape and the backdrop", async () => {
     const onClose = vi.fn();
     render(<TicketSidebar onClose={onClose} />);

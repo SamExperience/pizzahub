@@ -4,6 +4,7 @@ import { ORDER_TYPE } from "../services/order.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 import { getDefaultScheduledTime } from "../utils/ticketTime";
+import ItemConfigModal from "./ItemConfigModal";
 import MenuTableauPanel from "./MenuTableauPanel";
 import TicketCustomerSection from "./TicketCustomerSection";
 
@@ -16,7 +17,18 @@ const ORDER_TYPE_OPTIONS = [
 export default function TicketSidebar({ companyId, storeId, onClose }) {
   const [orderType, setOrderType] = useState(ORDER_TYPE.TAKEAWAY);
   const [menuOpen, setMenuOpen] = useState(false);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const [configProduct, setConfigProduct] = useState(null);
+  // Items added to the ticket (snapshots); the summary is built in 9.8.
+  const [items, setItems] = useState([]);
+  // Escape closes only the topmost layer: the configuration modal, if open.
+  const closeMenuPanel = useCallback(() => {
+    if (!configProduct) setMenuOpen(false);
+  }, [configProduct]);
+  const closeConfig = useCallback(() => setConfigProduct(null), []);
+  const addItem = useCallback((item) => {
+    setItems((list) => [...list, item]);
+    setConfigProduct(null);
+  }, []);
   const [scheduledTime, setScheduledTime] = useState(() =>
     getDefaultScheduledTime(),
   );
@@ -162,6 +174,11 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
           >
             Add product
           </button>
+          {items.length > 0 && (
+            <p className={muted}>
+              {items.length} {items.length === 1 ? "item" : "items"} added
+            </p>
+          )}
         </div>
 
         <footer className="flex justify-end border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
@@ -171,11 +188,17 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
         </footer>
       </aside>
       {menuOpen && (
-        // Product selection is wired to the item configuration step in 9.7.
         <MenuTableauPanel
           storeId={storeId}
-          onSelectProduct={() => {}}
-          onClose={closeMenu}
+          onSelectProduct={setConfigProduct}
+          onClose={closeMenuPanel}
+        />
+      )}
+      {configProduct && (
+        <ItemConfigModal
+          product={configProduct}
+          onAdd={addItem}
+          onClose={closeConfig}
         />
       )}
     </div>
