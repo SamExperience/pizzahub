@@ -1,8 +1,9 @@
 import TableauColumn from "./TableauColumn";
-import { ORDER_STATUSES } from "../services/order.service";
+import { ORDER_STATUSES, sortColumnOrders } from "../services/order.service";
 import { alert, button, muted, primaryButton } from "../utils/styles";
 
-// Presentational Tableau: three status columns plus loading and error states.
+// Presentational Tableau: three status columns (each in its display order,
+// see sortColumnOrders) plus loading and error states.
 export default function TableauBoard({
   orders = [],
   loading = false,
@@ -36,7 +37,10 @@ export default function TableauBoard({
             <TableauColumn
               key={status}
               title={status}
-              orders={orders.filter((order) => order.status === status)}
+              orders={sortColumnOrders(
+                status,
+                orders.filter((order) => order.status === status),
+              )}
               onChangeStatus={onChangeStatus}
               onEdit={onEdit}
               onCancel={onCancel}

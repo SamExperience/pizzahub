@@ -46,7 +46,38 @@ describe("TableauBoard", () => {
     expect(within(pending).getAllByRole("article")).toHaveLength(2);
   });
 
-  it("keeps the received chronological order inside each column", () => {
+  it("orders active columns by scheduled time and Completed by completion time", () => {
+    const at = (hour) => new Date(2026, 9, 12, hour);
+    const ticket = (id, status, productName, extra) => ({
+      id,
+      status,
+      items: [{ productId: id, productName, quantity: 1, subtotal: 5 }],
+      ...extra,
+    });
+    render(
+      <TableauBoard
+        orders={[
+          ticket("a", "Pending", "Late", { scheduledTime: at(21) }),
+          ticket("b", "Pending", "Early", { scheduledTime: at(19) }),
+          ticket("c", "In progress", "Later", { scheduledTime: at(20) }),
+          ticket("d", "In progress", "Sooner", { scheduledTime: at(18) }),
+          ticket("e", "Completed", "First", { completedAt: at(18) }),
+          ticket("f", "Completed", "Last", { completedAt: at(20) }),
+        ]}
+      />,
+    );
+
+    const names = (title) =>
+      within(screen.getByRole("heading", { name: title }).closest("section"))
+        .getAllByRole("article")
+        .map((article) => /1 x (\w+)/.exec(article.textContent)[1]);
+
+    expect(names("Pending")).toEqual(["Early", "Late"]);
+    expect(names("In progress")).toEqual(["Sooner", "Later"]);
+    expect(names("Completed")).toEqual(["Last", "First"]);
+  });
+
+  it("keeps the received (creation) order inside a column when times are equal", () => {
     const ticket = (id, status, productName) => ({
       id,
       status,
