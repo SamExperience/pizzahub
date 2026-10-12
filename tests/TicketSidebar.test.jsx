@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketSidebar from "../src/components/TicketSidebar";
@@ -6,7 +6,7 @@ import { getCategoriesByMenuId } from "../src/services/category.service";
 import { getCustomer, getCustomersByCompanyId } from "../src/services/customer.service";
 import { getMenuByStoreId } from "../src/services/menu.service";
 import { createOrder, updateOrder } from "../src/services/order.service";
-import { getProductById, getProductsByCategoryId } from "../src/services/product.service";
+import { getItemProduct, getProductsByCategoryId } from "../src/services/product.service";
 import { formatPrice } from "../src/utils/format";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
@@ -15,7 +15,8 @@ vi.mock("../src/services/category.service", () => ({
   getCategoriesByMenuId: vi.fn(),
 }));
 vi.mock("../src/services/product.service", () => ({
-  getProductById: vi.fn(),
+  ITEM_PRODUCT_STATUS: { SELLABLE: "sellable", UNAVAILABLE: "unavailable", DELETED: "deleted" },
+  getItemProduct: vi.fn(),
   getProductsByCategoryId: vi.fn(),
 }));
 vi.mock("../src/services/customer.service", async (importOriginal) => ({
@@ -359,14 +360,15 @@ describe("TicketSidebar item reconfiguration", () => {
     await addWater();
   };
 
-  it("reopens the configuration step and replaces the Item repriced", async () => {
+  it("reopens the full configuration step for a sellable product, keeping the price", async () => {
     const onClose = vi.fn();
-    getProductById.mockResolvedValue({ ...WATER, price: 2.5 });
+    // The menu price changed from 2 to 2.5 since the Item was added.
+    getItemProduct.mockResolvedValue({ status: "sellable", product: { ...WATER, price: 2.5 } });
     await renderWithWater(onClose);
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
 
-    expect(getProductById).toHaveBeenCalledWith("p1");
+    expect(getItemProduct).toHaveBeenCalledWith("p1");
     expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
 
     // Escape closes only the configuration step.
@@ -376,39 +378,45 @@ describe("TicketSidebar item reconfiguration", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
     await userEvent.click(await screen.findByRole("button", { name: "Increase quantity" }));
-    await userEvent.click(screen.getByRole("button", { name: "Update item · €5.00" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €4.00" }));
 
     expect(screen.getAllByLabelText("Quantity of Water")).toHaveLength(1);
     expect(screen.getByLabelText("Quantity of Water").textContent).toBe("2");
-    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(5));
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(4));
   });
 
-  it("keeps the Item and shows a message when the product is unavailable", async () => {
-    getProductById.mockResolvedValue({ ...WATER, isAvailable: false });
+  it("opens the restricted edit for an unavailable product and caps the quantity", async () => {
+    getItemProduct.mockResolvedValue({
+      status: "unavailable",
+      product: { ...WATER, isAvailable: false },
+    });
     await renderWithWater();
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
 
-    expect(await screen.findByText("Product no longer available")).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
-    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("1");
+    expect(await screen.findByText(/no longer sellable/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(true);
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByText("Unavailable")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Increase quantity of Water" }).disabled).toBe(true);
   });
 
-  it("shows the same message when the product was deleted", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    getProductById.mockRejectedValue(
-      Object.assign(new Error("denied"), { code: "permission-denied" }),
-    );
+  it("opens the restricted edit for a deleted product", async () => {
+    getItemProduct.mockResolvedValue({ status: "deleted", product: null });
     await renderWithWater();
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
 
-    expect(await screen.findByText("Product no longer available")).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+    expect(screen.getByText(/no longer sellable/)).toBeTruthy();
+    expect(screen.getByText("No longer on the menu")).toBeTruthy();
   });
 
-  it("shows a load error for other failures", async () => {
+  it("shows a load error when the product cannot be read", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
-    getProductById.mockRejectedValue(new Error("offline"));
+    getItemProduct.mockRejectedValue(new Error("offline"));
     await renderWithWater();
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
@@ -456,6 +464,35 @@ describe("TicketSidebar edit mode", () => {
   beforeEach(() => {
     getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
     getCustomer.mockResolvedValue(CUSTOMERS[0]);
+    getItemProduct.mockResolvedValue({ status: "sellable", product: WATER });
+  });
+
+  it("loads the Products' status and caps Items no longer sellable", async () => {
+    getItemProduct.mockResolvedValue({ status: "unavailable", product: WATER });
+    renderEdit();
+
+    expect(await screen.findByText("Unavailable")).toBeTruthy();
+    expect(getItemProduct).toHaveBeenCalledWith("p1");
+
+    const increase = screen.getByRole("button", { name: "Increase quantity of Water" });
+
+    expect(increase.disabled).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Decrease quantity of Water" }));
+    expect(increase.disabled).toBe(false);
+    await userEvent.click(increase);
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("3");
+    expect(increase.disabled).toBe(true);
+  });
+
+  it("does not cap Items whose Product is sellable", async () => {
+    renderEdit();
+
+    await screen.findByDisplayValue("Mario");
+    await waitFor(() => expect(getItemProduct).toHaveBeenCalled());
+    expect(screen.queryByText("Unavailable")).toBeNull();
+    expect(screen.getByRole("button", { name: "Increase quantity of Water" }).disabled).toBe(
+      false,
+    );
   });
 
   afterEach(() => {

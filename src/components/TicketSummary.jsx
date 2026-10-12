@@ -1,16 +1,25 @@
 import { calculateOrderTotal } from "../services/order.service";
+import { ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { formatPrice } from "../utils/format";
 import { button, dangerButton, muted } from "../utils/styles";
 import FieldError from "./FieldError";
 
+const STATUS_LABEL = {
+  [ITEM_PRODUCT_STATUS.UNAVAILABLE]: "Unavailable",
+  [ITEM_PRODUCT_STATUS.DELETED]: "No longer on the menu",
+};
+
 // Ticket summary: the added Items with quantity controls, reconfiguration,
-// removal and the automatic total. itemMessages shows a message under an
-// Item, by index.
+// removal and the automatic total. Per Item index: maxQuantities caps the
+// quantity (null = no limit), itemStatuses labels Products no longer
+// sellable and itemMessages shows a message under the Item.
 export default function TicketSummary({
   items,
   onChangeQuantity,
   onRemove,
   onEdit,
+  maxQuantities = [],
+  itemStatuses = [],
   itemMessages = {},
 }) {
   return (
@@ -28,6 +37,8 @@ export default function TicketSummary({
             ]
               .filter(Boolean)
               .join(" · ");
+            const maxQuantity = maxQuantities[index] ?? null;
+            const statusLabel = STATUS_LABEL[itemStatuses[index]];
 
             return (
               <li
@@ -38,6 +49,11 @@ export default function TicketSummary({
                   <div className="min-w-0">
                     <span className="font-medium">{item.productName}</span>
                     {details && <p className={`m-0 ${muted}`}>{details}</p>}
+                    {statusLabel && (
+                      <em className="mt-1 block w-fit rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                        {statusLabel}
+                      </em>
+                    )}
                   </div>
                   <span className="shrink-0 font-medium">
                     {formatPrice(item.subtotal)}
@@ -64,6 +80,7 @@ export default function TicketSummary({
                       type="button"
                       className={button}
                       aria-label={`Increase quantity of ${item.productName}`}
+                      disabled={maxQuantity !== null && item.quantity >= maxQuantity}
                       onClick={() => onChangeQuantity(index, item.quantity + 1)}
                     >
                       +

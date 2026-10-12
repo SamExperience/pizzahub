@@ -6,7 +6,7 @@ import {
   updateItemQuantity,
   updateOrder,
 } from "../services/order.service";
-import { getProductById } from "../services/product.service";
+import { getItemProduct, ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { alert, button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 import { dateToTime, getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
@@ -29,32 +29,43 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   const originalTime = isEdit ? dateToTime(order.scheduledTime) : null;
   const [orderType, setOrderType] = useState(order?.orderType ?? ORDER_TYPE.TAKEAWAY);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [configProduct, setConfigProduct] = useState(null);
+  // Configuration step: { product, index, restricted, maxQuantity } or null.
+  // index is null when adding a new Item; restricted is set for an Item whose
+  // Product is no longer sellable (product is null when it was deleted).
+  const [config, setConfig] = useState(null);
   // Items added to the ticket (snapshots).
   const [items, setItems] = useState(order?.items ?? []);
+  // Quantity saved in the ticket for each Item (null for Items added now),
+  // aligned with items: the cap for Items whose Product is not sellable.
+  const [savedQuantities, setSavedQuantities] = useState(() =>
+    (order?.items ?? []).map((item) => item.quantity),
+  );
+  // Status of each Item's Product by productId (see getItemProduct).
+  const [productStatuses, setProductStatuses] = useState({});
   // Escape closes only the topmost layer: the configuration modal, if open.
   const closeMenuPanel = useCallback(() => {
-    if (!configProduct) setMenuOpen(false);
-  }, [configProduct]);
-  // Index of the Item being reconfigured; null when adding a new Item.
-  const [configIndex, setConfigIndex] = useState(null);
+    if (!config) setMenuOpen(false);
+  }, [config]);
   // Message under one Item of the summary: { index, text } or null.
   const [itemMessage, setItemMessage] = useState(null);
-  const closeConfig = useCallback(() => {
-    setConfigProduct(null);
-    setConfigIndex(null);
-  }, []);
+  const selectProduct = useCallback(
+    (product) => setConfig({ product, index: null, restricted: false }),
+    [],
+  );
+  const closeConfig = useCallback(() => setConfig(null), []);
   const addItem = useCallback(
     (item) => {
+      const index = config?.index ?? null;
+
       setItems((list) =>
-        configIndex === null
+        index === null
           ? [...list, item]
-          : list.map((current, i) => (i === configIndex ? item : current)),
+          : list.map((current, i) => (i === index ? item : current)),
       );
-      setConfigProduct(null);
-      setConfigIndex(null);
+      if (index === null) setSavedQuantities((list) => [...list, null]);
+      setConfig(null);
     },
-    [configIndex],
+    [config],
   );
   const changeQuantity = useCallback((index, quantity) => {
     setItems((list) =>
@@ -63,37 +74,41 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   }, []);
   const removeItem = useCallback((index) => {
     setItems((list) => list.filter((_, i) => i !== index));
+    setSavedQuantities((list) => list.filter((_, i) => i !== index));
     setItemMessage(null);
   }, []);
-  // Reopens the configuration step for an Item with the current Product, so
-  // it is repriced from the menu. A deleted or unavailable Product keeps the
-  // Item as it is.
+  // Maximum quantity per Item: the saved quantity when its Product is not
+  // sellable, otherwise no limit.
+  const maxQuantities = items.map((item, index) => {
+    const status = productStatuses[item.productId];
+    const isLimited = status && status !== ITEM_PRODUCT_STATUS.SELLABLE;
+
+    return isLimited ? (savedQuantities[index] ?? item.quantity) : null;
+  });
+  // Opens the configuration step for an existing Item with its current
+  // Product: full edit when it is sellable, restricted edit otherwise.
   const editItem = useCallback(
     async (index) => {
+      const item = items[index];
+
       setItemMessage(null);
 
       try {
-        const product = await getProductById(items[index].productId);
+        const { status, product } = await getItemProduct(item.productId);
 
-        if (product.isAvailable === false) {
-          setItemMessage({ index, text: "Product no longer available" });
-          return;
-        }
-
-        setConfigIndex(index);
-        setConfigProduct(product);
+        setProductStatuses((current) => ({ ...current, [item.productId]: status }));
+        setConfig({
+          product,
+          index,
+          restricted: status !== ITEM_PRODUCT_STATUS.SELLABLE,
+          maxQuantity: savedQuantities[index] ?? item.quantity,
+        });
       } catch (err) {
         console.log("Error loading product -> ", err);
-        const missing =
-          err?.message === "Product not found" || err?.code === "permission-denied";
-
-        setItemMessage({
-          index,
-          text: missing ? "Product no longer available" : "Could not load the product. Try again.",
-        });
+        setItemMessage({ index, text: "Could not load the product. Try again." });
       }
     },
-    [items],
+    [items, savedQuantities],
   );
   const [scheduledTime, setScheduledTime] = useState(
     () => originalTime ?? getDefaultScheduledTime(),
@@ -235,17 +250,44 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
     setOrderCustomerRetryKey((key) => key + 1);
   };
 
+  // Edit mode: load the status of the Order's Products once, so Items whose
+  // Product is no longer sellable are capped and labelled. A failed read
+  // leaves the status unknown (no cap); Edit checks it again.
+  const orderItems = order?.items;
+
+  useEffect(() => {
+    if (!orderItems?.length) return;
+
+    let cancelled = false;
+    const productIds = [...new Set(orderItems.map((item) => item.productId))];
+
+    Promise.allSettled(productIds.map((id) => getItemProduct(id))).then((results) => {
+      if (cancelled) return;
+
+      const statuses = {};
+
+      results.forEach((result, i) => {
+        if (result.status === "fulfilled") statuses[productIds[i]] = result.value.status;
+      });
+      setProductStatuses((current) => ({ ...statuses, ...current }));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderItems]);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       // While the menu panel or the configuration step is open, Escape
       // closes only that layer.
-      if (event.key === "Escape" && !menuOpen && !configProduct && !saving) onClose();
+      if (event.key === "Escape" && !menuOpen && !config && !saving) onClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, menuOpen, configProduct, saving]);
+  }, [onClose, menuOpen, config, saving]);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -357,6 +399,8 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
             onChangeQuantity={changeQuantity}
             onRemove={removeItem}
             onEdit={editItem}
+            maxQuantities={maxQuantities}
+            itemStatuses={items.map((item) => productStatuses[item.productId])}
             itemMessages={itemMessage ? { [itemMessage.index]: itemMessage.text } : {}}
           />
           <FieldError id="items-error" message={errors.items} />
@@ -384,14 +428,16 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       {menuOpen && (
         <MenuTableauPanel
           storeId={storeId}
-          onSelectProduct={setConfigProduct}
+          onSelectProduct={selectProduct}
           onClose={closeMenuPanel}
         />
       )}
-      {configProduct && (
+      {config && (
         <ItemConfigModal
-          product={configProduct}
-          initialItem={configIndex === null ? null : items[configIndex]}
+          product={config.product}
+          initialItem={config.index === null ? null : items[config.index]}
+          restricted={config.restricted}
+          maxQuantity={config.maxQuantity}
           onAdd={addItem}
           onClose={closeConfig}
         />
