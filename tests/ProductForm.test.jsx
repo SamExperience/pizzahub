@@ -127,6 +127,7 @@ describe("ProductForm", () => {
     await click("Add cooking level");
     await userEvent.type(screen.getByLabelText("Cooking level 2"), "medium");
     expect(saveButton().disabled).toBe(true);
+    expect(screen.getByText("Required: choose the default cooking level.")).toBeTruthy();
 
     const select = screen.getByLabelText("Default cooking level");
     expect(
@@ -135,6 +136,7 @@ describe("ProductForm", () => {
 
     await userEvent.selectOptions(select, "medium");
     expect(saveButton().disabled).toBe(false);
+    expect(screen.queryByText("Required: choose the default cooking level.")).toBeNull();
     await click("Save product");
 
     expect(onSubmit).toHaveBeenCalledWith(

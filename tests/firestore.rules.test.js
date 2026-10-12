@@ -7,8 +7,10 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { beforeAll, describe, expect, it } from "vitest";
 import { app, auth, db } from "../src/services/firebase";
@@ -225,12 +227,9 @@ describe("orders and customers rules", () => {
     expect((await getDoc(doc(db, "orders", orderBId))).exists()).toBe(true);
   });
 
-  it("denies the owner creating, updating and deleting orders", async () => {
+  it("denies the owner updating and deleting orders", async () => {
     await signInAs(storeA);
     const ref = doc(db, "orders", orderAId);
-    await expect(
-      addDoc(collection(db, "orders"), { storeId: storeA.storeId }),
-    ).rejects.toThrow();
     await expect(updateDoc(ref, { status: "Completed" })).rejects.toThrow();
     await expect(deleteDoc(ref)).rejects.toThrow();
   });
@@ -247,21 +246,198 @@ describe("orders and customers rules", () => {
     await expect(getDoc(doc(db, "customers", customerAId))).rejects.toThrow();
   });
 
-  it("denies the owner writing customers", async () => {
-    await signInAs(storeA);
-    const ref = doc(db, "customers", customerAId);
-    await expect(
-      addDoc(collection(db, "customers"), { firstName: "X" }),
-    ).rejects.toThrow();
-    await expect(updateDoc(ref, { firstName: "X" })).rejects.toThrow();
-    await expect(deleteDoc(ref)).rejects.toThrow();
-  });
-
   it("denies unauthenticated reads", async () => {
     await signout();
     await expect(getDoc(doc(db, "orders", orderAId))).rejects.toThrow();
     await expect(getDoc(doc(db, "customers", customerAId))).rejects.toThrow();
   });
+});
+
+// Writes go through a batch with server timestamps, as in the services.
+const deliveryAddress = {
+  street: "Rue du Lyon",
+  streetNumber: "9",
+  postalCode: "1201",
+  city: "Genève",
+  country: null,
+};
+
+const customerFields = (companyId, extra = {}) => ({
+  companyId,
+  firstName: "Mario",
+  lastName: null,
+  phone: "0123456789",
+  address: deliveryAddress,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  ...extra,
+});
+
+const orderFields = (storeId, customerId, extra = {}) => ({
+  storeId,
+  customerId,
+  orderType: "takeaway",
+  scheduledTime: new Date(Date.now() + 30 * 60 * 1000),
+  status: "Pending",
+  items: [{ productId: "p1", productName: "Margherita", quantity: 1 }],
+  total: 10,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  ...extra,
+});
+
+describe("orders and customers write rules", () => {
+  let companyA;
+  let companyB;
+
+  beforeAll(async () => {
+    await signInAs(storeA);
+    companyA = (await getDoc(doc(db, "users", auth.currentUser.uid))).data()
+      .companyId;
+    await signInAs(storeB);
+    companyB = (await getDoc(doc(db, "users", auth.currentUser.uid))).data()
+      .companyId;
+  });
+
+  // Creates a Customer through the rules and returns its id.
+  const createCustomer = async (extra) => {
+    const ref = doc(collection(db, "customers"));
+    await writeBatch(db).set(ref, customerFields(companyA, extra)).commit();
+    return ref.id;
+  };
+
+  // Commits an Order and, when customerData is given, its Customer in the
+  // same batch. Returns the Order id.
+  const commitOrder = async (order, customerData) => {
+    const batch = writeBatch(db);
+    const customerRef = doc(collection(db, "customers"));
+    const orderRef = doc(collection(db, "orders"));
+
+    if (customerData) batch.set(customerRef, customerData);
+
+    batch.set(orderRef, order(customerData ? customerRef.id : null));
+    await batch.commit();
+
+    return orderRef.id;
+  };
+
+  it("lets the owner create and update a customer", async () => {
+    await signInAs(storeA);
+    const id = await createCustomer();
+    await expect(
+      updateDoc(doc(db, "customers", id), {
+        firstName: "Luigi",
+        updatedAt: serverTimestamp(),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("denies creating an invalid customer", async () => {
+    await signInAs(storeA);
+    const create = (fields) =>
+      writeBatch(db).set(doc(collection(db, "customers")), fields).commit();
+
+    await expect(create(customerFields(companyB))).rejects.toThrow();
+    await expect(create(customerFields(companyA, { firstName: "" }))).rejects.toThrow();
+    await expect(create(customerFields(companyA, { firstName: null }))).rejects.toThrow();
+    await expect(create(customerFields(companyA, { extra: "x" }))).rejects.toThrow();
+  });
+
+  it("denies another company updating or deleting a customer", async () => {
+    await signInAs(storeA);
+    const id = await createCustomer();
+    await signInAs(storeB);
+    const ref = doc(db, "customers", id);
+    await expect(
+      updateDoc(ref, { firstName: "Hacked", updatedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies changing the customer's companyId and deleting it", async () => {
+    await signInAs(storeA);
+    const ref = doc(db, "customers", await createCustomer());
+    await expect(
+      updateDoc(ref, { companyId: companyB, updatedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("lets the owner create a takeaway order with a new customer", async () => {
+    await signInAs(storeA);
+    const id = await commitOrder(
+      (customerId) => orderFields(storeA.storeId, customerId),
+      customerFields(companyA, { phone: null, address: null }),
+    );
+    expect((await getDoc(doc(db, "orders", id))).data().status).toBe("Pending");
+  });
+
+  it("lets the owner create a delivery order for an existing customer", async () => {
+    await signInAs(storeA);
+    const customerId = await createCustomer();
+    await commitOrder(() =>
+      orderFields(storeA.storeId, customerId, { orderType: "delivery" }),
+    );
+  });
+
+  it("denies a delivery order without phone or address", async () => {
+    await signInAs(storeA);
+    const delivery = (customerId) =>
+      orderFields(storeA.storeId, customerId, { orderType: "delivery" });
+
+    await expect(
+      commitOrder(delivery, customerFields(companyA, { phone: null })),
+    ).rejects.toThrow();
+    await expect(
+      commitOrder(delivery, customerFields(companyA, { address: null })),
+    ).rejects.toThrow();
+  });
+
+  it("denies invalid orders", async () => {
+    await signInAs(storeA);
+    const customer = () => customerFields(companyA);
+    const invalid = (extra) =>
+      commitOrder(
+        (customerId) => orderFields(storeA.storeId, customerId, extra),
+        customer(),
+      );
+
+    await expect(invalid({ storeId: storeB.storeId })).rejects.toThrow();
+    await expect(invalid({ status: "Completed" })).rejects.toThrow();
+    await expect(invalid({ items: [] })).rejects.toThrow();
+    await expect(invalid({ orderType: "dinein" })).rejects.toThrow();
+    await expect(invalid({ extra: "x" })).rejects.toThrow();
+  });
+
+  it("denies an order referencing another company's customer", async () => {
+    await signInAs(storeB);
+    const customerId = await createCustomerForB();
+    await signInAs(storeA);
+    await expect(
+      commitOrder(() => orderFields(storeA.storeId, customerId)),
+    ).rejects.toThrow();
+  });
+
+  it("denies unauthenticated order and customer creation", async () => {
+    await signout();
+    await expect(
+      writeBatch(db)
+        .set(doc(collection(db, "customers")), customerFields(companyA))
+        .commit(),
+    ).rejects.toThrow();
+    await expect(
+      writeBatch(db)
+        .set(doc(collection(db, "orders")), orderFields(storeA.storeId, "x"))
+        .commit(),
+    ).rejects.toThrow();
+  });
+
+  // Customer of Company B, created while signed in as B.
+  const createCustomerForB = async () => {
+    const ref = doc(collection(db, "customers"));
+    await writeBatch(db).set(ref, customerFields(companyB)).commit();
+    return ref.id;
+  };
 });
 
 describe("unauthenticated access", () => {

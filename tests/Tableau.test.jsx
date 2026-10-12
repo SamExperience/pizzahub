@@ -142,6 +142,23 @@ describe("Tableau page wiring", () => {
     expect(mocks.subscribe.mock.calls[1][0]).toBe("store-2");
   });
 
+  it("opens and closes the ticket sidebar without touching the orders", async () => {
+    render(<Tableau />);
+    act(() => mocks.subscribe.mock.calls[0][1]([{ id: "a", status: "Pending" }]));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create Ticket" }));
+
+    expect(screen.getByRole("dialog", { name: "Create ticket" })).toBeTruthy();
+    expect(screen.getByLabelText("Pending tickets").textContent).toBe("1");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mocks.subscribe).toHaveBeenCalledOnce();
+  });
+
   it("renews the listener at midnight", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 9, 23, 59, 0));
