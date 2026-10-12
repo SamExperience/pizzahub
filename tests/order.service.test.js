@@ -569,14 +569,21 @@ describe("sortColumnOrders", () => {
     expect(ids(sortColumnOrders("Completed", orders))).toEqual(["b", "c", "a"]);
   });
 
-  it("falls back to updatedAt and puts pending completion times first", () => {
+  it("puts pending completion times first and Orders without completedAt last", () => {
     const orders = [
-      { id: "old", updatedAt: at(18) },
-      { id: "done", completedAt: at(19) },
+      { id: "old1", updatedAt: at(21) },
+      { id: "done", completedAt: at(19), updatedAt: at(22) },
+      { id: "old2", updatedAt: at(18) },
       { id: "local", completedAt: null, updatedAt: null },
     ];
 
-    expect(ids(sortColumnOrders("Completed", orders))).toEqual(["local", "done", "old"]);
+    // updatedAt is ignored: an edit never moves a ticket.
+    expect(ids(sortColumnOrders("Completed", orders))).toEqual([
+      "local",
+      "done",
+      "old1",
+      "old2",
+    ]);
   });
 
   it("keeps the received order on ties and does not mutate the input", () => {

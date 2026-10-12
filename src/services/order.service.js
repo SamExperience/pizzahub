@@ -252,15 +252,19 @@ const toMillis = (value) => {
 
 // Orders of one Tableau column in display order: Pending and In progress by
 // scheduled time (earliest first); Completed by completion time (latest
-// first, falling back to updatedAt). A pending server timestamp (null right
-// after the local write) counts as the latest; ties keep the received order
-// (creation time). Returns a new array.
+// first). In Completed, a pending server timestamp (null right after the
+// local write) counts as the latest, and Orders completed before completedAt
+// existed (field absent) go last; edits never move a ticket. Ties keep the
+// received order (creation time). Returns a new array.
 export const sortColumnOrders = (status, orders) => {
   const compare = (x, y) => (x === y ? 0 : x - y);
 
   if (status === ORDER_STATUS.COMPLETED) {
-    const completedAt = (order) =>
-      toMillis(order.completedAt) ?? toMillis(order.updatedAt) ?? Infinity;
+    const completedAt = (order) => {
+      if (order.completedAt === undefined) return -Infinity;
+
+      return toMillis(order.completedAt) ?? Infinity;
+    };
 
     return [...orders].sort((a, b) => compare(completedAt(b), completedAt(a)));
   }
