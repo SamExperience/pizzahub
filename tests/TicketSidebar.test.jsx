@@ -6,6 +6,7 @@ import { getCategoriesByMenuId } from "../src/services/category.service";
 import { getCustomersByCompanyId } from "../src/services/customer.service";
 import { getMenuByStoreId } from "../src/services/menu.service";
 import { getProductsByCategoryId } from "../src/services/product.service";
+import { formatPrice } from "../src/utils/format";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
 vi.mock("../src/services/menu.service", () => ({ getMenuByStoreId: vi.fn() }));
@@ -148,8 +149,60 @@ describe("TicketSidebar", () => {
 
     expect(screen.queryByRole("dialog", { name: "Configure Water" })).toBeNull();
     expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
-    expect(screen.getByText("1 item added")).toBeTruthy();
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("1");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("changes quantities, removes items and updates the total automatically", async () => {
+    getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+    getCategoriesByMenuId.mockResolvedValue([{ id: "cat1", name: "Drinks" }]);
+    getProductsByCategoryId.mockResolvedValue(
+      [
+        { id: "p1", name: "Water", price: 2.5 },
+        { id: "p2", name: "Cola", price: 3 },
+      ].map((product) => ({
+        ...product,
+        sizes: null,
+        availableCookingLevels: [],
+        defaultCookingLevel: null,
+        isAvailable: true,
+      })),
+    );
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    expect(screen.getByText("No products added yet.")).toBeTruthy();
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(0));
+
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+    for (const name of ["Water", "Cola"]) {
+      await userEvent.click(await screen.findByRole("button", { name: new RegExp(name) }));
+      await userEvent.click(screen.getByRole("button", { name: /Add to ticket/ }));
+    }
+
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(5.5));
+
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
+
+    expect(screen.getByLabelText("Quantity of Water").textContent).toBe("3");
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(10.5));
+
+    await userEvent.click(screen.getByRole("button", { name: "Decrease quantity of Water" }));
+
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(8));
+    expect(
+      screen.getByRole("button", { name: "Decrease quantity of Cola" }).disabled,
+    ).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove Water" }));
+
+    expect(screen.queryByLabelText("Quantity of Water")).toBeNull();
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(3));
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove Cola" }));
+
+    expect(screen.getByText("No products added yet.")).toBeTruthy();
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(0));
   });
 
   it("closes from the close button, Cancel, Escape and the backdrop", async () => {

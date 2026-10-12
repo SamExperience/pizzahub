@@ -85,6 +85,14 @@ export const buildItemSnapshot = (
   };
 };
 
+// Copy of an Item snapshot with a new quantity and the recalculated subtotal.
+export const updateItemQuantity = (item, quantity) => {
+  if (!Number.isInteger(quantity) || quantity < 1)
+    throw new Error("Item quantity must be a positive integer");
+
+  return { ...item, quantity, subtotal: roundPrice(item.unitPrice * quantity) };
+};
+
 // Order total: sum of the Item subtotals.
 export const calculateOrderTotal = (items = []) =>
   roundPrice(items.reduce((sum, item) => sum + item.subtotal, 0));

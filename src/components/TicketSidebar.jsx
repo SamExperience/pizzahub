@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCustomersByCompanyId } from "../services/customer.service";
-import { ORDER_TYPE } from "../services/order.service";
+import { ORDER_TYPE, updateItemQuantity } from "../services/order.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 import { getDefaultScheduledTime } from "../utils/ticketTime";
 import ItemConfigModal from "./ItemConfigModal";
 import MenuTableauPanel from "./MenuTableauPanel";
 import TicketCustomerSection from "./TicketCustomerSection";
+import TicketSummary from "./TicketSummary";
 
 const ORDER_TYPE_OPTIONS = [
   { value: ORDER_TYPE.TAKEAWAY, label: "Takeaway" },
@@ -18,7 +19,7 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   const [orderType, setOrderType] = useState(ORDER_TYPE.TAKEAWAY);
   const [menuOpen, setMenuOpen] = useState(false);
   const [configProduct, setConfigProduct] = useState(null);
-  // Items added to the ticket (snapshots); the summary is built in 9.8.
+  // Items added to the ticket (snapshots).
   const [items, setItems] = useState([]);
   // Escape closes only the topmost layer: the configuration modal, if open.
   const closeMenuPanel = useCallback(() => {
@@ -28,6 +29,14 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   const addItem = useCallback((item) => {
     setItems((list) => [...list, item]);
     setConfigProduct(null);
+  }, []);
+  const changeQuantity = useCallback((index, quantity) => {
+    setItems((list) =>
+      list.map((item, i) => (i === index ? updateItemQuantity(item, quantity) : item)),
+    );
+  }, []);
+  const removeItem = useCallback((index) => {
+    setItems((list) => list.filter((_, i) => i !== index));
   }, []);
   const [scheduledTime, setScheduledTime] = useState(() =>
     getDefaultScheduledTime(),
@@ -174,11 +183,11 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
           >
             Add product
           </button>
-          {items.length > 0 && (
-            <p className={muted}>
-              {items.length} {items.length === 1 ? "item" : "items"} added
-            </p>
-          )}
+          <TicketSummary
+            items={items}
+            onChangeQuantity={changeQuantity}
+            onRemove={removeItem}
+          />
         </div>
 
         <footer className="flex justify-end border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">

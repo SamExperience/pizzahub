@@ -28,6 +28,7 @@ import {
   createOrder,
   getTodayRange,
   subscribeToTodayOrders,
+  updateItemQuantity,
   validateOrder,
 } from "../src/services/order.service";
 
@@ -130,6 +131,29 @@ describe("buildItemSnapshot", () => {
       expect(() => buildItemSnapshot(drink, { quantity })).toThrow(
         "Item quantity must be a positive integer",
       );
+  });
+});
+
+describe("updateItemQuantity", () => {
+  it("returns a copy with the new quantity and the recalculated subtotal", () => {
+    const item = buildItemSnapshot(pizza, { size: "Small", quantity: 1 });
+    const updated = updateItemQuantity(item, 3);
+
+    expect(updated).toEqual({ ...item, quantity: 3, subtotal: 28.5 });
+    expect(item.quantity).toBe(1);
+    expect(item.subtotal).toBe(9.5);
+  });
+
+  it("rounds the subtotal to cents", () => {
+    expect(updateItemQuantity({ unitPrice: 0.1, quantity: 1, subtotal: 0.1 }, 3).subtotal).toBe(0.3);
+  });
+
+  it.each([0, -1, 1.5, "2", undefined])("rejects quantity %s", (quantity) => {
+    const item = buildItemSnapshot(pizza, { size: "Small", quantity: 1 });
+
+    expect(() => updateItemQuantity(item, quantity)).toThrow(
+      "Item quantity must be a positive integer",
+    );
   });
 });
 
