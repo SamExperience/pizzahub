@@ -255,6 +255,9 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           </select>
         </label>
       )}
+      {levels && selectedDefault === "" && (
+        <p className={muted}>Required: choose the default cooking level.</p>
+      )}
 
       <fieldset className={fieldsetClass}>
         <legend className={legendClass}>Image</legend>
