@@ -10,6 +10,15 @@ export const getDefaultScheduledTime = (now = new Date()) => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+// "HH:MM" of a Firestore Timestamp or Date; empty string when missing.
+export const dateToTime = (value) => {
+  const date = value?.toDate ? value.toDate() : value;
+
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 // Date on today's day for an "HH:MM" value; null when the value is invalid.
 export const timeToDate = (time, now = new Date()) => {
   const match = /^(\d{2}):(\d{2})$/.exec(time ?? "");

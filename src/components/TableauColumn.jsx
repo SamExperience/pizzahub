@@ -2,7 +2,13 @@ import { card, muted } from "../utils/styles";
 import TicketCard from "./TicketCard";
 
 // One status column of the Tableau: header with ticket count, then the tickets.
-export default function TableauColumn({ title, orders, onChangeStatus, onCancel }) {
+export default function TableauColumn({
+  title,
+  orders,
+  onChangeStatus,
+  onEdit,
+  onCancel,
+}) {
   return (
     <section className={`${card} flex min-w-0 flex-col gap-3`}>
       <header className="flex items-center justify-between gap-2">
@@ -27,6 +33,7 @@ export default function TableauColumn({ title, orders, onChangeStatus, onCancel 
               <TicketCard
                 order={order}
                 onChangeStatus={onChangeStatus}
+                onEdit={onEdit}
                 onCancel={onCancel}
               />
             </li>

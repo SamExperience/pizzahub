@@ -17,8 +17,10 @@ const formatAddress = (address) =>
     .filter(Boolean)
     .join(", ");
 
-// Loads the Customer referenced by the Order; null while loading or when unavailable.
-function useCustomer(customerId) {
+// Loads the Customer referenced by the Order; null while loading or when
+// unavailable. It reloads when the Order is updated (version), because an
+// edit can change the Customer without changing customerId.
+function useCustomer(customerId, version) {
   const [result, setResult] = useState({ id: null, customer: null });
 
   useEffect(() => {
@@ -36,7 +38,7 @@ function useCustomer(customerId) {
     return () => {
       cancelled = true;
     };
-  }, [customerId]);
+  }, [customerId, version]);
 
   return {
     loading: Boolean(customerId) && result.id !== customerId,
@@ -45,7 +47,10 @@ function useCustomer(customerId) {
 }
 
 function CustomerInfo({ order }) {
-  const { loading, customer } = useCustomer(order.customerId);
+  const { loading, customer } = useCustomer(
+    order.customerId,
+    order.updatedAt?.toMillis?.(),
+  );
 
   if (loading) return <p className={`m-0 ${muted}`}>Loading customer ...</p>;
   if (!customer)
@@ -88,9 +93,9 @@ function TicketItem({ item }) {
 }
 
 // One ticket of the Tableau: order type and time, customer, items, total,
-// status, the arrows that move it one status back or forward and the
-// cancel action.
-export default function TicketCard({ order, onChangeStatus, onCancel }) {
+// status, the arrows that move it one status back or forward and the edit
+// and cancel actions.
+export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -167,17 +172,30 @@ export default function TicketCard({ order, onChangeStatus, onCancel }) {
           )}
         </div>
       )}
-      {onCancel && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className={dangerButton}
-            aria-label="Cancel ticket"
-            disabled={saving}
-            onClick={handleCancel}
-          >
-            Cancel
-          </button>
+      {(onEdit || onCancel) && (
+        <div className="flex justify-end gap-2">
+          {onEdit && (
+            <button
+              type="button"
+              className={button}
+              aria-label="Edit ticket"
+              disabled={saving}
+              onClick={() => onEdit(order)}
+            >
+              Edit
+            </button>
+          )}
+          {onCancel && (
+            <button
+              type="button"
+              className={dangerButton}
+              aria-label="Cancel ticket"
+              disabled={saving}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       )}
       {error && (

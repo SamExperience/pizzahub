@@ -23,7 +23,16 @@ export default function Tableau() {
   const [retryKey, setRetryKey] = useState(0);
   const [dayKey, setDayKey] = useState(0);
   const [ticketOpen, setTicketOpen] = useState(false);
-  const closeTicket = useCallback(() => setTicketOpen(false), []);
+  // Order edited in the sidebar; null in creation mode.
+  const [editingOrder, setEditingOrder] = useState(null);
+  const closeTicket = useCallback(() => {
+    setTicketOpen(false);
+    setEditingOrder(null);
+  }, []);
+  const editTicket = useCallback((order) => {
+    setEditingOrder(order);
+    setTicketOpen(true);
+  }, []);
 
   useEffect(() => {
     if (!storeId) return;
@@ -66,12 +75,14 @@ export default function Tableau() {
         onRetry={() => setRetryKey((key) => key + 1)}
         onCreateTicket={() => setTicketOpen(true)}
         onChangeStatus={changeTicketStatus}
+        onEdit={editTicket}
         onCancel={cancelTicket}
       />
       {ticketOpen && (
         <TicketSidebar
           companyId={selectedStore?.companyId}
           storeId={storeId}
+          order={editingOrder}
           onClose={closeTicket}
         />
       )}

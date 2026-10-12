@@ -54,4 +54,13 @@ describe("validateTicketForm", () => {
     );
     expect(validate({ scheduledTime: "12:10" }).scheduledTime).toBeUndefined();
   });
+
+  it("accepts an unchanged past time in edit mode but not a changed one", () => {
+    expect(
+      validate({ scheduledTime: "11:00", originalTime: "11:00" }).scheduledTime,
+    ).toBeUndefined();
+    expect(
+      validate({ scheduledTime: "11:30", originalTime: "11:00" }).scheduledTime,
+    ).toBe("Scheduled time is in the past");
+  });
 });

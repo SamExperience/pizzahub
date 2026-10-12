@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { getCustomersByCompanyId } from "../services/customer.service";
+import { getCustomer, getCustomersByCompanyId } from "../services/customer.service";
 import {
   createOrder,
   ORDER_TYPE,
   updateItemQuantity,
+  updateOrder,
 } from "../services/order.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { alert, button, ghostButton, input, muted, primaryButton } from "../utils/styles";
-import { getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
+import { dateToTime, getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
 import { validateTicketForm } from "../utils/ticketValidation";
 import FieldError from "./FieldError";
 import ItemConfigModal from "./ItemConfigModal";
@@ -21,12 +22,15 @@ const ORDER_TYPE_OPTIONS = [
 ];
 
 // Right sidebar for ticket creation: order type, customer and scheduled time.
-export default function TicketSidebar({ companyId, storeId, onClose }) {
-  const [orderType, setOrderType] = useState(ORDER_TYPE.TAKEAWAY);
+// With an order it edits that Order instead, prefilled from it.
+export default function TicketSidebar({ companyId, storeId, order = null, onClose }) {
+  const isEdit = Boolean(order);
+  const originalTime = isEdit ? dateToTime(order.scheduledTime) : null;
+  const [orderType, setOrderType] = useState(order?.orderType ?? ORDER_TYPE.TAKEAWAY);
   const [menuOpen, setMenuOpen] = useState(false);
   const [configProduct, setConfigProduct] = useState(null);
   // Items added to the ticket (snapshots).
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(order?.items ?? []);
   // Escape closes only the topmost layer: the configuration modal, if open.
   const closeMenuPanel = useCallback(() => {
     if (!configProduct) setMenuOpen(false);
@@ -44,8 +48,8 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   const removeItem = useCallback((index) => {
     setItems((list) => list.filter((_, i) => i !== index));
   }, []);
-  const [scheduledTime, setScheduledTime] = useState(() =>
-    getDefaultScheduledTime(),
+  const [scheduledTime, setScheduledTime] = useState(
+    () => originalTime ?? getDefaultScheduledTime(),
   );
   const [customers, setCustomers] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(true);
@@ -54,11 +58,22 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
   const [customersRetryKey, setCustomersRetryKey] = useState(0);
   const [customerForm, setCustomerForm] = useState(EMPTY_CUSTOMER_FORM);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  // Edit mode: loading of the Order's Customer ("loading" | "ready" | "error").
+  const [orderCustomerState, setOrderCustomerState] = useState(
+    isEdit ? "loading" : "ready",
+  );
+  const [orderCustomerRetryKey, setOrderCustomerRetryKey] = useState(0);
   // Inline field errors appear after the first save attempt and then follow the form.
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  const found = validateTicketForm({ orderType, form: customerForm, scheduledTime, items });
+  const found = validateTicketForm({
+    orderType,
+    form: customerForm,
+    scheduledTime,
+    items,
+    originalTime,
+  });
   const errors = submitted ? found : {};
 
   const handleSave = async () => {
@@ -69,16 +84,31 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
 
     setSaving(true);
 
+    const data = {
+      companyId,
+      orderType,
+      items,
+      customerData: customerForm,
+      existingCustomer: selectedCustomer,
+    };
+
     try {
-      await createOrder({
-        companyId,
-        storeId,
-        orderType,
-        scheduledTime: timeToDate(scheduledTime),
-        items,
-        customerData: customerForm,
-        existingCustomer: selectedCustomer,
-      });
+      if (isEdit) {
+        // Keep the Order's original day.
+        const day = order.scheduledTime?.toDate?.() ?? order.scheduledTime;
+
+        await updateOrder({
+          ...data,
+          orderId: order.id,
+          scheduledTime: timeToDate(scheduledTime, day),
+        });
+      } else {
+        await createOrder({
+          ...data,
+          storeId,
+          scheduledTime: timeToDate(scheduledTime),
+        });
+      }
       onClose();
     } catch (err) {
       console.log("Error saving ticket -> ", err);
@@ -125,6 +155,39 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
     };
   }, [companyId, customersRetryKey]);
 
+  // Edit mode: select the Order's Customer once loaded. A missing Customer
+  // leaves the form empty.
+  const orderCustomerId = order?.customerId;
+
+  useEffect(() => {
+    if (!orderCustomerId) return;
+
+    let cancelled = false;
+
+    getCustomer(orderCustomerId)
+      .then((customer) => {
+        if (cancelled) return;
+        if (customer) {
+          setSelectedCustomer(customer);
+          setCustomerForm(customerToForm(customer));
+        }
+        setOrderCustomerState("ready");
+      })
+      .catch((err) => {
+        console.log("Error loading the ticket customer -> ", err);
+        if (!cancelled) setOrderCustomerState("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderCustomerId, orderCustomerRetryKey]);
+
+  const retryOrderCustomer = () => {
+    setOrderCustomerState("loading");
+    setOrderCustomerRetryKey((key) => key + 1);
+  };
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       // While the menu panel is open, Escape closes only the panel.
@@ -145,11 +208,13 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
       />
       <aside
         role="dialog"
-        aria-label="Create ticket"
+        aria-label={isEdit ? "Edit ticket" : "Create ticket"}
         className="relative flex h-full w-full max-w-md flex-col bg-white text-left shadow-xl dark:bg-neutral-900"
       >
         <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-          <h2 className="m-0 text-xl font-semibold">Create Ticket</h2>
+          <h2 className="m-0 text-xl font-semibold">
+            {isEdit ? "Edit Ticket" : "Create Ticket"}
+          </h2>
           <button
             type="button"
             className={ghostButton}
@@ -188,6 +253,17 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
             </div>
           </fieldset>
 
+          {orderCustomerState === "loading" && (
+            <p className={`${muted} m-0`}>Loading customer ...</p>
+          )}
+          {orderCustomerState === "error" && (
+            <div role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
+              Could not load the ticket's customer.
+              <button type="button" className={button} onClick={retryOrderCustomer}>
+                Try again
+              </button>
+            </div>
+          )}
           <TicketCustomerSection
             orderType={orderType}
             customers={customers}
@@ -216,7 +292,9 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
               onChange={(event) => setScheduledTime(event.target.value)}
             />
             <FieldError id="scheduledTime-error" message={errors.scheduledTime} />
-            <p className={`${muted} mt-1`}>Today. Defaults to 30 minutes from now.</p>
+            {!isEdit && (
+              <p className={`${muted} mt-1`}>Today. Defaults to 30 minutes from now.</p>
+            )}
           </div>
 
           <button
@@ -246,10 +324,10 @@ export default function TicketSidebar({ companyId, storeId, onClose }) {
           <button
             type="button"
             className={primaryButton}
-            disabled={saving}
+            disabled={saving || orderCustomerState !== "ready"}
             onClick={handleSave}
           >
-            {saving ? "Saving…" : "Save ticket"}
+            {saving ? "Saving…" : isEdit ? "Save changes" : "Save ticket"}
           </button>
         </footer>
       </aside>

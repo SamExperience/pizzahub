@@ -77,6 +77,19 @@ describe("TicketCard", () => {
     expect(screen.getByText("Via Roma 5, 00100 Roma")).toBeTruthy();
   });
 
+  it("reloads the customer when the order is updated", async () => {
+    const { rerender } = render(
+      <TicketCard order={{ ...baseOrder, updatedAt: { toMillis: () => 1 } }} />,
+    );
+    await screen.findByText("Mario Rossi");
+
+    mocks.getCustomer.mockResolvedValue({ ...customer, firstName: "Luigi" });
+    rerender(<TicketCard order={{ ...baseOrder, updatedAt: { toMillis: () => 2 } }} />);
+
+    expect(await screen.findByText("Luigi Rossi")).toBeTruthy();
+    expect(mocks.getCustomer).toHaveBeenCalledTimes(2);
+  });
+
   it("shows a fallback when the customer is missing", async () => {
     mocks.getCustomer.mockResolvedValue(null);
     render(<TicketCard order={baseOrder} />);
@@ -209,6 +222,16 @@ describe("TicketCard status arrows", () => {
     );
     expect(screen.getByRole("button", { name: "Cancel ticket" }).disabled).toBe(false);
     confirm.mockRestore();
+  });
+
+  it("opens the edit mode with the order", async () => {
+    const onEdit = vi.fn();
+    render(<TicketCard order={baseOrder} onEdit={onEdit} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit ticket" }));
+
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: "o1" }));
+    await screen.findByText("Mario Rossi");
   });
 
   it("hides cancel without a cancel handler", async () => {

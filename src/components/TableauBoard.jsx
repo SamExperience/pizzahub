@@ -10,6 +10,7 @@ export default function TableauBoard({
   onRetry,
   onCreateTicket,
   onChangeStatus,
+  onEdit,
   onCancel,
 }) {
   return (
@@ -37,6 +38,7 @@ export default function TableauBoard({
               title={status}
               orders={orders.filter((order) => order.status === status)}
               onChangeStatus={onChangeStatus}
+              onEdit={onEdit}
               onCancel={onCancel}
             />
           ))}
