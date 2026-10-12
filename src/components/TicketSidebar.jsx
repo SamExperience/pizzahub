@@ -1,19 +1,67 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getCustomersByCompanyId } from "../services/customer.service";
 import { ORDER_TYPE } from "../services/order.service";
+import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { button, ghostButton, input, muted } from "../utils/styles";
 import { getDefaultScheduledTime } from "../utils/ticketTime";
+import TicketCustomerSection from "./TicketCustomerSection";
 
 const ORDER_TYPE_OPTIONS = [
   { value: ORDER_TYPE.TAKEAWAY, label: "Takeaway" },
   { value: ORDER_TYPE.DELIVERY, label: "Delivery" },
 ];
 
-// Right sidebar for ticket creation: order type and scheduled time.
-export default function TicketSidebar({ onClose }) {
+// Right sidebar for ticket creation: order type, customer and scheduled time.
+export default function TicketSidebar({ companyId, onClose }) {
   const [orderType, setOrderType] = useState(ORDER_TYPE.TAKEAWAY);
   const [scheduledTime, setScheduledTime] = useState(() =>
     getDefaultScheduledTime(),
   );
+  const [customers, setCustomers] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(true);
+  const [customersError, setCustomersError] = useState(null);
+  // Bumped to reload the Customers on retry.
+  const [customersRetryKey, setCustomersRetryKey] = useState(0);
+  const [customerForm, setCustomerForm] = useState(EMPTY_CUSTOMER_FORM);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+  const retryCustomers = useCallback(
+    () => setCustomersRetryKey((key) => key + 1),
+    [],
+  );
+
+  const selectCustomer = useCallback((customer) => {
+    setSelectedCustomer(customer);
+    setCustomerForm(customerToForm(customer));
+  }, []);
+
+  const clearCustomer = useCallback(() => {
+    setSelectedCustomer(null);
+    setCustomerForm(EMPTY_CUSTOMER_FORM);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCustomersError(null);
+    setCustomersLoading(true);
+
+    getCustomersByCompanyId(companyId)
+      .then((list) => {
+        if (!cancelled) setCustomers(list);
+      })
+      .catch((err) => {
+        console.log("Error loading customers -> ", err);
+        if (!cancelled) setCustomersError(err);
+      })
+      .finally(() => {
+        if (!cancelled) setCustomersLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, customersRetryKey]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -75,6 +123,19 @@ export default function TicketSidebar({ onClose }) {
               ))}
             </div>
           </fieldset>
+
+          <TicketCustomerSection
+            orderType={orderType}
+            customers={customers}
+            loading={customersLoading}
+            error={customersError}
+            onRetry={retryCustomers}
+            form={customerForm}
+            onFormChange={setCustomerForm}
+            selectedCustomer={selectedCustomer}
+            onSelect={selectCustomer}
+            onClear={clearCustomer}
+          />
 
           <div>
             <label htmlFor="scheduledTime" className="mb-1 block text-sm font-medium">

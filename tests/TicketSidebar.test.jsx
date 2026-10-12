@@ -1,14 +1,58 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketSidebar from "../src/components/TicketSidebar";
+import { getCustomersByCompanyId } from "../src/services/customer.service";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
+vi.mock("../src/services/customer.service", async (importOriginal) => ({
+  ...(await importOriginal()),
+  getCustomersByCompanyId: vi.fn(),
+}));
+
+const CUSTOMERS = [
+  {
+    id: "c1",
+    firstName: "Mario",
+    lastName: "Rossi",
+    phone: "333",
+    address: { street: "Via Roma", streetNumber: "1", postalCode: "00100", city: "Roma" },
+  },
+];
 
 describe("TicketSidebar", () => {
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+  });
+
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it("loads the Company's customers and fills the form from a search result", async () => {
+    render(<TicketSidebar companyId="co1" onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByLabelText("Delivery"));
+    await userEvent.type(screen.getByLabelText(/First name/), "mar");
+    await userEvent.click(await screen.findByRole("button", { name: /Mario/ }));
+
+    expect(getCustomersByCompanyId).toHaveBeenCalledWith("co1");
+    expect(screen.getByLabelText(/First name/).value).toBe("Mario");
+    expect(screen.getByLabelText("Last name").value).toBe("Rossi");
+    expect(screen.getByLabelText(/Phone/).value).toBe("333");
+    expect(screen.getByLabelText(/^Street \*/).value).toBe("Via Roma");
+  });
+
+  it("shows an error and retries loading the customers", async () => {
+    getCustomersByCompanyId.mockRejectedValueOnce(new Error("boom"));
+    render(<TicketSidebar companyId="co1" onClose={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+
+    expect(getCustomersByCompanyId).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("renders the dialog with Takeaway selected by default", () => {

@@ -58,7 +58,12 @@ export default function Tableau() {
         onRetry={() => setRetryKey((key) => key + 1)}
         onCreateTicket={() => setTicketOpen(true)}
       />
-      {ticketOpen && <TicketSidebar onClose={closeTicket} />}
+      {ticketOpen && (
+        <TicketSidebar
+          companyId={selectedStore?.companyId}
+          onClose={closeTicket}
+        />
+      )}
     </>
   );
 }
