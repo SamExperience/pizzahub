@@ -96,6 +96,24 @@ describe("TableauBoard", () => {
     expect(screen.getByRole("button", { name: "Create Ticket" })).toBeTruthy();
   });
 
+  it("passes the status handler to the ticket cards", async () => {
+    const onChangeStatus = vi.fn().mockResolvedValue();
+    render(
+      <TableauBoard
+        orders={[{ id: "a", status: "Pending" }]}
+        onChangeStatus={onChangeStatus}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Move to In progress" }),
+    );
+    expect(onChangeStatus).toHaveBeenCalledWith(
+      { id: "a", status: "Pending" },
+      "In progress",
+    );
+  });
+
   it("shows the error with a working retry button", async () => {
     const onRetry = vi.fn();
     render(<TableauBoard error={new Error("boom")} onRetry={onRetry} />);

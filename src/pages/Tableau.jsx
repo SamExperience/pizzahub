@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import TableauBoard from "../components/TableauBoard";
 import TicketSidebar from "../components/TicketSidebar";
 import { useStore } from "../contexts/StoreContext";
-import { getTodayRange, subscribeToTodayOrders } from "../services/order.service";
+import {
+  getTodayRange,
+  subscribeToTodayOrders,
+  updateOrderStatus,
+} from "../services/order.service";
+
+const changeTicketStatus = (order, status) => updateOrderStatus(order.id, status);
 
 // Real-time orders of the active Store for the current day.
 export default function Tableau() {
@@ -57,6 +63,7 @@ export default function Tableau() {
         error={error}
         onRetry={() => setRetryKey((key) => key + 1)}
         onCreateTicket={() => setTicketOpen(true)}
+        onChangeStatus={changeTicketStatus}
       />
       {ticketOpen && (
         <TicketSidebar

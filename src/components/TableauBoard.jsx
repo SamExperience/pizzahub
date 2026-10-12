@@ -9,6 +9,7 @@ export default function TableauBoard({
   error = null,
   onRetry,
   onCreateTicket,
+  onChangeStatus,
 }) {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 text-left">
@@ -34,6 +35,7 @@ export default function TableauBoard({
               key={status}
               title={status}
               orders={orders.filter((order) => order.status === status)}
+              onChangeStatus={onChangeStatus}
             />
           ))}
         </div>
