@@ -61,6 +61,7 @@ export default function Tableau() {
       {ticketOpen && (
         <TicketSidebar
           companyId={selectedStore?.companyId}
+          storeId={storeId}
           onClose={closeTicket}
         />
       )}

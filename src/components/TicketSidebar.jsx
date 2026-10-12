@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { getCustomersByCompanyId } from "../services/customer.service";
 import { ORDER_TYPE } from "../services/order.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
-import { button, ghostButton, input, muted } from "../utils/styles";
+import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 import { getDefaultScheduledTime } from "../utils/ticketTime";
+import MenuTableauPanel from "./MenuTableauPanel";
 import TicketCustomerSection from "./TicketCustomerSection";
 
 const ORDER_TYPE_OPTIONS = [
@@ -12,8 +13,10 @@ const ORDER_TYPE_OPTIONS = [
 ];
 
 // Right sidebar for ticket creation: order type, customer and scheduled time.
-export default function TicketSidebar({ companyId, onClose }) {
+export default function TicketSidebar({ companyId, storeId, onClose }) {
   const [orderType, setOrderType] = useState(ORDER_TYPE.TAKEAWAY);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const [scheduledTime, setScheduledTime] = useState(() =>
     getDefaultScheduledTime(),
   );
@@ -65,13 +68,14 @@ export default function TicketSidebar({ companyId, onClose }) {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
+      // While the menu panel is open, Escape closes only the panel.
+      if (event.key === "Escape" && !menuOpen) onClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, menuOpen]);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -150,6 +154,14 @@ export default function TicketSidebar({ companyId, onClose }) {
             />
             <p className={`${muted} mt-1`}>Today. Defaults to 30 minutes from now.</p>
           </div>
+
+          <button
+            type="button"
+            className={primaryButton}
+            onClick={() => setMenuOpen(true)}
+          >
+            Add product
+          </button>
         </div>
 
         <footer className="flex justify-end border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
@@ -158,6 +170,14 @@ export default function TicketSidebar({ companyId, onClose }) {
           </button>
         </footer>
       </aside>
+      {menuOpen && (
+        // Product selection is wired to the item configuration step in 9.7.
+        <MenuTableauPanel
+          storeId={storeId}
+          onSelectProduct={() => {}}
+          onClose={closeMenu}
+        />
+      )}
     </div>
   );
 }

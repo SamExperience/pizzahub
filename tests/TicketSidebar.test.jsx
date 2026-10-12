@@ -2,9 +2,19 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketSidebar from "../src/components/TicketSidebar";
+import { getCategoriesByMenuId } from "../src/services/category.service";
 import { getCustomersByCompanyId } from "../src/services/customer.service";
+import { getMenuByStoreId } from "../src/services/menu.service";
+import { getProductsByCategoryId } from "../src/services/product.service";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
+vi.mock("../src/services/menu.service", () => ({ getMenuByStoreId: vi.fn() }));
+vi.mock("../src/services/category.service", () => ({
+  getCategoriesByMenuId: vi.fn(),
+}));
+vi.mock("../src/services/product.service", () => ({
+  getProductsByCategoryId: vi.fn(),
+}));
 vi.mock("../src/services/customer.service", async (importOriginal) => ({
   ...(await importOriginal()),
   getCustomersByCompanyId: vi.fn(),
@@ -85,6 +95,24 @@ describe("TicketSidebar", () => {
     fireEvent.change(time, { target: { value: "13:15" } });
 
     expect(time.value).toBe("13:15");
+  });
+
+  it("opens the menu panel from Add product and closes only the panel on Escape", async () => {
+    const onClose = vi.fn();
+    getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+    getCategoriesByMenuId.mockResolvedValue([{ id: "cat1", name: "Pizzas" }]);
+    getProductsByCategoryId.mockResolvedValue([]);
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    expect(await screen.findByRole("dialog", { name: "Add product" })).toBeTruthy();
+    expect(getMenuByStoreId).toHaveBeenCalledWith("store-1");
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Add product" })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("closes from the close button, Cancel, Escape and the backdrop", async () => {
