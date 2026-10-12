@@ -6,6 +6,14 @@ const firestore = vi.hoisted(() => ({
   orderBy: vi.fn((field) => ({ type: "orderBy", field })),
   query: vi.fn((ref, ...constraints) => ({ ref, constraints })),
   onSnapshot: vi.fn(),
+  // doc(collectionRef) generates a new id; doc(db, name, id) points to a document.
+  doc: vi.fn((parent, name, id) =>
+    name === undefined
+      ? { collectionName: parent.collectionName, id: `new-${parent.collectionName}` }
+      : { collectionName: name, id },
+  ),
+  serverTimestamp: vi.fn(() => "server-time"),
+  writeBatch: vi.fn(),
 }));
 
 vi.mock("firebase/firestore", () => firestore);
@@ -15,12 +23,262 @@ import {
   ORDER_STATUS,
   ORDER_STATUSES,
   ORDER_TYPE,
+  buildItemSnapshot,
+  calculateOrderTotal,
+  createOrder,
   getTodayRange,
   subscribeToTodayOrders,
+  validateOrder,
 } from "../src/services/order.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+const pizza = {
+  id: "p1",
+  name: "Margherita",
+  price: null,
+  sizes: [
+    { name: "Small", price: 9.5 },
+    { name: "Large", price: 13.2 },
+  ],
+  availableCookingLevels: ["Rare", "Well done"],
+  defaultCookingLevel: "Well done",
+  isAvailable: true,
+};
+
+const drink = {
+  id: "p2",
+  name: "Cola",
+  price: 3.3,
+  sizes: null,
+  availableCookingLevels: null,
+  defaultCookingLevel: null,
+  isAvailable: true,
+};
+
+describe("buildItemSnapshot", () => {
+  it("copies the product data with size price and cooking level", () => {
+    expect(
+      buildItemSnapshot(pizza, {
+        size: "Large",
+        cookingLevel: "Rare",
+        customizations: ["  no basil ", "", "extra cheese"],
+        quantity: 2,
+      }),
+    ).toEqual({
+      productId: "p1",
+      productName: "Margherita",
+      size: "Large",
+      unitPrice: 13.2,
+      quantity: 2,
+      cookingLevel: "Rare",
+      customizations: ["no basil", "extra cheese"],
+      subtotal: 26.4,
+    });
+  });
+
+  it("uses the product price and no size or cooking level when not defined", () => {
+    expect(buildItemSnapshot(drink, { quantity: 3 })).toEqual({
+      productId: "p2",
+      productName: "Cola",
+      size: null,
+      unitPrice: 3.3,
+      quantity: 3,
+      cookingLevel: null,
+      customizations: [],
+      subtotal: 9.9,
+    });
+  });
+
+  it("falls back to the default cooking level", () => {
+    const item = buildItemSnapshot(pizza, { size: "Small", quantity: 1 });
+
+    expect(item.cookingLevel).toBe("Well done");
+  });
+
+  it("rejects unavailable products", () => {
+    expect(() =>
+      buildItemSnapshot({ ...drink, isAvailable: false }, { quantity: 1 }),
+    ).toThrow("Product is not available");
+  });
+
+  it("requires a valid size when the product has sizes", () => {
+    expect(() => buildItemSnapshot(pizza, { quantity: 1 })).toThrow(
+      "Item size is required",
+    );
+    expect(() =>
+      buildItemSnapshot(pizza, { size: "Huge", quantity: 1 }),
+    ).toThrow("Item size is required");
+  });
+
+  it("rejects a size or cooking level the product does not offer", () => {
+    expect(() =>
+      buildItemSnapshot(drink, { size: "Large", quantity: 1 }),
+    ).toThrow("Product has no sizes");
+    expect(() =>
+      buildItemSnapshot(drink, { cookingLevel: "Rare", quantity: 1 }),
+    ).toThrow("Product has no cooking levels");
+    expect(() =>
+      buildItemSnapshot(pizza, { size: "Small", cookingLevel: "Burnt", quantity: 1 }),
+    ).toThrow("Item cooking level is invalid");
+  });
+
+  it("requires a positive integer quantity", () => {
+    for (const quantity of [0, -1, 1.5, undefined])
+      expect(() => buildItemSnapshot(drink, { quantity })).toThrow(
+        "Item quantity must be a positive integer",
+      );
+  });
+});
+
+describe("calculateOrderTotal", () => {
+  it("sums the subtotals without floating point drift", () => {
+    expect(
+      calculateOrderTotal([{ subtotal: 0.1 }, { subtotal: 0.2 }, { subtotal: 9.9 }]),
+    ).toBe(10.2);
+  });
+
+  it("returns 0 for no items", () => {
+    expect(calculateOrderTotal([])).toBe(0);
+  });
+});
+
+const validOrder = () => ({
+  items: [buildItemSnapshot(drink, { quantity: 2 })],
+  orderType: ORDER_TYPE.TAKEAWAY,
+  scheduledTime: new Date(2026, 9, 12, 19, 30),
+});
+
+describe("validateOrder", () => {
+  it("returns the order data with the total", () => {
+    expect(validateOrder(validOrder())).toEqual({ ...validOrder(), total: 6.6 });
+  });
+
+  it("rejects an invalid order type", () => {
+    expect(() => validateOrder({ ...validOrder(), orderType: "dine-in" })).toThrow(
+      "Order type is invalid",
+    );
+  });
+
+  it("requires at least one item", () => {
+    expect(() => validateOrder({ ...validOrder(), items: [] })).toThrow(
+      "Order must have at least one item",
+    );
+    expect(() => validateOrder({ ...validOrder(), items: undefined })).toThrow(
+      "Order must have at least one item",
+    );
+  });
+
+  it("requires a valid scheduled time", () => {
+    for (const scheduledTime of [undefined, "19:30", new Date("invalid")])
+      expect(() => validateOrder({ ...validOrder(), scheduledTime })).toThrow(
+        "Scheduled time is required",
+      );
+  });
+});
+
+describe("createOrder", () => {
+  const createBatch = () => ({
+    set: vi.fn(),
+    update: vi.fn(),
+    commit: vi.fn().mockResolvedValue(undefined),
+  });
+
+  const params = (overrides = {}) => ({
+    companyId: "company1",
+    storeId: "store1",
+    customerData: { firstName: "Mario" },
+    ...validOrder(),
+    ...overrides,
+  });
+
+  it("writes a new Customer and a Pending Order in one batch", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await expect(createOrder(params())).resolves.toBe("new-orders");
+
+    expect(batch.set).toHaveBeenCalledTimes(2);
+    expect(batch.set).toHaveBeenNthCalledWith(
+      1,
+      { collectionName: "customers", id: "new-customers" },
+      expect.objectContaining({ companyId: "company1", firstName: "Mario" }),
+    );
+    expect(batch.set).toHaveBeenNthCalledWith(
+      2,
+      { collectionName: "orders", id: "new-orders" },
+      {
+        storeId: "store1",
+        customerId: "new-customers",
+        items: validOrder().items,
+        orderType: "takeaway",
+        scheduledTime: validOrder().scheduledTime,
+        total: 6.6,
+        status: "Pending",
+        createdAt: "server-time",
+        updatedAt: "server-time",
+      },
+    );
+    expect(batch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("references an unchanged existing Customer without updating it", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await createOrder(
+      params({
+        existingCustomer: { id: "c1", firstName: "Mario" },
+      }),
+    );
+
+    expect(batch.update).not.toHaveBeenCalled();
+    expect(batch.set).toHaveBeenCalledTimes(1);
+    expect(batch.set.mock.calls[0][1]).toMatchObject({ customerId: "c1" });
+  });
+
+  it("updates an edited existing Customer in the same batch", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await createOrder(
+      params({
+        customerData: { firstName: "Mario", phone: "123" },
+        existingCustomer: { id: "c1", firstName: "Mario" },
+      }),
+    );
+
+    expect(batch.update).toHaveBeenCalledWith(
+      { collectionName: "customers", id: "c1" },
+      expect.objectContaining({ phone: "123", updatedAt: "server-time" }),
+    );
+    expect(batch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not write anything when the order or the Customer is invalid", async () => {
+    const batch = createBatch();
+    firestore.writeBatch.mockReturnValue(batch);
+
+    await expect(createOrder(params({ items: [] }))).rejects.toThrow(
+      "Order must have at least one item",
+    );
+    await expect(
+      createOrder(params({ orderType: ORDER_TYPE.DELIVERY })),
+    ).rejects.toThrow("Customer phone is required for delivery");
+
+    expect(batch.commit).not.toHaveBeenCalled();
+  });
+
+  it("requires the Company and the Store", async () => {
+    await expect(createOrder(params({ companyId: "" }))).rejects.toThrow(
+      "Company ID is required",
+    );
+    await expect(createOrder(params({ storeId: "" }))).rejects.toThrow(
+      "Store ID is required",
+    );
+  });
 });
 
 describe("order constants", () => {
