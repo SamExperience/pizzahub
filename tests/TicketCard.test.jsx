@@ -168,6 +168,56 @@ describe("TicketCard status arrows", () => {
     );
   });
 
+  it("cancels the ticket after confirmation", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onCancel = vi.fn().mockResolvedValue();
+    render(<TicketCard order={baseOrder} onCancel={onCancel} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel ticket" }));
+
+    expect(confirm).toHaveBeenCalledWith("Cancel this ticket? This cannot be undone.");
+    expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: "o1" }));
+    await screen.findByText("Mario Rossi");
+    confirm.mockRestore();
+  });
+
+  it("does not cancel when the confirmation is dismissed", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const onCancel = vi.fn();
+    render(<TicketCard order={baseOrder} onCancel={onCancel} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel ticket" }));
+
+    expect(onCancel).not.toHaveBeenCalled();
+    await screen.findByText("Mario Rossi");
+    confirm.mockRestore();
+  });
+
+  it("disables cancel while saving and shows an error when it fails", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let reject;
+    const onCancel = vi.fn(() => new Promise((_, r) => (reject = r)));
+    render(<TicketCard order={baseOrder} onCancel={onCancel} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel ticket" }));
+    expect(screen.getByRole("button", { name: "Cancel ticket" }).disabled).toBe(true);
+
+    reject(new Error("denied"));
+    expect((await screen.findByRole("alert")).textContent).toMatch(
+      "Could not update the ticket",
+    );
+    expect(screen.getByRole("button", { name: "Cancel ticket" }).disabled).toBe(false);
+    confirm.mockRestore();
+  });
+
+  it("hides cancel without a cancel handler", async () => {
+    render(<TicketCard order={baseOrder} />);
+
+    expect(screen.queryByRole("button", { name: "Cancel ticket" })).toBeNull();
+    await screen.findByText("Mario Rossi");
+  });
+
   it("shows an error and re-enables the arrows when the update fails", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     renderCard("Pending", vi.fn().mockRejectedValue(new Error("denied")));

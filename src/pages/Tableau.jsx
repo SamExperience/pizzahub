@@ -3,12 +3,14 @@ import TableauBoard from "../components/TableauBoard";
 import TicketSidebar from "../components/TicketSidebar";
 import { useStore } from "../contexts/StoreContext";
 import {
+  cancelOrder,
   getTodayRange,
   subscribeToTodayOrders,
   updateOrderStatus,
 } from "../services/order.service";
 
 const changeTicketStatus = (order, status) => updateOrderStatus(order.id, status);
+const cancelTicket = (order) => cancelOrder(order.id);
 
 // Real-time orders of the active Store for the current day.
 export default function Tableau() {
@@ -64,6 +66,7 @@ export default function Tableau() {
         onRetry={() => setRetryKey((key) => key + 1)}
         onCreateTicket={() => setTicketOpen(true)}
         onChangeStatus={changeTicketStatus}
+        onCancel={cancelTicket}
       />
       {ticketOpen && (
         <TicketSidebar

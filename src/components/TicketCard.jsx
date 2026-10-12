@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getCustomer } from "../services/customer.service";
 import { ORDER_STATUSES, ORDER_TYPE } from "../services/order.service";
 import { formatPrice, formatTime } from "../utils/format";
-import { alert, button, muted } from "../utils/styles";
+import { alert, button, dangerButton, muted } from "../utils/styles";
 
 const ORDER_TYPE_LABEL = {
   [ORDER_TYPE.TAKEAWAY]: "Takeaway",
@@ -88,8 +88,9 @@ function TicketItem({ item }) {
 }
 
 // One ticket of the Tableau: order type and time, customer, items, total,
-// status and the arrows that move it one status back or forward.
-export default function TicketCard({ order, onChangeStatus }) {
+// status, the arrows that move it one status back or forward and the
+// cancel action.
+export default function TicketCard({ order, onChangeStatus, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -113,6 +114,11 @@ export default function TicketCard({ order, onChangeStatus }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    if (window.confirm("Cancel this ticket? This cannot be undone."))
+      run(() => onCancel(order));
   };
 
   return (
@@ -159,6 +165,19 @@ export default function TicketCard({ order, onChangeStatus }) {
               {nextStatus} →
             </button>
           )}
+        </div>
+      )}
+      {onCancel && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className={dangerButton}
+            aria-label="Cancel ticket"
+            disabled={saving}
+            onClick={handleCancel}
+          >
+            Cancel
+          </button>
         </div>
       )}
       {error && (

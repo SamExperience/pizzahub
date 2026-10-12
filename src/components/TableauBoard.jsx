@@ -10,6 +10,7 @@ export default function TableauBoard({
   onRetry,
   onCreateTicket,
   onChangeStatus,
+  onCancel,
 }) {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 text-left">
@@ -36,6 +37,7 @@ export default function TableauBoard({
               title={status}
               orders={orders.filter((order) => order.status === status)}
               onChangeStatus={onChangeStatus}
+              onCancel={onCancel}
             />
           ))}
         </div>
