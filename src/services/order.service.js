@@ -5,6 +5,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -16,9 +17,11 @@ export const ORDER_STATUS = {
   PENDING: "Pending",
   IN_PROGRESS: "In progress",
   COMPLETED: "Completed",
+  // Soft delete: final, hidden from the Tableau, kept for history.
+  CANCELLED: "Cancelled",
 };
 
-// Ordered as the Tableau columns
+// Active statuses, ordered as the Tableau columns
 export const ORDER_STATUSES = [
   ORDER_STATUS.PENDING,
   ORDER_STATUS.IN_PROGRESS,
@@ -31,6 +34,13 @@ export const ORDER_TYPE = {
 };
 
 const roundPrice = (value) => Math.round(value * 100) / 100;
+
+// Trimmed, non-empty customization texts.
+const normalizeCustomizations = (customizations = []) =>
+  customizations
+    .filter((text) => typeof text === "string")
+    .map((text) => text.trim())
+    .filter(Boolean);
 
 // Item snapshot for a Product and the options chosen on the ticket. The
 // Product data is copied so historical Orders stay correct.
@@ -77,11 +87,41 @@ export const buildItemSnapshot = (
     unitPrice,
     quantity,
     cookingLevel: selectedCookingLevel,
-    customizations: customizations
-      .filter((text) => typeof text === "string")
-      .map((text) => text.trim())
-      .filter(Boolean),
+    customizations: normalizeCustomizations(customizations),
     subtotal: roundPrice(unitPrice * quantity),
+  };
+};
+
+// Reconfigured copy of an existing Item for its sellable Product. The saved
+// unit price is kept unless the size changes; then the current menu price
+// of the new size applies.
+export const reconfigureItem = (product, item, options) => {
+  const next = buildItemSnapshot(product, options);
+
+  if (next.size !== item.size) return next;
+
+  return {
+    ...next,
+    unitPrice: item.unitPrice,
+    subtotal: roundPrice(item.unitPrice * next.quantity),
+  };
+};
+
+// Restricted edit of an Item whose Product is no longer sellable: only the
+// customizations and a quantity between 1 and maxQuantity (the quantity
+// saved in the ticket) can change; size, cooking level and price are kept.
+export const editRestrictedItem = (item, { customizations, quantity }, maxQuantity) => {
+  if (!Number.isInteger(quantity) || quantity < 1)
+    throw new Error("Item quantity must be a positive integer");
+
+  if (quantity > maxQuantity)
+    throw new Error("Item quantity cannot exceed the quantity in the ticket");
+
+  return {
+    ...item,
+    customizations: normalizeCustomizations(customizations),
+    quantity,
+    subtotal: roundPrice(item.unitPrice * quantity),
   };
 };
 
@@ -153,6 +193,97 @@ export const createOrder = async ({
   return orderRef.id;
 };
 
+// Updates the content of an existing Order: customer, order type, scheduled
+// time, items and total. The Customer (created or updated when changed) and
+// the Order are written in a single batch. Status, storeId and createdAt are
+// never written here.
+export const updateOrder = async ({
+  companyId,
+  orderId,
+  orderType,
+  scheduledTime,
+  items,
+  customerData,
+  existingCustomer = null,
+}) => {
+  if (!companyId) throw new Error("Company ID is required");
+
+  if (!orderId) throw new Error("Order ID is required");
+
+  const order = validateOrder({ items, orderType, scheduledTime });
+  const batch = writeBatch(db);
+
+  const customerId = addCustomerToBatch(batch, {
+    companyId,
+    orderType,
+    data: customerData,
+    existingCustomer,
+  });
+
+  batch.update(doc(db, "orders", orderId), {
+    customerId,
+    ...order,
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
+};
+
+// Moves an Order to one of the active Tableau statuses. completedAt records
+// when the Order moved to Completed and is cleared when it moves back.
+export const updateOrderStatus = async (orderId, status) => {
+  if (!orderId) throw new Error("Order ID is required");
+
+  if (!ORDER_STATUSES.includes(status)) throw new Error("Order status is invalid");
+
+  await updateDoc(doc(db, "orders", orderId), {
+    status,
+    completedAt: status === ORDER_STATUS.COMPLETED ? serverTimestamp() : null,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Milliseconds of a Firestore Timestamp or Date; null when missing.
+const toMillis = (value) => {
+  if (typeof value?.toMillis === "function") return value.toMillis();
+
+  return value instanceof Date ? value.getTime() : null;
+};
+
+// Orders of one Tableau column in display order: Pending and In progress by
+// scheduled time (earliest first); Completed by completion time (latest
+// first). In Completed, a pending server timestamp (null right after the
+// local write) counts as the latest, and Orders completed before completedAt
+// existed (field absent) go last; edits never move a ticket. Ties keep the
+// received order (creation time). Returns a new array.
+export const sortColumnOrders = (status, orders) => {
+  const compare = (x, y) => (x === y ? 0 : x - y);
+
+  if (status === ORDER_STATUS.COMPLETED) {
+    const completedAt = (order) => {
+      if (order.completedAt === undefined) return -Infinity;
+
+      return toMillis(order.completedAt) ?? Infinity;
+    };
+
+    return [...orders].sort((a, b) => compare(completedAt(b), completedAt(a)));
+  }
+
+  const scheduledAt = (order) => toMillis(order.scheduledTime) ?? Infinity;
+
+  return [...orders].sort((a, b) => compare(scheduledAt(a), scheduledAt(b)));
+};
+
+// Cancels an Order (soft delete): the Order is kept with status Cancelled.
+export const cancelOrder = async (orderId) => {
+  if (!orderId) throw new Error("Order ID is required");
+
+  await updateDoc(doc(db, "orders", orderId), {
+    status: ORDER_STATUS.CANCELLED,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 // Current day in the device time zone: [start, end), end is tomorrow at 00:00.
 export const getTodayRange = (now = new Date()) => {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -161,9 +292,9 @@ export const getTodayRange = (now = new Date()) => {
   return { start, end };
 };
 
-// Listens to the Orders created today for a Store, oldest first.
-// Calls onChange with the full list at every change and returns the
-// unsubscribe function.
+// Listens to the Orders created today for a Store, oldest first; Cancelled
+// Orders are left out. Calls onChange with the full list at every change and
+// returns the unsubscribe function.
 export const subscribeToTodayOrders = (storeId, onChange, onError) => {
   if (!storeId) throw new Error("Store ID is required");
 
@@ -183,7 +314,11 @@ export const subscribeToTodayOrders = (storeId, onChange, onError) => {
   return onSnapshot(
     q,
     (snapshot) => {
-      onChange(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      onChange(
+        snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((order) => order.status !== ORDER_STATUS.CANCELLED),
+      );
     },
     onError,
   );

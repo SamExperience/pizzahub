@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   where,
@@ -46,6 +47,23 @@ export const getCustomer = async (customerId) => {
   const snapshot = await getDoc(doc(db, "customers", customerId));
 
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+};
+
+// Listens to a Customer in real time. Calls onChange with the Customer, or
+// null when it does not exist, at every change and returns the unsubscribe
+// function.
+export const subscribeToCustomer = (customerId, onChange, onError) => {
+  if (!customerId) throw new Error("Customer ID is required");
+
+  if (typeof onChange !== "function")
+    throw new Error("onChange callback is required");
+
+  return onSnapshot(
+    doc(db, "customers", customerId),
+    (snapshot) =>
+      onChange(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null),
+    onError,
+  );
 };
 
 // All Customers of a Company, sorted by first name. Search is done on the

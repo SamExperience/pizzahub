@@ -25,6 +25,7 @@ import {
   filterCustomersByFirstName,
   getCustomer,
   getCustomersByCompanyId,
+  subscribeToCustomer,
   validateCustomer,
 } from "../src/services/customer.service";
 
@@ -73,6 +74,60 @@ describe("getCustomer", () => {
   it("requires a Customer id", async () => {
     await expect(getCustomer("")).rejects.toThrow("Customer ID is required");
     expect(firestore.getDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe("subscribeToCustomer", () => {
+  it("listens to the Customer document and delivers every change", () => {
+    const onChange = vi.fn();
+    const unsubscribe = vi.fn();
+    let emit;
+    firestore.onSnapshot.mockImplementation((ref, next) => {
+      emit = next;
+      return unsubscribe;
+    });
+
+    const result = subscribeToCustomer("c1", onChange);
+
+    expect(firestore.onSnapshot.mock.calls[0][0]).toEqual({
+      collectionName: "customers",
+      id: "c1",
+    });
+    emit({ id: "c1", exists: () => true, data: () => ({ firstName: "Mario" }) });
+    emit({ id: "c1", exists: () => true, data: () => ({ firstName: "Luigi" }) });
+    expect(onChange).toHaveBeenNthCalledWith(1, { id: "c1", firstName: "Mario" });
+    expect(onChange).toHaveBeenNthCalledWith(2, { id: "c1", firstName: "Luigi" });
+    expect(result).toBe(unsubscribe);
+  });
+
+  it("delivers null when the Customer does not exist", () => {
+    const onChange = vi.fn();
+    firestore.onSnapshot.mockImplementation((ref, next) => {
+      next({ id: "c1", exists: () => false });
+      return vi.fn();
+    });
+
+    subscribeToCustomer("c1", onChange);
+
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it("forwards listener errors", () => {
+    const onError = vi.fn();
+    const error = new Error("permission-denied");
+    firestore.onSnapshot.mockImplementation((ref, next, fail) => {
+      fail(error);
+      return vi.fn();
+    });
+
+    subscribeToCustomer("c1", vi.fn(), onError);
+
+    expect(onError).toHaveBeenCalledWith(error);
+  });
+
+  it("requires the Customer ID and the callback", () => {
+    expect(() => subscribeToCustomer("", vi.fn())).toThrow("Customer ID is required");
+    expect(() => subscribeToCustomer("c1")).toThrow("onChange callback is required");
   });
 });
 

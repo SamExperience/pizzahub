@@ -133,3 +133,102 @@ describe("ItemConfigModal", () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("ItemConfigModal reconfiguration", () => {
+  afterEach(cleanup);
+
+  const ITEM = {
+    productId: "p1",
+    productName: "Margherita",
+    size: "Small",
+    unitPrice: 5,
+    quantity: 2,
+    cookingLevel: "Rare",
+    customizations: ["No basil"],
+    subtotal: 10,
+  };
+
+  it("prefills the Item options and keeps the saved price for the same size", async () => {
+    const { onAdd } = renderModal(PIZZA, { initialItem: ITEM });
+
+    expect(screen.getByRole("heading", { name: "Margherita · Small" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Rare" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("No basil")).toBeTruthy();
+    expect(screen.getByLabelText("Quantity").textContent).toBe("2");
+
+    await userEvent.click(screen.getByRole("button", { name: "Medium" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €10.00" }));
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        size: "Small",
+        unitPrice: 5,
+        quantity: 2,
+        cookingLevel: "Medium",
+        customizations: ["No basil"],
+        subtotal: 10,
+      }),
+    );
+  });
+
+  it("uses the current menu price when the size changes", async () => {
+    const { onAdd } = renderModal(PIZZA, { initialItem: ITEM });
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to sizes" }));
+
+    // The Item's own size shows its saved price, the others the menu price.
+    expect(screen.getByRole("button", { name: /Small/ }).textContent).toContain("€5.00");
+    expect(screen.getByRole("button", { name: /Large/ }).textContent).toContain("€10.00");
+
+    await userEvent.click(screen.getByRole("button", { name: /Large/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €20.00" }));
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ size: "Large", unitPrice: 10, subtotal: 20 }),
+    );
+  });
+
+  it("asks for the size again when the Item's size is no longer offered", () => {
+    renderModal(PIZZA, { initialItem: { ...ITEM, size: "Medium" } });
+
+    expect(screen.getByRole("button", { name: /Large/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Update item/ })).toBeNull();
+  });
+
+  it("allows only customizations and a lower quantity in restricted mode", async () => {
+    const { onAdd } = renderModal(null, {
+      initialItem: { ...ITEM, quantity: 3, subtotal: 15 },
+      restricted: true,
+      maxQuantity: 3,
+    });
+
+    expect(screen.getByRole("dialog", { name: "Configure Margherita" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Margherita · Small" })).toBeTruthy();
+    expect(screen.getByText("Rare · €5.00 each")).toBeTruthy();
+    expect(screen.getByText(/no longer sellable/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to sizes" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Medium" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Decrease quantity" }));
+    expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "Remove No basil" }));
+    await userEvent.type(screen.getByLabelText("Customizations"), "Cut in 8{Enter}");
+    await userEvent.click(screen.getByRole("button", { name: "Update item · €10.00" }));
+
+    expect(onAdd).toHaveBeenCalledWith({
+      ...ITEM,
+      customizations: ["Cut in 8"],
+      quantity: 2,
+      subtotal: 10,
+    });
+  });
+
+  it("falls back to the default cooking level when the Item's one is gone", () => {
+    renderModal(PIZZA, { initialItem: { ...ITEM, cookingLevel: "Burnt" } });
+
+    expect(screen.getByRole("button", { name: "Medium" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+});

@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { getDefaultScheduledTime, timeToDate } from "../src/utils/ticketTime";
+import { dateToTime, getDefaultScheduledTime, timeToDate } from "../src/utils/ticketTime";
+
+describe("dateToTime", () => {
+  it("formats a Date or a Firestore Timestamp as HH:MM", () => {
+    const date = new Date(2026, 9, 12, 7, 5);
+
+    expect(dateToTime(date)).toBe("07:05");
+    expect(dateToTime({ toDate: () => date })).toBe("07:05");
+  });
+
+  it("returns an empty string for a missing or invalid value", () => {
+    expect(dateToTime(null)).toBe("");
+    expect(dateToTime(new Date("x"))).toBe("");
+  });
+});
 
 describe("getDefaultScheduledTime", () => {
   it("returns now + 30 minutes as HH:MM", () => {

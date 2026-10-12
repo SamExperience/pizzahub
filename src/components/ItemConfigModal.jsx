@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { buildItemSnapshot } from "../services/order.service";
+import {
+  buildItemSnapshot,
+  editRestrictedItem,
+  reconfigureItem,
+} from "../services/order.service";
 import { formatPrice } from "../utils/format";
 import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 
@@ -9,19 +13,38 @@ const pillBase =
 // Item configuration step of the ticket creation. Step 1 (only when the
 // product has sizes) picks the size; step 2 picks cooking level,
 // customizations and quantity, then adds the Item snapshot to the ticket.
-export default function ItemConfigModal({ product, onAdd, onClose }) {
-  const sizes = Array.isArray(product.sizes) ? product.sizes : [];
-  const cookingLevels = Array.isArray(product.availableCookingLevels)
-    ? product.availableCookingLevels
-    : [];
+// With initialItem it reconfigures that Item: options still offered by the
+// current product are prefilled and the saved price is kept unless the size
+// changes. restricted (Product no longer sellable, product may be null)
+// allows only customizations and a quantity up to maxQuantity.
+export default function ItemConfigModal({
+  product,
+  initialItem = null,
+  restricted = false,
+  maxQuantity = null,
+  onAdd,
+  onClose,
+}) {
+  const name = restricted ? initialItem.productName : product.name;
+  const sizes = !restricted && Array.isArray(product.sizes) ? product.sizes : [];
+  const cookingLevels =
+    !restricted && Array.isArray(product.availableCookingLevels)
+      ? product.availableCookingLevels
+      : [];
 
-  const [size, setSize] = useState(null);
-  const [cookingLevel, setCookingLevel] = useState(
-    product.defaultCookingLevel ?? cookingLevels[0] ?? null,
+  const [size, setSize] = useState(() =>
+    sizes.some((item) => item.name === initialItem?.size) ? initialItem.size : null,
   );
-  const [customizations, setCustomizations] = useState([]);
+  const [cookingLevel, setCookingLevel] = useState(() =>
+    cookingLevels.includes(initialItem?.cookingLevel)
+      ? initialItem.cookingLevel
+      : (product?.defaultCookingLevel ?? cookingLevels[0] ?? null),
+  );
+  const [customizations, setCustomizations] = useState(
+    initialItem?.customizations ?? [],
+  );
   const [customizationText, setCustomizationText] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(initialItem?.quantity ?? 1);
 
   const choosingSize = sizes.length > 0 && size === null;
 
@@ -46,10 +69,20 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
   const removeCustomization = (index) =>
     setCustomizations((list) => list.filter((_, i) => i !== index));
 
-  const buildItem = () =>
-    buildItemSnapshot(product, { size, cookingLevel, customizations, quantity });
+  const buildItem = () => {
+    if (restricted)
+      return editRestrictedItem(initialItem, { customizations, quantity }, maxQuantity);
+
+    const options = { size, cookingLevel, customizations, quantity };
+
+    return initialItem
+      ? reconfigureItem(product, initialItem, options)
+      : buildItemSnapshot(product, options);
+  };
 
   const lineTotal = choosingSize ? 0 : buildItem().subtotal;
+  const atMaxQuantity = restricted && maxQuantity !== null && quantity >= maxQuantity;
+  const title = restricted ? [name, initialItem.size] : [name, size];
 
   const pill = (selected) =>
     `${pillBase} ${
@@ -67,7 +100,7 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
       />
       <section
         role="dialog"
-        aria-label={`Configure ${product.name}`}
+        aria-label={`Configure ${name}`}
         className="relative flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white text-left shadow-xl dark:bg-neutral-900"
       >
         <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
@@ -83,8 +116,7 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
               </button>
             )}
             <h2 className="m-0 truncate text-xl font-semibold">
-              {product.name}
-              {size && ` · ${size}`}
+              {title.filter(Boolean).join(" · ")}
             </h2>
           </div>
           <button
@@ -110,7 +142,10 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
                   >
                     <strong className="text-base font-semibold">{item.name}</strong>
                     <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                      {formatPrice(item.price)}
+                      {/* The Item's own size keeps its saved price. */}
+                      {formatPrice(
+                        item.name === initialItem?.size ? initialItem.unitPrice : item.price,
+                      )}
                     </span>
                   </button>
                 </li>
@@ -120,6 +155,22 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
         ) : (
           <>
             <div className="flex flex-col gap-5 overflow-y-auto p-4">
+              {restricted && (
+                <div className="flex flex-col gap-1">
+                  <p className={`${muted} m-0`}>
+                    {[
+                      initialItem.cookingLevel,
+                      `${formatPrice(initialItem.unitPrice)} each`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <p className="m-0 text-sm text-amber-700 dark:text-amber-300">
+                    This product is no longer sellable: only the customizations can
+                    change and the quantity can only be lowered.
+                  </p>
+                </div>
+              )}
               {cookingLevels.length > 0 && (
                 <fieldset className="m-0 border-0 p-0">
                   <legend className="mb-2 text-sm font-medium">Cooking level</legend>
@@ -209,6 +260,7 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
                     type="button"
                     className={button}
                     aria-label="Increase quantity"
+                    disabled={atMaxQuantity}
                     onClick={() => setQuantity((n) => n + 1)}
                   >
                     +
@@ -223,7 +275,7 @@ export default function ItemConfigModal({ product, onAdd, onClose }) {
                 className={`${primaryButton} w-full py-2.5`}
                 onClick={() => onAdd(buildItem())}
               >
-                Add to ticket · {formatPrice(lineTotal)}
+                {initialItem ? "Update item" : "Add to ticket"} · {formatPrice(lineTotal)}
               </button>
             </footer>
           </>
