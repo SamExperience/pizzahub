@@ -1,14 +1,23 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketCard from "../src/components/TicketCard";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
 
-const mocks = vi.hoisted(() => ({ getCustomer: vi.fn() }));
+const mocks = vi.hoisted(() => ({ subscribe: vi.fn(), unsubscribe: vi.fn(), emit: null }));
 
 vi.mock("../src/services/customer.service", () => ({
-  getCustomer: mocks.getCustomer,
+  subscribeToCustomer: mocks.subscribe,
 }));
+
+// Fake Customer listener: delivers value (or the error) asynchronously and
+// keeps the callback in mocks.emit to push later changes.
+const listenWith = (value, error = null) =>
+  mocks.subscribe.mockImplementation((customerId, onChange, onError) => {
+    mocks.emit = onChange;
+    queueMicrotask(() => (error ? onError(error) : onChange(value)));
+    return mocks.unsubscribe;
+  });
 
 const baseOrder = {
   id: "o1",
@@ -41,8 +50,8 @@ const customer = {
 
 describe("TicketCard", () => {
   beforeEach(() => {
-    mocks.getCustomer.mockReset();
-    mocks.getCustomer.mockResolvedValue(customer);
+    mocks.subscribe.mockReset();
+    listenWith(customer);
   });
 
   afterEach(() => {
@@ -58,7 +67,7 @@ describe("TicketCard", () => {
     expect(screen.getAllByText("€21.00")).toHaveLength(2);
     expect(screen.getByText("Pending")).toBeTruthy();
     expect(await screen.findByText("Mario Rossi")).toBeTruthy();
-    expect(mocks.getCustomer).toHaveBeenCalledWith("c1");
+    expect(mocks.subscribe.mock.calls[0][0]).toBe("c1");
   });
 
   it("hides phone and address for takeaway", async () => {
@@ -77,21 +86,28 @@ describe("TicketCard", () => {
     expect(screen.getByText("Via Roma 5, 00100 Roma")).toBeTruthy();
   });
 
-  it("reloads the customer when the order is updated", async () => {
-    const { rerender } = render(
-      <TicketCard order={{ ...baseOrder, updatedAt: { toMillis: () => 1 } }} />,
-    );
+  it("shows customer changes made from any ticket in real time", async () => {
+    render(<TicketCard order={{ ...baseOrder, orderType: "delivery" }} />);
     await screen.findByText("Mario Rossi");
 
-    mocks.getCustomer.mockResolvedValue({ ...customer, firstName: "Luigi" });
-    rerender(<TicketCard order={{ ...baseOrder, updatedAt: { toMillis: () => 2 } }} />);
+    act(() => mocks.emit({ ...customer, firstName: "Luigi", phone: "333 0000000" }));
 
-    expect(await screen.findByText("Luigi Rossi")).toBeTruthy();
-    expect(mocks.getCustomer).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Luigi Rossi")).toBeTruthy();
+    expect(screen.getByText("333 0000000")).toBeTruthy();
+    expect(mocks.subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops listening when unmounted", async () => {
+    const { unmount } = render(<TicketCard order={baseOrder} />);
+    await screen.findByText("Mario Rossi");
+
+    unmount();
+
+    expect(mocks.unsubscribe).toHaveBeenCalled();
   });
 
   it("shows a fallback when the customer is missing", async () => {
-    mocks.getCustomer.mockResolvedValue(null);
+    listenWith(null);
     render(<TicketCard order={baseOrder} />);
 
     expect(await screen.findByText("Customer unavailable")).toBeTruthy();
@@ -99,7 +115,7 @@ describe("TicketCard", () => {
 
   it("shows a fallback when the customer cannot be loaded", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
-    mocks.getCustomer.mockRejectedValue(new Error("boom"));
+    listenWith(null, new Error("boom"));
     render(<TicketCard order={baseOrder} />);
 
     expect(await screen.findByText("Customer unavailable")).toBeTruthy();
@@ -108,8 +124,8 @@ describe("TicketCard", () => {
 
 describe("TicketCard status arrows", () => {
   beforeEach(() => {
-    mocks.getCustomer.mockReset();
-    mocks.getCustomer.mockResolvedValue(customer);
+    mocks.subscribe.mockReset();
+    listenWith(customer);
   });
 
   afterEach(() => {

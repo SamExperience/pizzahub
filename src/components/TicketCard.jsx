@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCustomer } from "../services/customer.service";
+import { subscribeToCustomer } from "../services/customer.service";
 import { ORDER_STATUSES, ORDER_TYPE } from "../services/order.service";
 import { formatPrice, formatTime } from "../utils/format";
 import { alert, button, dangerButton, muted } from "../utils/styles";
@@ -17,28 +17,23 @@ const formatAddress = (address) =>
     .filter(Boolean)
     .join(", ");
 
-// Loads the Customer referenced by the Order; null while loading or when
-// unavailable. It reloads when the Order is updated (version), because an
-// edit can change the Customer without changing customerId.
-function useCustomer(customerId, version) {
+// Customer referenced by the Order, kept up to date in real time (it can be
+// edited from any ticket); null while loading or when unavailable.
+function useCustomer(customerId) {
   const [result, setResult] = useState({ id: null, customer: null });
 
   useEffect(() => {
     if (!customerId) return;
 
-    let cancelled = false;
-
-    getCustomer(customerId)
-      .then((customer) => !cancelled && setResult({ id: customerId, customer }))
-      .catch((error) => {
+    return subscribeToCustomer(
+      customerId,
+      (customer) => setResult({ id: customerId, customer }),
+      (error) => {
         console.log("Error loading customer -> ", error);
-        if (!cancelled) setResult({ id: customerId, customer: null });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [customerId, version]);
+        setResult({ id: customerId, customer: null });
+      },
+    );
+  }, [customerId]);
 
   return {
     loading: Boolean(customerId) && result.id !== customerId,
@@ -47,10 +42,7 @@ function useCustomer(customerId, version) {
 }
 
 function CustomerInfo({ order }) {
-  const { loading, customer } = useCustomer(
-    order.customerId,
-    order.updatedAt?.toMillis?.(),
-  );
+  const { loading, customer } = useCustomer(order.customerId);
 
   if (loading) return <p className={`m-0 ${muted}`}>Loading customer ...</p>;
   if (!customer)
