@@ -5,6 +5,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -16,9 +17,11 @@ export const ORDER_STATUS = {
   PENDING: "Pending",
   IN_PROGRESS: "In progress",
   COMPLETED: "Completed",
+  // Soft delete: final, hidden from the Tableau, kept for history.
+  CANCELLED: "Cancelled",
 };
 
-// Ordered as the Tableau columns
+// Active statuses, ordered as the Tableau columns
 export const ORDER_STATUSES = [
   ORDER_STATUS.PENDING,
   ORDER_STATUS.IN_PROGRESS,
@@ -153,6 +156,64 @@ export const createOrder = async ({
   return orderRef.id;
 };
 
+// Updates the content of an existing Order: customer, order type, scheduled
+// time, items and total. The Customer (created or updated when changed) and
+// the Order are written in a single batch. Status, storeId and createdAt are
+// never written here.
+export const updateOrder = async ({
+  companyId,
+  orderId,
+  orderType,
+  scheduledTime,
+  items,
+  customerData,
+  existingCustomer = null,
+}) => {
+  if (!companyId) throw new Error("Company ID is required");
+
+  if (!orderId) throw new Error("Order ID is required");
+
+  const order = validateOrder({ items, orderType, scheduledTime });
+  const batch = writeBatch(db);
+
+  const customerId = addCustomerToBatch(batch, {
+    companyId,
+    orderType,
+    data: customerData,
+    existingCustomer,
+  });
+
+  batch.update(doc(db, "orders", orderId), {
+    customerId,
+    ...order,
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
+};
+
+// Moves an Order to one of the active Tableau statuses.
+export const updateOrderStatus = async (orderId, status) => {
+  if (!orderId) throw new Error("Order ID is required");
+
+  if (!ORDER_STATUSES.includes(status)) throw new Error("Order status is invalid");
+
+  await updateDoc(doc(db, "orders", orderId), {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Cancels an Order (soft delete): the Order is kept with status Cancelled.
+export const cancelOrder = async (orderId) => {
+  if (!orderId) throw new Error("Order ID is required");
+
+  await updateDoc(doc(db, "orders", orderId), {
+    status: ORDER_STATUS.CANCELLED,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 // Current day in the device time zone: [start, end), end is tomorrow at 00:00.
 export const getTodayRange = (now = new Date()) => {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -161,9 +222,9 @@ export const getTodayRange = (now = new Date()) => {
   return { start, end };
 };
 
-// Listens to the Orders created today for a Store, oldest first.
-// Calls onChange with the full list at every change and returns the
-// unsubscribe function.
+// Listens to the Orders created today for a Store, oldest first; Cancelled
+// Orders are left out. Calls onChange with the full list at every change and
+// returns the unsubscribe function.
 export const subscribeToTodayOrders = (storeId, onChange, onError) => {
   if (!storeId) throw new Error("Store ID is required");
 
@@ -183,7 +244,11 @@ export const subscribeToTodayOrders = (storeId, onChange, onError) => {
   return onSnapshot(
     q,
     (snapshot) => {
-      onChange(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      onChange(
+        snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((order) => order.status !== ORDER_STATUS.CANCELLED),
+      );
     },
     onError,
   );
