@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import TableauBoard from "../components/TableauBoard";
+import TicketSidebar from "../components/TicketSidebar";
 import { useStore } from "../contexts/StoreContext";
 import { getTodayRange, subscribeToTodayOrders } from "../services/order.service";
 
@@ -13,6 +14,8 @@ export default function Tableau() {
   // Bumped to resubscribe: on retry and when the day changes.
   const [retryKey, setRetryKey] = useState(0);
   const [dayKey, setDayKey] = useState(0);
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const closeTicket = useCallback(() => setTicketOpen(false), []);
 
   useEffect(() => {
     if (!storeId) return;
@@ -47,13 +50,15 @@ export default function Tableau() {
   }, [storeId, retryKey, dayKey]);
 
   return (
-    <TableauBoard
-      orders={orders}
-      loading={loading}
-      error={error}
-      onRetry={() => setRetryKey((key) => key + 1)}
-      // Entry point only: milestone 9 opens the ticket creation sidebar here.
-      onCreateTicket={() => {}}
-    />
+    <>
+      <TableauBoard
+        orders={orders}
+        loading={loading}
+        error={error}
+        onRetry={() => setRetryKey((key) => key + 1)}
+        onCreateTicket={() => setTicketOpen(true)}
+      />
+      {ticketOpen && <TicketSidebar onClose={closeTicket} />}
+    </>
   );
 }
