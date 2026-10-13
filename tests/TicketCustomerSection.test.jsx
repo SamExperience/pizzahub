@@ -74,6 +74,7 @@ describe("TicketCustomerSection", () => {
 
     await userEvent.type(screen.getByLabelText(/First name/), "mario");
     await userEvent.click(screen.getByRole("button", { name: /Mario/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit details" }));
 
     expect(screen.getByLabelText(/First name/).value).toBe("Mario");
     expect(screen.getByLabelText("Last name").value).toBe("Rossi");
@@ -85,6 +86,45 @@ describe("TicketCustomerSection", () => {
     expect(screen.getByLabelText(/First name/).value).toBe("");
     expect(screen.getByLabelText("Last name").value).toBe("");
     expect(screen.queryByRole("button", { name: "New customer" })).toBeNull();
+  });
+
+  it("shows the selected customer as a card with name and phone", async () => {
+    render(<Harness />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "mario");
+    await userEvent.click(screen.getByRole("button", { name: /Mario/ }));
+
+    expect(screen.getByText("Mario Rossi")).toBeTruthy();
+    expect(screen.getByText("333")).toBeTruthy();
+    expect(screen.queryByLabelText(/First name/)).toBeNull();
+  });
+
+  it("keeps the form open for an incomplete customer, also once completed", async () => {
+    const { rerender } = render(<Harness incomplete />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "maria");
+    await userEvent.click(screen.getByRole("button", { name: /Maria/ }));
+
+    expect(screen.queryByRole("button", { name: "Edit details" })).toBeNull();
+    await userEvent.type(screen.getByLabelText(/Phone/), "555");
+
+    rerender(<Harness incomplete={false} />);
+
+    expect(screen.getByLabelText(/Phone/).value).toBe("555");
+    expect(screen.queryByRole("button", { name: "Edit details" })).toBeNull();
+  });
+
+  it("shows the card again when another customer is selected", async () => {
+    render(<Harness />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "mario");
+    await userEvent.click(screen.getByRole("button", { name: /Mario/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit details" }));
+    await userEvent.click(screen.getByRole("button", { name: "New customer" }));
+    await userEvent.type(screen.getByLabelText(/First name/), "luigi");
+    await userEvent.click(screen.getByRole("button", { name: /Luigi/ }));
+
+    expect(screen.getByRole("button", { name: "Edit details" })).toBeTruthy();
   });
 
   it("shows address fields only for Delivery and keeps their values", async () => {

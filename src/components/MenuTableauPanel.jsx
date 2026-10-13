@@ -137,7 +137,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
     <section
       role="dialog"
       aria-label="Add product"
-      className="absolute inset-y-0 left-0 right-0 z-10 flex flex-col bg-neutral-50 text-left shadow-xl md:right-[28rem]"
+      className="absolute inset-y-0 left-0 right-0 z-10 flex flex-col bg-neutral-50 text-left shadow-xl md:right-[28rem] lg:right-[27rem]"
     >
       <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
         <h2 className={`${sectionTitle} m-0`}>Add product</h2>

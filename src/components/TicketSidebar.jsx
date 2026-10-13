@@ -1,7 +1,8 @@
-import { Bike, Clock, Plus, ShoppingBag, X } from "lucide-react";
+import { Bike, Clock, ShoppingBag, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getCustomer, getCustomersByCompanyId } from "../services/customer.service";
 import {
+  calculateOrderTotal,
   createOrder,
   ORDER_TYPE,
   updateItemQuantity,
@@ -9,6 +10,7 @@ import {
 } from "../services/order.service";
 import { getItemProduct, ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
+import { formatPrice } from "../utils/format";
 import {
   alert,
   button,
@@ -35,6 +37,9 @@ const ORDER_TYPE_OPTIONS = [
 // Small uppercase heading of a sidebar section.
 const sectionHeading =
   "mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase";
+
+// Customer form fields checked by validateTicketForm.
+const CUSTOMER_FIELDS = ["firstName", "phone", "street", "streetNumber", "postalCode", "city"];
 
 // Right sidebar for ticket creation: order type, customer and scheduled time.
 // With an order it edits that Order instead, prefilled from it.
@@ -151,6 +156,9 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
     originalTime,
   });
   const errors = submitted ? found : {};
+  // A required customer field is missing: the customer form stays visible.
+  const customerIncomplete = CUSTOMER_FIELDS.some((field) => found[field]);
+  const itemCount = items.reduce((total, item) => total + (item.quantity ?? 0), 0);
 
   const handleSave = async () => {
     setSubmitted(true);
@@ -313,7 +321,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       <aside
         role="dialog"
         aria-label={isEdit ? "Edit ticket" : "Create ticket"}
-        className="relative flex h-full w-full flex-col bg-white text-left shadow-xl sm:max-w-md"
+        className="relative flex h-full w-full flex-col bg-white text-left shadow-xl sm:max-w-md lg:max-w-[54rem]"
       >
         <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3">
           <h2 className={`${sectionTitle} m-0`}>
@@ -331,124 +339,137 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
-          <fieldset className="m-0 border-0 p-0">
-            <legend className={sectionHeading}>Order type</legend>
-            <div className="grid grid-cols-2 gap-2">
-              {ORDER_TYPE_OPTIONS.map(({ value, label, Icon }) => (
-                <label
-                  key={value}
-                  className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
-                    orderType === value
-                      ? "border-brand-600 bg-brand-50 text-brand-700"
-                      : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
-                  }`}
-                >
+        {/* One scrolling column; from lg order and customer on the left,
+            items on the right, each scrolling on its own. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-2 lg:overflow-hidden">
+          <div className="flex flex-col gap-5 p-4 lg:overflow-y-auto">
+            <div>
+              <div className="grid grid-cols-[1fr_7rem] items-end gap-2 sm:grid-cols-[1fr_8.5rem]">
+                <fieldset className="m-0 min-w-0 border-0 p-0">
+                  <legend className={sectionHeading}>Order type</legend>
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1">
+                    {ORDER_TYPE_OPTIONS.map(({ value, label, Icon }) => (
+                      <label
+                        key={value}
+                        className={`flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
+                          orderType === value
+                            ? "bg-white text-brand-700 shadow-sm ring-1 ring-brand-200"
+                            : "text-neutral-600 hover:bg-white/60"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="orderType"
+                          value={value}
+                          checked={orderType === value}
+                          onChange={() => setOrderType(value)}
+                          className="sr-only"
+                        />
+                        <Icon className="size-4 shrink-0 max-sm:hidden" aria-hidden="true" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div className="min-w-0">
+                  <label
+                    htmlFor="scheduledTime"
+                    className={`${sectionHeading} flex items-center gap-1.5 truncate`}
+                  >
+                    <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                    {orderType === ORDER_TYPE.DELIVERY ? "Delivery time" : "Pickup time"}
+                  </label>
                   <input
-                    type="radio"
-                    name="orderType"
-                    value={value}
-                    checked={orderType === value}
-                    onChange={() => setOrderType(value)}
-                    className="sr-only"
+                    id="scheduledTime"
+                    type="time"
+                    className={`${input} min-h-12 font-semibold`}
+                    value={scheduledTime}
+                    aria-invalid={Boolean(errors.scheduledTime)}
+                    aria-describedby={errors.scheduledTime ? "scheduledTime-error" : undefined}
+                    onChange={(event) => setScheduledTime(event.target.value)}
                   />
-                  <Icon className="size-5" aria-hidden="true" />
-                  {label}
-                </label>
-              ))}
+                </div>
+              </div>
+              <FieldError id="scheduledTime-error" message={errors.scheduledTime} />
+              {!isEdit && (
+                <p className={`${muted} mt-1 text-xs`}>Today. Defaults to 30 minutes from now.</p>
+              )}
             </div>
-          </fieldset>
 
-          {orderCustomerState === "loading" && (
-            <LoadingState text="Loading customer ..." />
-          )}
-          {orderCustomerState === "error" && (
-            <div role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
-              Could not load the ticket's customer.
-              <button type="button" className={button} onClick={retryOrderCustomer}>
-                Try again
-              </button>
-            </div>
-          )}
-          <TicketCustomerSection
-            orderType={orderType}
-            customers={customers}
-            loading={customersLoading}
-            error={customersError}
-            onRetry={retryCustomers}
-            form={customerForm}
-            onFormChange={setCustomerForm}
-            selectedCustomer={selectedCustomer}
-            onSelect={selectCustomer}
-            onClear={clearCustomer}
-            errors={errors}
-          />
-
-          <div>
-            <label
-              htmlFor="scheduledTime"
-              className={`${sectionHeading} flex items-center gap-1.5`}
-            >
-              <Clock className="size-4" aria-hidden="true" />
-              {orderType === ORDER_TYPE.DELIVERY ? "Delivery time" : "Pickup time"}
-            </label>
-            <input
-              id="scheduledTime"
-              type="time"
-              className={`${input} min-h-11`}
-              value={scheduledTime}
-              aria-invalid={Boolean(errors.scheduledTime)}
-              aria-describedby={errors.scheduledTime ? "scheduledTime-error" : undefined}
-              onChange={(event) => setScheduledTime(event.target.value)}
-            />
-            <FieldError id="scheduledTime-error" message={errors.scheduledTime} />
-            {!isEdit && (
-              <p className={`${muted} mt-1`}>Today. Defaults to 30 minutes from now.</p>
+            {orderCustomerState === "loading" && (
+              <LoadingState text="Loading customer ..." />
             )}
+            {orderCustomerState === "error" && (
+              <div role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
+                Could not load the ticket's customer.
+                <button type="button" className={button} onClick={retryOrderCustomer}>
+                  Try again
+                </button>
+              </div>
+            )}
+            <TicketCustomerSection
+              orderType={orderType}
+              customers={customers}
+              loading={customersLoading}
+              error={customersError}
+              onRetry={retryCustomers}
+              form={customerForm}
+              onFormChange={setCustomerForm}
+              selectedCustomer={selectedCustomer}
+              onSelect={selectCustomer}
+              onClear={clearCustomer}
+              incomplete={customerIncomplete}
+              errors={errors}
+            />
           </div>
 
-          <button
-            type="button"
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-brand-600 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1"
-            onClick={() => setMenuOpen(true)}
-          >
-            <Plus className="size-5" aria-hidden="true" />
-            Add product
-          </button>
-          <TicketSummary
-            items={items}
-            onChangeQuantity={changeQuantity}
-            onRemove={removeItem}
-            onEdit={editItem}
-            maxQuantities={maxQuantities}
-            itemStatuses={items.map((item) => productStatuses[item.productId])}
-            itemMessages={itemMessage ? { [itemMessage.index]: itemMessage.text } : {}}
-          />
-          <FieldError id="items-error" message={errors.items} />
-          {saveError && (
-            <div role="alert" className={alert}>
-              Could not save the ticket. Try again.
-            </div>
-          )}
+          <div className="flex flex-col gap-3 border-t border-neutral-200 p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:bg-neutral-50">
+            <TicketSummary
+              items={items}
+              onAddProduct={() => setMenuOpen(true)}
+              onChangeQuantity={changeQuantity}
+              onRemove={removeItem}
+              onEdit={editItem}
+              maxQuantities={maxQuantities}
+              itemStatuses={items.map((item) => productStatuses[item.productId])}
+              itemMessages={itemMessage ? { [itemMessage.index]: itemMessage.text } : {}}
+            />
+            <FieldError id="items-error" message={errors.items} />
+            {saveError && (
+              <div role="alert" className={alert}>
+                Could not save the ticket. Try again.
+              </div>
+            )}
+          </div>
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-neutral-200 bg-white px-4 py-3">
-          <button
-            type="button"
-            className={`${button} min-h-11 px-4`}
-            disabled={saving}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={`${primaryButton} min-h-11 px-5`}
-            disabled={saving || orderCustomerState !== "ready"}
-            onClick={handleSave}
-          >
-            {saving ? "Saving…" : isEdit ? "Save changes" : "Save ticket"}
-          </button>
+        <footer className="flex items-center justify-between gap-3 border-t border-neutral-200 bg-white px-4 py-3">
+          <div className="min-w-0">
+            <p className={`m-0 text-xs ${muted}`}>
+              Total{itemCount > 0 && ` · ${itemCount} ${itemCount === 1 ? "item" : "items"}`}
+            </p>
+            <strong aria-label="Total" className="text-xl font-bold tabular-nums">
+              {formatPrice(calculateOrderTotal(items))}
+            </strong>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              className={`${button} min-h-11 px-4`}
+              disabled={saving}
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`${primaryButton} min-h-11 px-5`}
+              disabled={saving || orderCustomerState !== "ready"}
+              onClick={handleSave}
+            >
+              {saving ? "Saving…" : isEdit ? "Save changes" : "Save ticket"}
+            </button>
+          </div>
         </footer>
       </aside>
       {menuOpen && (

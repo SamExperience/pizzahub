@@ -81,10 +81,40 @@ describe("TicketSidebar", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Mario/ }));
 
     expect(getCustomersByCompanyId).toHaveBeenCalledWith("co1");
+    expect(screen.getByText("Mario Rossi")).toBeTruthy();
+    expect(screen.getByText("Via Roma 1, 00100 Roma")).toBeTruthy();
+    expect(screen.queryByLabelText(/First name/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit details" }));
+
     expect(screen.getByLabelText(/First name/).value).toBe("Mario");
     expect(screen.getByLabelText("Last name").value).toBe("Rossi");
     expect(screen.getByLabelText(/Phone/).value).toBe("333");
     expect(screen.getByLabelText(/^Street \*/).value).toBe("Via Roma");
+  });
+
+  it("opens the customer form by itself when a required field is missing", async () => {
+    getCustomersByCompanyId.mockResolvedValue([
+      { id: "c2", firstName: "Anna", lastName: "Neri", phone: "444", address: null },
+    ]);
+    render(<TicketSidebar companyId="co1" onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "ann");
+    await userEvent.click(await screen.findByRole("button", { name: /Anna/ }));
+    expect(screen.getByRole("button", { name: "Edit details" })).toBeTruthy();
+
+    await userEvent.click(screen.getByLabelText("Delivery"));
+
+    expect(screen.queryByRole("button", { name: "Edit details" })).toBeNull();
+    expect(screen.getByLabelText(/^Street \*/).value).toBe("");
+
+    // Completing the address keeps the form open while it is being edited.
+    await userEvent.type(screen.getByLabelText(/^Street \*/), "Via Po");
+    await userEvent.type(screen.getByLabelText(/^Street number/), "2");
+    await userEvent.type(screen.getByLabelText(/^Postal code/), "10100");
+    await userEvent.type(screen.getByLabelText(/^City/), "Torino");
+
+    expect(screen.getByLabelText(/^City/).value).toBe("Torino");
   });
 
   it("shows an error and retries loading the customers", async () => {
@@ -234,6 +264,19 @@ describe("TicketSidebar", () => {
 
     expect(screen.getByText("No products added yet.")).toBeTruthy();
     expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(0));
+  });
+
+  it("shows the item count in the summary header and the footer", async () => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: "Items" })).toBeTruthy();
+
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
+
+    expect(screen.getByRole("heading", { name: "Items · 2" })).toBeTruthy();
+    expect(screen.getByText("Total · 2 items")).toBeTruthy();
+    expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(4));
   });
 
   it("closes from the close button, Cancel, Escape and the backdrop", async () => {
@@ -487,7 +530,7 @@ describe("TicketSidebar edit mode", () => {
   it("does not cap Items whose Product is sellable", async () => {
     renderEdit();
 
-    await screen.findByDisplayValue("Mario");
+    await screen.findByText("Mario Rossi");
     await waitFor(() => expect(getItemProduct).toHaveBeenCalled());
     expect(screen.queryByText("Unavailable")).toBeNull();
     expect(screen.getByRole("button", { name: "Increase quantity of Water" }).disabled).toBe(
@@ -510,8 +553,9 @@ describe("TicketSidebar edit mode", () => {
     expect(screen.getByLabelText("Delivery time").value).toBe("20:30");
     expect(screen.getByLabelText("Quantity of Water").textContent).toBe("3");
     expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(6));
-    expect(await screen.findByDisplayValue("Mario")).toBeTruthy();
+    expect(await screen.findByText("Mario Rossi")).toBeTruthy();
     expect(getCustomer).toHaveBeenCalledWith("c1");
+    await userEvent.click(screen.getByRole("button", { name: "Edit details" }));
     expect(screen.getByLabelText(/Phone/).value).toBe("333");
     expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
   });
@@ -521,7 +565,7 @@ describe("TicketSidebar edit mode", () => {
     updateOrder.mockResolvedValue();
     renderEdit({ onClose });
 
-    await screen.findByDisplayValue("Mario");
+    await screen.findByText("Mario Rossi");
     await userEvent.click(screen.getByLabelText("Takeaway"));
     await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -548,7 +592,7 @@ describe("TicketSidebar edit mode", () => {
     updateOrder.mockResolvedValue();
     renderEdit();
 
-    await screen.findByDisplayValue("Mario");
+    await screen.findByText("Mario Rossi");
     fireEvent.change(screen.getByLabelText("Delivery time"), { target: { value: "20:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
@@ -574,7 +618,7 @@ describe("TicketSidebar edit mode", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByDisplayValue("Mario")).toBeTruthy();
+    expect(await screen.findByText("Mario Rossi")).toBeTruthy();
     expect(getCustomer).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("button", { name: "Save changes" }).disabled).toBe(false);
   });
@@ -585,7 +629,7 @@ describe("TicketSidebar edit mode", () => {
     updateOrder.mockRejectedValue(new Error("denied"));
     renderEdit({ onClose });
 
-    await screen.findByDisplayValue("Mario");
+    await screen.findByText("Mario Rossi");
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
