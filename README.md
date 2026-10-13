@@ -1,6 +1,6 @@
 # PizzaHub
 
-PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu, create, edit and cancel tickets (orders), move them through their statuses and follow the Store's orders of the day in real time on the Tableau. The interface is responsive and usable on desktop, tablet and mobile. The project is an MVP under active development; this document describes only what is implemented today.
+PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu, create, edit and cancel tickets (orders), move them through their statuses, follow the Store's orders of the day in real time on the Tableau and browse the Store's order history by day on the Dashboard. The interface is responsive and usable on desktop, tablet and mobile. The project is an MVP under active development; this document describes only what is implemented today.
 
 ## Implemented features
 
@@ -54,7 +54,7 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 ### Ticket creation
 
 - Right sidebar opened from **Create Ticket**, with close and cancel actions. It is full screen on phones and uses two columns (customer details and ticket summary) on large screens.
-- Order type (Takeaway or Delivery) and scheduled time, on one row: a time of day on the current date, defaulting to 30 minutes from now.
+- Order type (Takeaway or Delivery) and scheduled time, on one row: a time of day on the current date, defaulting to 30 minutes from now (capped at 23:59 late in the evening, so the default never falls on the next day).
 - Customer search by first name among the Company's Customers (case-insensitive, matches any part of the name) with dynamic results. Selecting a Customer shows it as a card with an **Edit details** action (the form opens automatically while a required field is missing); otherwise a new Customer is entered.
 - Customer validation by order type: Takeaway requires the first name; Delivery also requires phone, street, street number, postal code and city (country is optional). An existing Customer is updated only when its fields were changed.
 - **Add product**, in the ticket summary header, opens a left panel with a category sidebar and product cards; unavailable products are shown but cannot be selected.
@@ -73,9 +73,13 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
   - Product no longer on sale (unavailable or deleted): only customizations and a lower quantity can be changed; size, cooking level and price are shown as locked, and **+** in the summary cannot exceed the quantity saved in the ticket.
 - Items always keep their snapshot: deleting a Product from the Menu never removes it from existing tickets. **Add product** still shows unavailable products as disabled.
 
-### Other pages
+### Dashboard (order history)
 
-- **Dashboard** exists as a route with placeholder content only.
+- Section sidebar with one item, **Order history**; on small screens it becomes a selector above the content. The selected section is local state, not a separate route.
+- A day field (default today, future days not allowed) shows the active Store's Orders created on that day (device time zone), newest first. The Orders are read once when the page opens or the day changes; the history is not updated in real time.
+- Each row shows the creation time, the customer name, the order type, the status and the total. Cancelled Orders are included, greyed out, with their status badge.
+- Clicking a row expands a read-only detail in place (one row at a time): the stored item snapshots (quantity, size, cooking level, customizations, subtotal), the customer name, phone and, for delivery, address, the created, scheduled and completed times and the total.
+- The Company's Customers are read once, not on every day change. Loading, empty and error states (with a retry action).
 
 ### Security
 
@@ -143,14 +147,14 @@ npx firebase-tools emulators:exec --only auth,firestore,storage "npm test -- --r
 ```text
 src/
   pages/        Route-level pages (Login, Onboarding, StoreSelection, Menu, Tableau, Dashboard)
-  components/   Reusable UI components (app shell with header and navigation, route guards, shared loading state and confirmation dialog, category and product UI, Tableau board and ticket cards, ticket sidebar for creation and editing, customer section, menu panel, item configuration and ticket summary)
+  components/   Reusable UI components (app shell with header and navigation, route guards, shared loading state and confirmation dialog, category and product UI, Tableau board and ticket cards, ticket sidebar for creation and editing, customer section, menu panel, item configuration and ticket summary, Dashboard order history list and detail)
   contexts/     React contexts for auth state and the active Store
   services/     Firebase data layer, one service per entity; components never call Firebase directly
   utils/        Shared helpers, including the shared Tailwind class sets
   routes.jsx    Route definitions
 tests/          Unit, UI and security-rules tests
 firestore.rules Firestore security rules
-firestore.indexes.json Firestore composite indexes (orders of the day)
+firestore.indexes.json Firestore composite indexes (a Store's orders by day)
 storage.rules   Storage security rules
 firebase.json   Firebase Hosting, rules and emulator configuration
 ```
