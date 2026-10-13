@@ -24,10 +24,12 @@ import {
   alert,
   badge,
   button,
-  muted,
+  emptyBox,
   primaryButton,
   sectionTitle,
 } from "../utils/styles";
+import ConfirmDialog from "./ConfirmDialog";
+import LoadingState from "./LoadingState";
 import ProductForm from "./ProductForm";
 
 // Square 40px icon action for product rows.
@@ -46,14 +48,10 @@ function ProductRow({
   isLast,
   onMove,
   onEdit,
-  onDelete,
+  onRequestDelete,
   onToggleAvailability,
 }) {
   const available = product.isAvailable !== false;
-
-  const handleDelete = () => {
-    if (window.confirm(`Delete "${product.name}"?`)) onDelete(product.id);
-  };
 
   const toggleLabel = `${available ? "Mark unavailable" : "Mark available"} ${product.name}`;
 
@@ -155,7 +153,7 @@ function ProductRow({
               aria-label={`Delete ${product.name}`}
               title={`Delete ${product.name}`}
               className={`${actionButton} hover:bg-red-50 hover:text-red-600`}
-              onClick={handleDelete}
+              onClick={() => onRequestDelete(product)}
             >
               <Trash2 className="size-4" aria-hidden="true" />
             </button>
@@ -180,6 +178,7 @@ export default function ProductList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,6 +279,10 @@ export default function ProductList({
     runAction(() => moveProductById(productId, direction));
   const handleDelete = (productId) =>
     runAction(() => deleteProductById(productId));
+  const handleConfirmDelete = () => {
+    handleDelete(productToDelete.id);
+    setProductToDelete(null);
+  };
   const handleToggleAvailability = (productId, isAvailable) =>
     runAction(() => setProductAvailability(productId, isAvailable));
 
@@ -316,9 +319,9 @@ export default function ProductList({
         </p>
       )}
       {showForm && <ProductForm onSubmit={handleCreate} onCancel={closeForm} />}
-      {loading && <p className={muted}>Loading ...</p>}
+      {loading && <LoadingState />}
       {error && (
-        <p className={`${alert} flex flex-wrap items-center gap-3`}>
+        <p role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
           Unable to load the products.
           <button type="button" className={button} onClick={handleRetry}>
             Try again
@@ -326,11 +329,7 @@ export default function ProductList({
         </p>
       )}
       {!loading && !error && products.length === 0 && (
-        <p
-          className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`}
-        >
-          No products in this category yet.
-        </p>
+        <p className={emptyBox}>No products in this category yet.</p>
       )}
       {!loading && !error && products.length > 0 && (
         <ul className="grid gap-3 xl:grid-cols-2">
@@ -351,13 +350,22 @@ export default function ProductList({
                 isLast={index === products.length - 1}
                 onMove={handleMove}
                 onEdit={openEdit}
-                onDelete={handleDelete}
+                onRequestDelete={setProductToDelete}
                 onToggleAvailability={handleToggleAvailability}
               />
             ),
           )}
         </ul>
       )}
+      <ConfirmDialog
+        open={productToDelete !== null}
+        title={`Delete "${productToDelete?.name}"?`}
+        confirmLabel="Delete product"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setProductToDelete(null)}
+      />
     </div>
   );
 }

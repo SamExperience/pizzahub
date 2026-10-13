@@ -4,7 +4,8 @@ import { getCategoriesByMenuId } from "../services/category.service";
 import { getMenuByStoreId } from "../services/menu.service";
 import { getProductsByCategoryId } from "../services/product.service";
 import { formatPrice } from "../utils/format";
-import { alert, button, iconButton, muted, sectionTitle } from "../utils/styles";
+import { alert, button, emptyBox, iconButton, sectionTitle } from "../utils/styles";
+import LoadingState from "./LoadingState";
 
 // Single price, or "From <lowest size price>" when the product has sizes.
 const formatCardPrice = ({ price, sizes }) =>
@@ -132,8 +133,6 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const emptyBox = `rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`;
-
   return (
     <section
       role="dialog"
@@ -146,15 +145,16 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
           type="button"
           className={iconButton}
           aria-label="Close menu"
+          title="Close menu"
           onClick={onClose}
         >
           <X className="size-5" aria-hidden="true" />
         </button>
       </header>
 
-      {categoriesLoading && <p className={`${muted} p-4`}>Loading ...</p>}
+      {categoriesLoading && <LoadingState className="p-4" />}
       {categoriesError && (
-        <p className={`${alert} m-4 flex flex-wrap items-center gap-3`}>
+        <p role="alert" className={`${alert} m-4 flex flex-wrap items-center gap-3`}>
           Unable to load the menu.
           <button
             type="button"
@@ -197,9 +197,9 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
             <h3 className="mt-0 mb-3 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
               {selectedCategory.name}
             </h3>
-            {productsLoading && <p className={muted}>Loading ...</p>}
+            {productsLoading && <LoadingState />}
             {productsError && (
-              <p className={`${alert} flex flex-wrap items-center gap-3`}>
+              <p role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
                 Unable to load the products.
                 <button
                   type="button"

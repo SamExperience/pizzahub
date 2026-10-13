@@ -1,4 +1,4 @@
-import { muted, statusStyles } from "../utils/styles";
+import { emptyBox, statusStyles } from "../utils/styles";
 import TicketCard from "./TicketCard";
 
 // One status column of the Tableau: header with ticket count, then the tickets.
@@ -41,7 +41,7 @@ export default function TableauColumn({
       </header>
       {orders.length === 0 ? (
         <p
-          className={`m-0 rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`}
+          className={`${emptyBox} m-0`}
         >
           No tickets
         </p>

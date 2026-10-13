@@ -2,7 +2,7 @@
 // ProductForm and CategoryList. Only the service boundary is replaced by a
 // small in-memory store, so each assertion checks what the UI shows after the
 // data was written and reloaded.
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Menu from "../src/pages/Menu";
@@ -147,11 +147,16 @@ const productNames = () =>
     .map((item) => item.querySelector("strong")?.textContent)
     .filter(Boolean);
 
+// Clicks a button of the open confirmation dialog.
+const clickDialog = (name) =>
+  userEvent.click(
+    within(screen.getByRole("alertdialog")).getByRole("button", { name }),
+  );
+
 describe("Menu management through the UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     useStore.mockReturnValue({ selectedStore: store, refreshMenuReady });
     installFakeServices();
   });
@@ -199,6 +204,7 @@ describe("Menu management through the UI", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Delete Dolci" }));
+    await clickDialog("Delete category");
     await vi.waitFor(() => expect(names()).toEqual(["Pizze rosse", "Bibite"]));
     expect(refreshMenuReady).toHaveBeenCalled();
   });
@@ -285,6 +291,7 @@ describe("Menu management through the UI", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Delete Margherita" }),
     );
+    await clickDialog("Delete product");
     await vi.waitFor(() =>
       expect(productNames()).toEqual(["Capricciosa", "Diavola piccante"]),
     );
@@ -338,6 +345,7 @@ describe("Menu management through the UI", () => {
     expect(await screen.findByText("Margherita")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Delete Pizze" }));
+    await clickDialog("Delete category");
     await vi.waitFor(() =>
       expect(
         screen.queryByRole("button", { name: "Select Pizze" }),

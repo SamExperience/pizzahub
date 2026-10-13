@@ -31,6 +31,10 @@ export const alert =
 
 export const muted = "text-sm text-neutral-500";
 
+// Dashed box for empty states.
+export const emptyBox =
+  "rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-neutral-500";
+
 // Base pill for status badges; combine with color classes.
 export const badge =
   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium";

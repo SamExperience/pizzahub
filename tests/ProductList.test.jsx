@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ProductList from "../src/components/ProductList";
@@ -23,6 +23,12 @@ vi.mock("../src/services/product.service", () => ({
   updateProductById: vi.fn(),
   uploadProductImage: vi.fn(),
 }));
+
+// Clicks a button of the open confirmation dialog.
+const clickDialog = (name) =>
+  userEvent.click(
+    within(screen.getByRole("alertdialog")).getByRole("button", { name }),
+  );
 
 describe("ProductList", () => {
   beforeEach(() => {
@@ -273,7 +279,6 @@ describe("ProductList", () => {
     });
 
     it("deletes a confirmed product and refreshes the list", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       getProductsByCategoryId
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce([existing[1]]);
@@ -287,6 +292,7 @@ describe("ProductList", () => {
       await userEvent.click(
         await screen.findByRole("button", { name: "Delete Margherita" }),
       );
+      await clickDialog("Delete product");
 
       await waitFor(() => expect(screen.queryByText("Margherita")).toBeNull());
       expect(deleteProductById).toHaveBeenCalledWith("p1");
@@ -294,20 +300,19 @@ describe("ProductList", () => {
     });
 
     it("does not delete when the confirmation is declined", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(false);
       getProductsByCategoryId.mockResolvedValue(existing);
 
       render(<ProductList categoryId="c1" categoryName="Pizze" />);
       await userEvent.click(
         await screen.findByRole("button", { name: "Delete Margherita" }),
       );
+      await clickDialog("Keep");
 
       expect(deleteProductById).not.toHaveBeenCalled();
       expect(screen.getByText("Margherita")).toBeTruthy();
     });
 
     it("shows the error when the deletion fails", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       getProductsByCategoryId.mockResolvedValue(existing);
       deleteProductById.mockRejectedValue(new Error("Product not found"));
 
@@ -315,6 +320,7 @@ describe("ProductList", () => {
       await userEvent.click(
         await screen.findByRole("button", { name: "Delete Margherita" }),
       );
+      await clickDialog("Delete product");
 
       expect((await screen.findByRole("alert")).textContent).toBe(
         "Product not found",

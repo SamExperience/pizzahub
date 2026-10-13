@@ -20,6 +20,7 @@ import {
 } from "../utils/styles";
 import { dateToTime, getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
 import { validateTicketForm } from "../utils/ticketValidation";
+import LoadingState from "./LoadingState";
 import FieldError from "./FieldError";
 import ItemConfigModal from "./ItemConfigModal";
 import MenuTableauPanel from "./MenuTableauPanel";
@@ -322,6 +323,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
             type="button"
             className={iconButton}
             aria-label="Close"
+            title="Close"
             disabled={saving}
             onClick={onClose}
           >
@@ -358,7 +360,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           </fieldset>
 
           {orderCustomerState === "loading" && (
-            <p className={`${muted} m-0`}>Loading customer ...</p>
+            <LoadingState text="Loading customer ..." />
           )}
           {orderCustomerState === "error" && (
             <div role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>

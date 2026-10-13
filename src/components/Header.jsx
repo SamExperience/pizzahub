@@ -60,6 +60,7 @@ function MobileMenu({ storeName, userName }) {
           type="button"
           className={iconButton}
           aria-label={open ? "Close menu" : "Open menu"}
+          title={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           aria-controls={MENU_PANEL_ID}
           onClick={() => setOpen((value) => !value)}

@@ -2,7 +2,7 @@ import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { calculateOrderTotal } from "../services/order.service";
 import { ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { formatPrice } from "../utils/format";
-import { iconButton, muted } from "../utils/styles";
+import { emptyBox, iconButton, muted } from "../utils/styles";
 import FieldError from "./FieldError";
 
 const STATUS_LABEL = {
@@ -35,7 +35,7 @@ export default function TicketSummary({
         Ticket summary
       </h3>
       {items.length === 0 ? (
-        <p className="m-0 rounded-xl border border-dashed border-neutral-300 px-4 py-6 text-center text-sm text-neutral-500">
+        <p className={`${emptyBox} m-0 py-6!`}>
           No products added yet.
         </p>
       ) : (
@@ -78,6 +78,7 @@ export default function TicketSummary({
                       type="button"
                       className={stepButton}
                       aria-label={`Decrease quantity of ${item.productName}`}
+                      title={`Decrease quantity of ${item.productName}`}
                       disabled={item.quantity <= 1}
                       onClick={() => onChangeQuantity(index, item.quantity - 1)}
                     >
@@ -93,6 +94,7 @@ export default function TicketSummary({
                       type="button"
                       className={stepButton}
                       aria-label={`Increase quantity of ${item.productName}`}
+                      title={`Increase quantity of ${item.productName}`}
                       disabled={maxQuantity !== null && item.quantity >= maxQuantity}
                       onClick={() => onChangeQuantity(index, item.quantity + 1)}
                     >

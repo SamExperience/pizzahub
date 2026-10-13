@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { button, input, muted, primaryButton } from "../utils/styles";
+import { button, emptyBox, input, primaryButton } from "../utils/styles";
+import ConfirmDialog from "./ConfirmDialog";
 
 // Icon action that reads on both the mobile chip (brand-600) and the desktop row.
 const actionButton =
@@ -14,7 +15,7 @@ function CategoryRow({
   isSelected,
   onSelect,
   onRename,
-  onDelete,
+  onRequestDelete,
   onMove,
 }) {
   const [editing, setEditing] = useState(false);
@@ -32,13 +33,6 @@ function CategoryRow({
     if (await onRename(category.id, name)) {
       setEditing(false);
     }
-  };
-
-  const handleDelete = () => {
-    const confirmed = window.confirm(
-      `Delete "${category.name}"? Its products will be deleted too.`,
-    );
-    if (confirmed) onDelete(category.id);
   };
 
   if (editing) {
@@ -130,7 +124,7 @@ function CategoryRow({
           aria-label={`Delete ${category.name}`}
           title={`Delete ${category.name}`}
           className={`${actionButton} md:hover:bg-red-50 md:hover:text-red-600`}
-          onClick={handleDelete}
+          onClick={() => onRequestDelete(category)}
         >
           <Trash2 className="size-4" aria-hidden="true" />
         </button>
@@ -147,12 +141,20 @@ export default function CategoryList({
   onDelete,
   onMove,
 }) {
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+
   if (categories.length === 0) {
-    return <p className={muted}>No categories yet.</p>;
+    return <p className={emptyBox}>No categories yet.</p>;
   }
+
+  const handleConfirmDelete = () => {
+    onDelete(categoryToDelete.id);
+    setCategoryToDelete(null);
+  };
 
   // One list: a scrollable chip bar below md, a column from md.
   return (
+    <>
     <ol className="flex flex-row gap-2 overflow-x-auto pb-1 md:flex-col md:gap-1 md:overflow-visible md:pb-0">
       {categories.map((category, index) => (
         <CategoryRow
@@ -163,10 +165,21 @@ export default function CategoryList({
           isSelected={category.id === selectedId}
           onSelect={onSelect}
           onRename={onRename}
-          onDelete={onDelete}
+          onRequestDelete={setCategoryToDelete}
           onMove={onMove}
         />
       ))}
     </ol>
+    <ConfirmDialog
+      open={categoryToDelete !== null}
+      title={`Delete "${categoryToDelete?.name}"?`}
+      message="Its products will be deleted too."
+      confirmLabel="Delete category"
+      cancelLabel="Keep"
+      destructive
+      onConfirm={handleConfirmDelete}
+      onCancel={() => setCategoryToDelete(null)}
+    />
+    </>
   );
 }

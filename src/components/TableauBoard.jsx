@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import LoadingState from "./LoadingState";
 import TableauColumn from "./TableauColumn";
 import { ORDER_STATUSES, sortColumnOrders } from "../services/order.service";
 import {
@@ -52,12 +53,7 @@ export default function TableauBoard({
           Create Ticket
         </button>
       </div>
-      {loading && (
-        <p className={`m-0 flex items-center gap-2 ${muted}`}>
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          Loading ...
-        </p>
-      )}
+      {loading && <LoadingState />}
       {error && (
         <p role="alert" className={`${alert} m-0 flex flex-wrap items-center gap-3`}>
           Unable to load the tickets.

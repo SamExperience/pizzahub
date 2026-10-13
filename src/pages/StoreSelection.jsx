@@ -2,7 +2,7 @@ import { useStore } from "../contexts/StoreContext";
 import StoreCard from "../components/StoreCard";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Loader2 } from "lucide-react";
+import LoadingState from "../components/LoadingState";
 import { alert, button, muted, pageTitle } from "../utils/styles";
 
 export default function StoreSelection() {
@@ -46,12 +46,7 @@ export default function StoreSelection() {
         </div>
       )}
 
-      {loadingStore && (
-        <p className={`${muted} flex items-center gap-2`}>
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          <span>Loading ...</span>
-        </p>
-      )}
+      {loadingStore && <LoadingState />}
 
       {accessibleStore && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

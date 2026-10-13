@@ -1,5 +1,6 @@
 import { filterCustomersByFirstName } from "../services/customer.service";
 import { ORDER_TYPE } from "../services/order.service";
+import LoadingState from "./LoadingState";
 import { alert, button, ghostButton, input, label, muted } from "../utils/styles";
 import FieldError from "./FieldError";
 
@@ -90,7 +91,9 @@ export default function TicketCustomerSection({
         />
         <FieldError id="customerFirstName-error" message={errors.firstName} />
 
-        {searching && loading && <p className={`${muted} mt-1`}>Loading customers…</p>}
+        {searching && loading && (
+          <LoadingState text="Loading customers…" className="mt-1" />
+        )}
 
         {searching && !loading && !error && (
           <ul

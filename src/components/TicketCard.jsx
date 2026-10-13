@@ -10,6 +10,8 @@ import {
   Phone,
   ShoppingBag,
 } from "lucide-react";
+import ConfirmDialog from "./ConfirmDialog";
+import LoadingState from "./LoadingState";
 import { subscribeToCustomer } from "../services/customer.service";
 import { ORDER_STATUSES, ORDER_TYPE } from "../services/order.service";
 import { formatPrice, formatTime } from "../utils/format";
@@ -68,7 +70,7 @@ function useCustomer(customerId) {
 function CustomerInfo({ order }) {
   const { loading, customer } = useCustomer(order.customerId);
 
-  if (loading) return <p className={`m-0 ${muted}`}>Loading customer ...</p>;
+  if (loading) return <LoadingState text="Loading customer ..." />;
   if (!customer)
     return <p className={`m-0 ${muted}`}>Customer unavailable</p>;
 
@@ -120,6 +122,7 @@ function TicketItem({ item }) {
 export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmingOrder, setConfirmingOrder] = useState(null);
 
   const statusIndex = ORDER_STATUSES.indexOf(order.status);
   const previousStatus = statusIndex > 0 ? ORDER_STATUSES[statusIndex - 1] : null;
@@ -143,9 +146,9 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
     }
   };
 
-  const handleCancel = () => {
-    if (window.confirm("Cancel this ticket? This cannot be undone."))
-      run(() => onCancel(order));
+  const handleConfirmCancel = () => {
+    setConfirmingOrder(null);
+    run(() => onCancel(confirmingOrder));
   };
 
   const styles = statusStyles[order.status];
@@ -213,7 +216,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
               aria-label="Cancel ticket"
               title="Cancel ticket"
               disabled={saving}
-              onClick={handleCancel}
+              onClick={() => setConfirmingOrder(order)}
             >
               <Ban className="size-4" aria-hidden="true" />
             </button>
@@ -237,6 +240,16 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
           Could not update the ticket. Try again.
         </p>
       )}
+      <ConfirmDialog
+        open={confirmingOrder !== null}
+        title="Cancel this ticket?"
+        message="This cannot be undone."
+        confirmLabel="Cancel ticket"
+        cancelLabel="Keep ticket"
+        destructive
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setConfirmingOrder(null)}
+      />
     </article>
   );
 }

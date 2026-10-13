@@ -277,7 +277,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
         <label className="flex min-h-10 items-center gap-2 text-sm font-medium text-neutral-700">
           <input
             type="checkbox"
-            className="size-4 accent-brand-600"
+            className="size-4 rounded accent-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1"
             checked={isAvailable}
             onChange={(event) => setIsAvailable(event.target.checked)}
           />
@@ -312,7 +312,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           type="file"
           accept="image/*"
           aria-label="Product image"
-          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200"
+          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
           onChange={(event) => setImageFile(event.target.files[0] ?? null)}
         />
       </fieldset>

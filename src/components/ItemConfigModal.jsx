@@ -123,6 +123,7 @@ export default function ItemConfigModal({
                 type="button"
                 className={iconButton}
                 aria-label="Back to sizes"
+                title="Back to sizes"
                 onClick={() => setSize(null)}
               >
                 <ArrowLeft className="size-5" aria-hidden="true" />
@@ -136,6 +137,7 @@ export default function ItemConfigModal({
             type="button"
             className={iconButton}
             aria-label="Close"
+            title="Close"
             onClick={onClose}
           >
             <X className="size-5" aria-hidden="true" />
@@ -247,6 +249,7 @@ export default function ItemConfigModal({
                           type="button"
                           className="inline-flex size-8 items-center justify-center rounded-full text-brand-700 hover:bg-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           aria-label={`Remove ${text}`}
+                          title={`Remove ${text}`}
                           onClick={() => removeCustomization(index)}
                         >
                           <X className="size-4" aria-hidden="true" />
@@ -264,6 +267,7 @@ export default function ItemConfigModal({
                     type="button"
                     className={stepButton}
                     aria-label="Decrease quantity"
+                    title="Decrease quantity"
                     disabled={quantity <= 1}
                     onClick={() => setQuantity((n) => n - 1)}
                   >
@@ -279,6 +283,7 @@ export default function ItemConfigModal({
                     type="button"
                     className={stepButton}
                     aria-label="Increase quantity"
+                    title="Increase quantity"
                     disabled={atMaxQuantity}
                     onClick={() => setQuantity((n) => n + 1)}
                   >

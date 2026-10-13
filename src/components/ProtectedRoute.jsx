@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { useStore } from "../contexts/StoreContext";
+import LoadingState from "./LoadingState";
 
 export default function ProtectedRoute() {
   const { authUser, userProfile, loadingLogin } = useAuth();
@@ -8,7 +9,7 @@ export default function ProtectedRoute() {
     useStore();
   const location = useLocation();
 
-  if (loadingLogin) return null;
+  if (loadingLogin) return <LoadingState fullPage />;
 
   if (!authUser) {
     return <Navigate to="/" replace />;
@@ -18,7 +19,7 @@ export default function ProtectedRoute() {
     if (location.pathname === "/onboarding") return <Outlet />;
     return <Navigate to="/onboarding" replace />;
   }
-  if (loadingStore) return null;
+  if (loadingStore) return <LoadingState fullPage />;
   if (location.pathname === "/onboarding") {
     return <Navigate to="/stores" replace />;
   }
@@ -34,7 +35,7 @@ export default function ProtectedRoute() {
   }
 
   // Until the Menu is ready, only /menu is reachable.
-  if (menuReady === null) return null;
+  if (menuReady === null) return <LoadingState fullPage />;
   if (!menuReady && location.pathname !== "/menu") {
     return <Navigate to="/menu" replace />;
   }

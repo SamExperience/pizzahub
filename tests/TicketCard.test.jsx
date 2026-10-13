@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketCard from "../src/components/TicketCard";
 
@@ -206,38 +206,43 @@ describe("TicketCard status arrows", () => {
   });
 
   it("cancels the ticket after confirmation", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const onCancel = vi.fn().mockResolvedValue();
     render(<TicketCard order={baseOrder} onCancel={onCancel} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel ticket" }));
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText("Cancel this ticket?")).toBeTruthy();
+    expect(onCancel).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel ticket" }));
 
-    expect(confirm).toHaveBeenCalledWith("Cancel this ticket? This cannot be undone.");
     expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: "o1" }));
     await screen.findByText("Mario Rossi");
-    confirm.mockRestore();
   });
 
   it("does not cancel when the confirmation is dismissed", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const onCancel = vi.fn();
     render(<TicketCard order={baseOrder} onCancel={onCancel} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel ticket" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Keep ticket" }),
+    );
 
     expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     await screen.findByText("Mario Rossi");
-    confirm.mockRestore();
   });
 
   it("disables cancel while saving and shows an error when it fails", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     let reject;
     const onCancel = vi.fn(() => new Promise((_, r) => (reject = r)));
     render(<TicketCard order={baseOrder} onCancel={onCancel} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel ticket" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel ticket" }),
+    );
     expect(screen.getByRole("button", { name: "Cancel ticket" }).disabled).toBe(true);
 
     reject(new Error("denied"));
@@ -245,7 +250,6 @@ describe("TicketCard status arrows", () => {
       "Could not update the ticket",
     );
     expect(screen.getByRole("button", { name: "Cancel ticket" }).disabled).toBe(false);
-    confirm.mockRestore();
   });
 
   it("opens the edit mode with the order", async () => {

@@ -11,7 +11,8 @@ import {
   updateCategoryById,
 } from "../services/category.service";
 import { createMenu, getMenuByStoreId } from "../services/menu.service";
-import { alert, button, muted, pageTitle } from "../utils/styles";
+import LoadingState from "../components/LoadingState";
+import { alert, button, emptyBox, muted, pageTitle } from "../utils/styles";
 
 // Loads the Store's Menu (creating it on first access) and its categories.
 const loadMenu = async (store) => {
@@ -107,9 +108,9 @@ export default function Menu() {
           Manage categories and products of the active store.
         </p>
       </header>
-      {loading && <p className={muted}>Loading ...</p>}
+      {loading && <LoadingState />}
       {error && (
-        <p className={`${alert} flex flex-wrap items-center gap-3`}>
+        <p role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
           Unable to load the menu.
           <button type="button" className={button} onClick={handleRetry}>
             Try again
@@ -147,11 +148,7 @@ export default function Menu() {
                 onChange={refreshMenuReady}
               />
             ) : (
-              <p
-                className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`}
-              >
-                Create a category to start adding products.
-              </p>
+              <p className={emptyBox}>Create a category to start adding products.</p>
             )}
           </section>
         </div>
