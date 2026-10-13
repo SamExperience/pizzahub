@@ -1,12 +1,36 @@
 import { useEffect, useState } from "react";
+import {
+  Bike,
+  Ban,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MapPin,
+  Pencil,
+  Phone,
+  ShoppingBag,
+} from "lucide-react";
 import { subscribeToCustomer } from "../services/customer.service";
 import { ORDER_STATUSES, ORDER_TYPE } from "../services/order.service";
 import { formatPrice, formatTime } from "../utils/format";
-import { alert, button, dangerButton, muted } from "../utils/styles";
+import {
+  alert,
+  badge,
+  button,
+  dangerButton,
+  muted,
+  primaryButton,
+  statusStyles,
+} from "../utils/styles";
 
 const ORDER_TYPE_LABEL = {
   [ORDER_TYPE.TAKEAWAY]: "Takeaway",
   [ORDER_TYPE.DELIVERY]: "Delivery",
+};
+
+const ORDER_TYPE_ICON = {
+  [ORDER_TYPE.TAKEAWAY]: ShoppingBag,
+  [ORDER_TYPE.DELIVERY]: Bike,
 };
 
 const formatAddress = (address) =>
@@ -54,13 +78,19 @@ function CustomerInfo({ order }) {
   const isDelivery = order.orderType === ORDER_TYPE.DELIVERY;
 
   return (
-    <div className="text-sm">
-      <p className="m-0 font-medium">{name}</p>
+    <div className="flex flex-col gap-0.5 text-sm">
+      <p className="m-0 font-semibold text-neutral-900">{name}</p>
       {isDelivery && customer.phone && (
-        <p className={`m-0 ${muted}`}>{customer.phone}</p>
+        <p className={`m-0 flex items-center gap-1.5 ${muted}`}>
+          <Phone className="size-3.5 shrink-0" aria-hidden="true" />
+          {customer.phone}
+        </p>
       )}
       {isDelivery && customer.address && (
-        <p className={`m-0 ${muted}`}>{formatAddress(customer.address)}</p>
+        <p className={`m-0 flex items-start gap-1.5 ${muted}`}>
+          <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          {formatAddress(customer.address)}
+        </p>
       )}
     </div>
   );
@@ -79,7 +109,7 @@ function TicketItem({ item }) {
         </span>
         {details && <p className={`m-0 ${muted}`}>{details}</p>}
       </div>
-      <span className="shrink-0">{formatPrice(item.subtotal)}</span>
+      <span className="shrink-0 tabular-nums">{formatPrice(item.subtotal)}</span>
     </li>
   );
 }
@@ -118,11 +148,24 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
       run(() => onCancel(order));
   };
 
+  const styles = statusStyles[order.status];
+  const TypeIcon = ORDER_TYPE_ICON[order.orderType] ?? ShoppingBag;
+  // Icon-only actions keep four buttons inside an 18rem column.
+  const actionButton = "size-10 min-h-10 px-0";
+
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3">
-      <header className="flex items-center justify-between gap-2 text-sm font-semibold">
-        <span>{ORDER_TYPE_LABEL[order.orderType] ?? order.orderType}</span>
-        <time>{formatTime(order.scheduledTime)}</time>
+    <article
+      className={`flex flex-col gap-3 rounded-xl border border-l-4 border-neutral-200 bg-white p-3 shadow-sm ${styles?.border ?? "border-l-neutral-300"}`}
+    >
+      <header className="flex items-center justify-between gap-2">
+        <time className="flex items-center gap-1.5 text-lg font-semibold tabular-nums text-neutral-900">
+          <Clock className="size-4 text-neutral-500" aria-hidden="true" />
+          {formatTime(order.scheduledTime)}
+        </time>
+        <span className={`${badge} bg-neutral-100 text-neutral-700`}>
+          <TypeIcon className="size-3.5" aria-hidden="true" />
+          {ORDER_TYPE_LABEL[order.orderType] ?? order.orderType}
+        </span>
       </header>
       <CustomerInfo order={order} />
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -131,61 +174,60 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
         ))}
       </ul>
       <footer className="flex items-center justify-between gap-2 border-t border-neutral-200 pt-2 text-sm">
-        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+        <span className={`${badge} ${styles?.badge ?? "bg-neutral-100 text-neutral-600"}`}>
           {order.status}
         </span>
-        <strong>{formatPrice(order.total)}</strong>
+        <strong className="text-base tabular-nums">{formatPrice(order.total)}</strong>
       </footer>
-      {onChangeStatus && (previousStatus || nextStatus) && (
-        <div className="flex items-center justify-between gap-2">
-          {previousStatus ? (
+      {((onChangeStatus && (previousStatus || nextStatus)) || onEdit || onCancel) && (
+        <div className="flex items-center gap-2">
+          {onChangeStatus && previousStatus && (
             <button
               type="button"
-              className={button}
+              className={`${button} ${actionButton}`}
               aria-label={`Move to ${previousStatus}`}
+              title={`Move to ${previousStatus}`}
               disabled={saving}
               onClick={() => run(() => onChangeStatus(order, previousStatus))}
             >
-              ← {previousStatus}
-            </button>
-          ) : (
-            <span />
-          )}
-          {nextStatus && (
-            <button
-              type="button"
-              className={button}
-              aria-label={`Move to ${nextStatus}`}
-              disabled={saving}
-              onClick={() => run(() => onChangeStatus(order, nextStatus))}
-            >
-              {nextStatus} →
+              <ChevronLeft className="size-4" aria-hidden="true" />
             </button>
           )}
-        </div>
-      )}
-      {(onEdit || onCancel) && (
-        <div className="flex justify-end gap-2">
+          <span className="ml-auto" />
           {onEdit && (
             <button
               type="button"
-              className={button}
+              className={`${button} ${actionButton}`}
               aria-label="Edit ticket"
+              title="Edit ticket"
               disabled={saving}
               onClick={() => onEdit(order)}
             >
-              Edit
+              <Pencil className="size-4" aria-hidden="true" />
             </button>
           )}
           {onCancel && (
             <button
               type="button"
-              className={dangerButton}
+              className={`${dangerButton} size-10 min-h-10 px-0`}
               aria-label="Cancel ticket"
+              title="Cancel ticket"
               disabled={saving}
               onClick={handleCancel}
             >
-              Cancel
+              <Ban className="size-4" aria-hidden="true" />
+            </button>
+          )}
+          {onChangeStatus && nextStatus && (
+            <button
+              type="button"
+              className={`${primaryButton} ${actionButton}`}
+              aria-label={`Move to ${nextStatus}`}
+              title={`Move to ${nextStatus}`}
+              disabled={saving}
+              onClick={() => run(() => onChangeStatus(order, nextStatus))}
+            >
+              <ChevronRight className="size-4" aria-hidden="true" />
             </button>
           )}
         </div>

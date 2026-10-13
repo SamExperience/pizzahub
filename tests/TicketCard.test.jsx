@@ -70,6 +70,14 @@ describe("TicketCard", () => {
     expect(mocks.subscribe.mock.calls[0][0]).toBe("c1");
   });
 
+  it("shows the status badge and the order type badge", async () => {
+    render(<TicketCard order={{ ...baseOrder, status: "In progress", orderType: "delivery" }} />);
+
+    expect(screen.getByText("In progress").className).toMatch(/bg-blue-100/);
+    expect(screen.getByText("Delivery")).toBeTruthy();
+    await screen.findByText("Mario Rossi");
+  });
+
   it("hides phone and address for takeaway", async () => {
     render(<TicketCard order={baseOrder} />);
 

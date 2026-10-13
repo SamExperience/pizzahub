@@ -41,3 +41,29 @@ export const pageTitle =
 
 // Section-level heading.
 export const sectionTitle = "text-lg font-semibold text-neutral-900";
+
+// Order status colors (single source), keyed by status: badge = pill colors,
+// dot = small indicator, accent = column top border, border = ticket left border, count = count pill.
+export const statusStyles = {
+  Pending: {
+    badge: "bg-amber-100 text-amber-800",
+    dot: "bg-amber-500",
+    accent: "border-t-amber-400",
+    border: "border-l-amber-400",
+    count: "bg-amber-100 text-amber-800",
+  },
+  "In progress": {
+    badge: "bg-blue-100 text-blue-800",
+    dot: "bg-blue-500",
+    accent: "border-t-blue-400",
+    border: "border-l-blue-400",
+    count: "bg-blue-100 text-blue-800",
+  },
+  Completed: {
+    badge: "bg-green-100 text-green-800",
+    dot: "bg-green-500",
+    accent: "border-t-green-400",
+    border: "border-l-green-400",
+    count: "bg-green-100 text-green-800",
+  },
+};

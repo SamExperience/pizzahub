@@ -153,4 +153,27 @@ describe("TableauBoard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it("shows mobile status tabs with counts and switches the selected tab", async () => {
+    render(
+      <TableauBoard
+        orders={[
+          { id: "a", status: "Pending" },
+          { id: "b", status: "Pending" },
+          { id: "c", status: "Completed" },
+        ]}
+      />,
+    );
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    expect(tabs[0].textContent).toBe("Pending2");
+    expect(tabs[2].textContent).toBe("Completed1");
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+
+    await userEvent.click(tabs[2]);
+
+    expect(tabs[2].getAttribute("aria-selected")).toBe("true");
+    expect(tabs[0].getAttribute("aria-selected")).toBe("false");
+  });
 });
