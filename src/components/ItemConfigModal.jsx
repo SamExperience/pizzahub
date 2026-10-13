@@ -1,3 +1,4 @@
+import { ArrowLeft, Minus, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   buildItemSnapshot,
@@ -5,10 +6,22 @@ import {
   reconfigureItem,
 } from "../services/order.service";
 import { formatPrice } from "../utils/format";
-import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
+import {
+  button,
+  iconButton,
+  input,
+  label,
+  muted,
+  primaryButton,
+  sectionTitle,
+} from "../utils/styles";
+
+// Round quantity stepper button, 44px touch target.
+const stepButton =
+  "inline-flex size-11 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40";
 
 const pillBase =
-  "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400";
+  "min-h-11 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400";
 
 // Item configuration step of the ticket creation. Step 1 (only when the
 // product has sizes) picks the size; step 2 picks cooking level,
@@ -92,7 +105,7 @@ export default function ItemConfigModal({
     }`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
         className="absolute inset-0 bg-black/50"
         data-testid="item-config-backdrop"
@@ -101,31 +114,31 @@ export default function ItemConfigModal({
       <section
         role="dialog"
         aria-label={`Configure ${name}`}
-        className="relative flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white text-left shadow-xl"
+        className="relative flex max-h-[90svh] w-full flex-col overflow-hidden rounded-t-2xl bg-white text-left shadow-xl sm:max-h-full sm:max-w-lg sm:rounded-xl"
       >
         <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             {sizes.length > 0 && !choosingSize && (
               <button
                 type="button"
-                className={ghostButton}
+                className={iconButton}
                 aria-label="Back to sizes"
                 onClick={() => setSize(null)}
               >
-                ←
+                <ArrowLeft className="size-5" aria-hidden="true" />
               </button>
             )}
-            <h2 className="m-0 truncate text-xl font-semibold">
+            <h2 className={`${sectionTitle} m-0 truncate`}>
               {title.filter(Boolean).join(" · ")}
             </h2>
           </div>
           <button
             type="button"
-            className={ghostButton}
+            className={iconButton}
             aria-label="Close"
             onClick={onClose}
           >
-            ✕
+            <X className="size-5" aria-hidden="true" />
           </button>
         </header>
 
@@ -137,7 +150,7 @@ export default function ItemConfigModal({
                 <li key={item.name}>
                   <button
                     type="button"
-                    className="flex h-full w-full flex-col items-center gap-1 rounded-xl border border-neutral-200 bg-white px-3 py-5 text-center transition-colors hover:border-brand-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                    className="flex h-full w-full flex-col items-center gap-1 rounded-xl border border-neutral-200 bg-white px-3 py-5 text-center transition-colors hover:border-brand-400 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
                     onClick={() => setSize(item.name)}
                   >
                     <strong className="text-base font-semibold">{item.name}</strong>
@@ -173,7 +186,9 @@ export default function ItemConfigModal({
               )}
               {cookingLevels.length > 0 && (
                 <fieldset className="m-0 border-0 p-0">
-                  <legend className="mb-2 text-sm font-medium">Cooking level</legend>
+                  <legend className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                    Cooking level
+                  </legend>
                   <div className="flex flex-wrap gap-2">
                     {cookingLevels.map((level) => (
                       <button
@@ -193,7 +208,7 @@ export default function ItemConfigModal({
               <div>
                 <label
                   htmlFor="customization"
-                  className="mb-1 block text-sm font-medium"
+                  className="mb-1 block text-xs font-semibold tracking-wide text-neutral-500 uppercase"
                 >
                   Customizations
                 </label>
@@ -201,7 +216,7 @@ export default function ItemConfigModal({
                   <input
                     id="customization"
                     type="text"
-                    className={input}
+                    className={`${input} min-h-11`}
                     placeholder="e.g. no onions"
                     value={customizationText}
                     onChange={(event) => setCustomizationText(event.target.value)}
@@ -212,7 +227,11 @@ export default function ItemConfigModal({
                       }
                     }}
                   />
-                  <button type="button" className={button} onClick={addCustomization}>
+                  <button
+                    type="button"
+                    className={`${button} min-h-11 px-4`}
+                    onClick={addCustomization}
+                  >
                     Add
                   </button>
                 </div>
@@ -226,11 +245,11 @@ export default function ItemConfigModal({
                         {text}
                         <button
                           type="button"
-                          className={ghostButton}
+                          className="inline-flex size-8 items-center justify-center rounded-full text-brand-700 hover:bg-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           aria-label={`Remove ${text}`}
                           onClick={() => removeCustomization(index)}
                         >
-                          ✕
+                          <X className="size-4" aria-hidden="true" />
                         </button>
                       </li>
                     ))}
@@ -239,40 +258,40 @@ export default function ItemConfigModal({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Quantity</span>
+                <span className={label}>Quantity</span>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    className={button}
+                    className={stepButton}
                     aria-label="Decrease quantity"
                     disabled={quantity <= 1}
                     onClick={() => setQuantity((n) => n - 1)}
                   >
-                    −
+                    <Minus className="size-5" aria-hidden="true" />
                   </button>
                   <output
                     aria-label="Quantity"
-                    className="min-w-6 text-center text-base font-semibold"
+                    className="min-w-8 text-center text-lg font-semibold tabular-nums"
                   >
                     {quantity}
                   </output>
                   <button
                     type="button"
-                    className={button}
+                    className={stepButton}
                     aria-label="Increase quantity"
                     disabled={atMaxQuantity}
                     onClick={() => setQuantity((n) => n + 1)}
                   >
-                    +
+                    <Plus className="size-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
             </div>
 
-            <footer className="border-t border-neutral-200 px-4 py-3">
+            <footer className="border-t border-neutral-200 bg-white px-4 py-3">
               <button
                 type="button"
-                className={`${primaryButton} w-full py-2.5`}
+                className={`${primaryButton} min-h-11 w-full py-2.5 text-base`}
                 onClick={() => onAdd(buildItem())}
               >
                 {initialItem ? "Update item" : "Add to ticket"} · {formatPrice(lineTotal)}

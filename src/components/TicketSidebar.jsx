@@ -1,3 +1,4 @@
+import { Bike, Clock, Plus, ShoppingBag, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getCustomer, getCustomersByCompanyId } from "../services/customer.service";
 import {
@@ -8,7 +9,15 @@ import {
 } from "../services/order.service";
 import { getItemProduct, ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
-import { alert, button, ghostButton, input, muted, primaryButton } from "../utils/styles";
+import {
+  alert,
+  button,
+  iconButton,
+  input,
+  muted,
+  primaryButton,
+  sectionTitle,
+} from "../utils/styles";
 import { dateToTime, getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
 import { validateTicketForm } from "../utils/ticketValidation";
 import FieldError from "./FieldError";
@@ -18,9 +27,13 @@ import TicketCustomerSection from "./TicketCustomerSection";
 import TicketSummary from "./TicketSummary";
 
 const ORDER_TYPE_OPTIONS = [
-  { value: ORDER_TYPE.TAKEAWAY, label: "Takeaway" },
-  { value: ORDER_TYPE.DELIVERY, label: "Delivery" },
+  { value: ORDER_TYPE.TAKEAWAY, label: "Takeaway", Icon: ShoppingBag },
+  { value: ORDER_TYPE.DELIVERY, label: "Delivery", Icon: Bike },
 ];
+
+// Small uppercase heading of a sidebar section.
+const sectionHeading =
+  "mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase";
 
 // Right sidebar for ticket creation: order type, customer and scheduled time.
 // With an order it edits that Order instead, prefilled from it.
@@ -299,33 +312,33 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       <aside
         role="dialog"
         aria-label={isEdit ? "Edit ticket" : "Create ticket"}
-        className="relative flex h-full w-full max-w-md flex-col bg-white text-left shadow-xl"
+        className="relative flex h-full w-full flex-col bg-white text-left shadow-xl sm:max-w-md"
       >
-        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <h2 className="m-0 text-xl font-semibold">
+        <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3">
+          <h2 className={`${sectionTitle} m-0`}>
             {isEdit ? "Edit Ticket" : "Create Ticket"}
           </h2>
           <button
             type="button"
-            className={ghostButton}
+            className={iconButton}
             aria-label="Close"
             disabled={saving}
             onClick={onClose}
           >
-            ✕
+            <X className="size-5" aria-hidden="true" />
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-4">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
           <fieldset className="m-0 border-0 p-0">
-            <legend className="mb-2 text-sm font-medium">Order type</legend>
+            <legend className={sectionHeading}>Order type</legend>
             <div className="grid grid-cols-2 gap-2">
-              {ORDER_TYPE_OPTIONS.map(({ value, label }) => (
+              {ORDER_TYPE_OPTIONS.map(({ value, label, Icon }) => (
                 <label
                   key={value}
-                  className={`cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
+                  className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
                     orderType === value
-                      ? "border-brand-600 bg-brand-600 text-white"
+                      ? "border-brand-600 bg-brand-50 text-brand-700"
                       : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
                   }`}
                 >
@@ -337,6 +350,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
                     onChange={() => setOrderType(value)}
                     className="sr-only"
                   />
+                  <Icon className="size-5" aria-hidden="true" />
                   {label}
                 </label>
               ))}
@@ -369,13 +383,17 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           />
 
           <div>
-            <label htmlFor="scheduledTime" className="mb-1 block text-sm font-medium">
+            <label
+              htmlFor="scheduledTime"
+              className={`${sectionHeading} flex items-center gap-1.5`}
+            >
+              <Clock className="size-4" aria-hidden="true" />
               {orderType === ORDER_TYPE.DELIVERY ? "Delivery time" : "Pickup time"}
             </label>
             <input
               id="scheduledTime"
               type="time"
-              className={input}
+              className={`${input} min-h-11`}
               value={scheduledTime}
               aria-invalid={Boolean(errors.scheduledTime)}
               aria-describedby={errors.scheduledTime ? "scheduledTime-error" : undefined}
@@ -389,9 +407,10 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
 
           <button
             type="button"
-            className={primaryButton}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-brand-600 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1"
             onClick={() => setMenuOpen(true)}
           >
+            <Plus className="size-5" aria-hidden="true" />
             Add product
           </button>
           <TicketSummary
@@ -411,13 +430,18 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           )}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-neutral-200 px-4 py-3">
-          <button type="button" className={button} disabled={saving} onClick={onClose}>
+        <footer className="flex justify-end gap-2 border-t border-neutral-200 bg-white px-4 py-3">
+          <button
+            type="button"
+            className={`${button} min-h-11 px-4`}
+            disabled={saving}
+            onClick={onClose}
+          >
             Cancel
           </button>
           <button
             type="button"
-            className={primaryButton}
+            className={`${primaryButton} min-h-11 px-5`}
             disabled={saving || orderCustomerState !== "ready"}
             onClick={handleSave}
           >
