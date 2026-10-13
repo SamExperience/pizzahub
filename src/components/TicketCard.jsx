@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  Bike,
   Ban,
   ChevronDown,
   ChevronLeft,
@@ -12,13 +11,19 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
+import OrderItemRow from "./OrderItemRow";
 import { subscribeToCustomer } from "../services/customer.service";
 import {
   ORDER_STATUS,
   ORDER_STATUSES,
   ORDER_TYPE,
 } from "../services/order.service";
-import { formatPrice, formatTime } from "../utils/format";
+import { formatAddress, formatPrice, formatStreet, formatTime } from "../utils/format";
+import {
+  ORDER_TYPE_BADGE,
+  ORDER_TYPE_ICON,
+  ORDER_TYPE_LABEL,
+} from "../utils/orderType";
 import {
   alert,
   badge,
@@ -28,21 +33,6 @@ import {
   primaryButton,
   statusStyles,
 } from "../utils/styles";
-
-const ORDER_TYPE_LABEL = {
-  [ORDER_TYPE.TAKEAWAY]: "Takeaway",
-  [ORDER_TYPE.DELIVERY]: "Delivery",
-};
-
-const ORDER_TYPE_ICON = {
-  [ORDER_TYPE.TAKEAWAY]: ShoppingBag,
-  [ORDER_TYPE.DELIVERY]: Bike,
-};
-
-const ORDER_TYPE_BADGE = {
-  [ORDER_TYPE.TAKEAWAY]: "bg-neutral-100 text-neutral-700",
-  [ORDER_TYPE.DELIVERY]: "bg-sky-50 text-sky-800",
-};
 
 // Visible labels of the status moves, keyed by target status; moves without
 // a label are icon-only ("Move to <status>").
@@ -54,14 +44,6 @@ const FORWARD_LABEL = {
 const BACK_LABEL = {
   [ORDER_STATUS.IN_PROGRESS]: "Reopen",
 };
-
-const formatStreet = (address) =>
-  [address?.street, address?.streetNumber].filter(Boolean).join(" ");
-
-const formatAddress = (address) =>
-  [formatStreet(address), [address?.postalCode, address?.city].filter(Boolean).join(" ")]
-    .filter(Boolean)
-    .join(", ");
 
 const countItems = (items = []) =>
   items.reduce((total, item) => total + (item.quantity ?? 0), 0);
@@ -98,24 +80,6 @@ function CustomerName({ loading, customer }) {
     <span className="truncate text-sm font-semibold text-neutral-900">
       {[customer.firstName, customer.lastName].filter(Boolean).join(" ")}
     </span>
-  );
-}
-
-function TicketItem({ item }) {
-  const details = [item.size, item.cookingLevel, ...(item.customizations ?? [])]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <li className="flex items-start justify-between gap-2 text-sm">
-      <div className="min-w-0">
-        <span className="font-medium">
-          {item.quantity} x {item.productName}
-        </span>
-        {details && <p className={`m-0 ${muted}`}>{details}</p>}
-      </div>
-      <span className="shrink-0 tabular-nums">{formatPrice(item.subtotal)}</span>
-    </li>
   );
 }
 
@@ -303,7 +267,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
             )}
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {(order.items ?? []).map((item, index) => (
-                <TicketItem key={`${item.productId}-${index}`} item={item} />
+                <OrderItemRow key={`${item.productId}-${index}`} item={item} />
               ))}
             </ul>
           </div>

@@ -2,10 +2,13 @@
 
 const pad = (value) => String(value).padStart(2, "0");
 
-// Default scheduled time: now + 30 minutes, as "HH:MM". Past midnight the
-// value wraps to the early hours while the Order stays on today's date.
+// Default scheduled time: now + 30 minutes, as "HH:MM". The Order is on
+// today's date, so after 23:29 the default is capped at 23:59 instead of
+// wrapping to the early hours (a time in the past for today).
 export const getDefaultScheduledTime = (now = new Date()) => {
   const date = new Date(now.getTime() + 30 * 60 * 1000);
+
+  if (date.getDate() !== now.getDate()) return "23:59";
 
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };

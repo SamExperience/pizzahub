@@ -4,7 +4,7 @@ import TicketSidebar from "../components/TicketSidebar";
 import { useStore } from "../contexts/StoreContext";
 import {
   cancelOrder,
-  getTodayRange,
+  getDayRange,
   subscribeToTodayOrders,
   updateOrderStatus,
 } from "../services/order.service";
@@ -57,7 +57,7 @@ export default function Tableau() {
     // The listener covers a fixed day range: renew it at midnight.
     const midnightTimer = setTimeout(
       () => setDayKey((key) => key + 1),
-      getTodayRange().end - Date.now(),
+      getDayRange().end - Date.now(),
     );
 
     return () => {
