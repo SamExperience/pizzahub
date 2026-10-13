@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -284,12 +285,39 @@ export const cancelOrder = async (orderId) => {
   });
 };
 
-// Current day in the device time zone: [start, end), end is tomorrow at 00:00.
-export const getTodayRange = (now = new Date()) => {
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+// Day of the given date (default today) in the device time zone: [start, end),
+// end is the next day at 00:00.
+export const getDayRange = (date = new Date()) => {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
   return { start, end };
+};
+
+// Query of the Orders created on a day for a Store, oldest first.
+const dayOrdersQuery = (storeId, date) => {
+  const { start, end } = getDayRange(date);
+
+  return query(
+    collection(db, "orders"),
+    where("storeId", "==", storeId),
+    where("createdAt", ">=", start),
+    where("createdAt", "<", end),
+    orderBy("createdAt"),
+  );
+};
+
+// Reads once the Orders created on a day for a Store, newest first; Cancelled
+// Orders are included (order history).
+export const getOrdersByDay = async (storeId, date) => {
+  if (!storeId) throw new Error("Store ID is required");
+
+  if (!(date instanceof Date) || Number.isNaN(date.getTime()))
+    throw new Error("Valid date is required");
+
+  const snapshot = await getDocs(dayOrdersQuery(storeId, date));
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).reverse();
 };
 
 // Listens to the Orders created today for a Store, oldest first; Cancelled
@@ -301,18 +329,8 @@ export const subscribeToTodayOrders = (storeId, onChange, onError) => {
   if (typeof onChange !== "function")
     throw new Error("onChange callback is required");
 
-  const { start, end } = getTodayRange();
-
-  const q = query(
-    collection(db, "orders"),
-    where("storeId", "==", storeId),
-    where("createdAt", ">=", start),
-    where("createdAt", "<", end),
-    orderBy("createdAt"),
-  );
-
   return onSnapshot(
-    q,
+    dayOrdersQuery(storeId, new Date()),
     (snapshot) => {
       onChange(
         snapshot.docs

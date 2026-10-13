@@ -70,4 +70,11 @@ export const statusStyles = {
     border: "border-l-green-400",
     count: "bg-green-100 text-green-800",
   },
+  Cancelled: {
+    badge: "bg-neutral-200 text-neutral-600",
+    dot: "bg-neutral-400",
+    accent: "border-t-neutral-300",
+    border: "border-l-neutral-300",
+    count: "bg-neutral-200 text-neutral-600",
+  },
 };

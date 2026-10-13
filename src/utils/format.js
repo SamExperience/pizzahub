@@ -10,3 +10,12 @@ export const formatTime = (timestamp) => {
 
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
+
+// Street and number of an address; empty string when missing.
+export const formatStreet = (address) =>
+  [address?.street, address?.streetNumber].filter(Boolean).join(" ");
+
+export const formatAddress = (address) =>
+  [formatStreet(address), [address?.postalCode, address?.city].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");

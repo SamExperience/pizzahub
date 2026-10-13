@@ -159,6 +159,14 @@ describe("TicketSidebar", () => {
     expect(time.value).toBe("13:15");
   });
 
+  it("caps the default scheduled time at 23:59 late in the evening", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 12, 23, 45));
+    render(<TicketSidebar onClose={vi.fn()} />);
+
+    expect(screen.getByLabelText("Pickup time").value).toBe("23:59");
+  });
+
   it("opens the menu panel from Add product and closes only the panel on Escape", async () => {
     const onClose = vi.fn();
     getMenuByStoreId.mockResolvedValue({ id: "menu-1" });

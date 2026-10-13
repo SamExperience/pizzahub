@@ -24,8 +24,11 @@ describe("getDefaultScheduledTime", () => {
     expect(getDefaultScheduledTime(new Date(2026, 9, 12, 8, 45))).toBe("09:15");
   });
 
-  it("wraps past midnight", () => {
-    expect(getDefaultScheduledTime(new Date(2026, 9, 12, 23, 50))).toBe("00:20");
+  it("caps the time at 23:59 instead of wrapping past midnight", () => {
+    expect(getDefaultScheduledTime(new Date(2026, 9, 12, 23, 29))).toBe("23:59");
+    expect(getDefaultScheduledTime(new Date(2026, 9, 12, 23, 30))).toBe("23:59");
+    expect(getDefaultScheduledTime(new Date(2026, 9, 12, 23, 50))).toBe("23:59");
+    expect(getDefaultScheduledTime(new Date(2026, 9, 12, 23, 59, 30))).toBe("23:59");
   });
 });
 

@@ -5,6 +5,7 @@ const firestore = vi.hoisted(() => ({
   where: vi.fn((field, op, value) => ({ type: "where", field, op, value })),
   orderBy: vi.fn((field) => ({ type: "orderBy", field })),
   query: vi.fn((ref, ...constraints) => ({ ref, constraints })),
+  getDocs: vi.fn(),
   onSnapshot: vi.fn(),
   // doc(collectionRef) generates a new id; doc(db, name, id) points to a document.
   doc: vi.fn((parent, name, id) =>
@@ -29,7 +30,8 @@ import {
   cancelOrder,
   createOrder,
   editRestrictedItem,
-  getTodayRange,
+  getDayRange,
+  getOrdersByDay,
   reconfigureItem,
   sortColumnOrders,
   subscribeToTodayOrders,
@@ -637,26 +639,119 @@ describe("order constants", () => {
   });
 });
 
-describe("getTodayRange", () => {
+describe("getDayRange", () => {
   it("returns local midnight today and tomorrow", () => {
-    const { start, end } = getTodayRange(new Date(2026, 9, 9, 15, 30, 45));
+    const { start, end } = getDayRange(new Date(2026, 9, 9, 15, 30, 45));
 
     expect(start).toEqual(new Date(2026, 9, 9, 0, 0, 0, 0));
     expect(end).toEqual(new Date(2026, 9, 10, 0, 0, 0, 0));
   });
 
   it("treats the last millisecond of the day as today", () => {
-    const { start, end } = getTodayRange(new Date(2026, 9, 9, 23, 59, 59, 999));
+    const { start, end } = getDayRange(new Date(2026, 9, 9, 23, 59, 59, 999));
 
     expect(start).toEqual(new Date(2026, 9, 9));
     expect(end).toEqual(new Date(2026, 9, 10));
   });
 
   it("rolls over month and year boundaries", () => {
-    const { start, end } = getTodayRange(new Date(2026, 11, 31, 12));
+    const { start, end } = getDayRange(new Date(2026, 11, 31, 12));
 
     expect(start).toEqual(new Date(2026, 11, 31));
     expect(end).toEqual(new Date(2027, 0, 1));
+  });
+});
+
+describe("getDayRange", () => {
+  it("defaults to today", () => {
+    const { start } = getDayRange();
+    const now = new Date();
+
+    expect(start).toEqual(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+    );
+  });
+});
+
+describe("getOrdersByDay", () => {
+  it("queries the Store's orders created on the given day", async () => {
+    firestore.getDocs.mockResolvedValue({ docs: [] });
+
+    await getOrdersByDay("store-1", new Date(2026, 9, 5, 18, 30));
+
+    const [ref, storeFilter, fromFilter, toFilter, order] =
+      firestore.query.mock.calls[0];
+
+    expect(ref).toEqual({ collectionName: "orders" });
+    expect(storeFilter).toMatchObject({
+      field: "storeId",
+      op: "==",
+      value: "store-1",
+    });
+    expect(fromFilter).toMatchObject({
+      field: "createdAt",
+      op: ">=",
+      value: new Date(2026, 9, 5),
+    });
+    expect(toFilter).toMatchObject({
+      field: "createdAt",
+      op: "<",
+      value: new Date(2026, 9, 6),
+    });
+    expect(order).toEqual({ type: "orderBy", field: "createdAt" });
+    expect(firestore.getDocs).toHaveBeenCalledTimes(1);
+    expect(firestore.onSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("returns plain orders newest first, Cancelled included", async () => {
+    firestore.getDocs.mockResolvedValue({
+      docs: [
+        { id: "o1", data: () => ({ status: "Completed" }) },
+        { id: "o2", data: () => ({ status: "Cancelled" }) },
+        { id: "o3", data: () => ({ status: "Pending" }) },
+      ],
+    });
+
+    const orders = await getOrdersByDay("store-1", new Date(2026, 9, 5));
+
+    expect(orders).toEqual([
+      { id: "o3", status: "Pending" },
+      { id: "o2", status: "Cancelled" },
+      { id: "o1", status: "Completed" },
+    ]);
+  });
+
+  it("returns an empty list when there are no orders", async () => {
+    firestore.getDocs.mockResolvedValue({ docs: [] });
+
+    await expect(
+      getOrdersByDay("store-1", new Date(2026, 9, 5)),
+    ).resolves.toEqual([]);
+  });
+
+  it("propagates read errors", async () => {
+    firestore.getDocs.mockRejectedValue(new Error("permission-denied"));
+
+    await expect(
+      getOrdersByDay("store-1", new Date(2026, 9, 5)),
+    ).rejects.toThrow("permission-denied");
+  });
+
+  it("rejects a missing Store ID", async () => {
+    await expect(getOrdersByDay("", new Date())).rejects.toThrow(
+      "Store ID is required",
+    );
+    expect(firestore.getDocs).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing or invalid date", async () => {
+    await expect(getOrdersByDay("store-1")).rejects.toThrow(
+      "Valid date is required",
+    );
+    await expect(
+      getOrdersByDay("store-1", new Date("not a date")),
+    ).rejects.toThrow("Valid date is required");
+    expect(firestore.getDocs).not.toHaveBeenCalled();
   });
 });
 
