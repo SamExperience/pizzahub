@@ -1,3 +1,13 @@
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Pencil,
+  Plus,
+  Trash2,
+  UtensilsCrossed,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   createProduct,
@@ -12,13 +22,17 @@ import {
 import { formatPrice } from "../utils/format";
 import {
   alert,
+  badge,
   button,
-  card,
-  dangerButton,
   muted,
   primaryButton,
+  sectionTitle,
 } from "../utils/styles";
 import ProductForm from "./ProductForm";
+
+// Square 40px icon action for product rows.
+const actionButton =
+  "inline-flex size-10 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40";
 
 // Single price, or one "Size: price" entry per size (decision A1).
 const formatPricing = ({ price, sizes }) =>
@@ -41,83 +55,111 @@ function ProductRow({
     if (window.confirm(`Delete "${product.name}"?`)) onDelete(product.id);
   };
 
+  const toggleLabel = `${available ? "Mark unavailable" : "Mark available"} ${product.name}`;
+
   return (
-    <li className={`${card} flex gap-4 ${available ? "" : "opacity-70"}`}>
-      {product.imageUrl && (
+    <li
+      className={`flex gap-3 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-4 ${
+        available ? "" : "opacity-80"
+      }`}
+    >
+      {product.imageUrl ? (
         <img
           src={product.imageUrl}
           alt={product.name}
-          className="size-20 shrink-0 rounded-lg object-cover"
+          className="size-16 shrink-0 rounded-lg object-cover sm:size-20"
         />
+      ) : (
+        <div
+          className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-400 sm:size-20"
+          aria-hidden="true"
+        >
+          <UtensilsCrossed className="size-6" />
+        </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <strong className="text-base font-semibold text-neutral-900">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-3">
+          <strong className="min-w-0 text-base font-semibold text-neutral-900">
             {product.name}
           </strong>{" "}
-          <span className="text-sm font-medium text-brand-700">
+          <span className="shrink-0 text-right text-sm font-semibold tabular-nums text-brand-700">
             {formatPricing(product)}
           </span>
-          {!available && (
-            <em className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700">
-              Unavailable
-            </em>
-          )}
         </div>
         {product.description && (
-          <p className="text-sm text-neutral-700">
+          <p className="m-0 line-clamp-2 text-sm text-neutral-500">
             {product.description}
           </p>
         )}
         {Array.isArray(product.ingredients) &&
           product.ingredients.length > 0 && (
-            <p className={muted}>
+            <p className="m-0 text-xs text-neutral-500">
               Ingredients: {product.ingredients.join(", ")}
             </p>
           )}
-        <div className="flex flex-wrap gap-2 pt-1">
-          <button
-            type="button"
-            aria-label={`Move ${product.name} up`}
-            className={button}
-            disabled={isFirst}
-            onClick={() => onMove(product.id, "up")}
-          >
-            Up
-          </button>
-          <button
-            type="button"
-            aria-label={`Move ${product.name} down`}
-            className={button}
-            disabled={isLast}
-            onClick={() => onMove(product.id, "down")}
-          >
-            Down
-          </button>
-          <button
-            type="button"
-            aria-label={`Edit ${product.name}`}
-            className={button}
-            onClick={() => onEdit(product.id)}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            aria-label={`${available ? "Mark unavailable" : "Mark available"} ${product.name}`}
-            className={button}
-            onClick={() => onToggleAvailability(product.id, !available)}
-          >
-            {available ? "Mark unavailable" : "Mark available"}
-          </button>
-          <button
-            type="button"
-            aria-label={`Delete ${product.name}`}
-            className={dangerButton}
-            onClick={handleDelete}
-          >
-            Delete
-          </button>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+          {available ? (
+            <span className={`${badge} bg-green-100 text-green-800`}>
+              Available
+            </span>
+          ) : (
+            <span className={`${badge} bg-amber-100 text-amber-800`}>
+              Unavailable
+            </span>
+          )}
+          <div className="-mr-1 flex flex-wrap items-center">
+            <button
+              type="button"
+              aria-label={`Move ${product.name} up`}
+              title={`Move ${product.name} up`}
+              className={actionButton}
+              disabled={isFirst}
+              onClick={() => onMove(product.id, "up")}
+            >
+              <ChevronUp className="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Move ${product.name} down`}
+              title={`Move ${product.name} down`}
+              className={actionButton}
+              disabled={isLast}
+              onClick={() => onMove(product.id, "down")}
+            >
+              <ChevronDown className="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              className={actionButton}
+              onClick={() => onToggleAvailability(product.id, !available)}
+            >
+              {available ? (
+                <EyeOff className="size-4" aria-hidden="true" />
+              ) : (
+                <Eye className="size-4" aria-hidden="true" />
+              )}
+            </button>
+            <button
+              type="button"
+              aria-label={`Edit ${product.name}`}
+              title={`Edit ${product.name}`}
+              className={actionButton}
+              onClick={() => onEdit(product.id)}
+            >
+              <Pencil className="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Delete ${product.name}`}
+              title={`Delete ${product.name}`}
+              className={`${actionButton} hover:bg-red-50 hover:text-red-600`}
+              onClick={handleDelete}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </li>
@@ -256,13 +298,14 @@ export default function ProductList({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="m-0 truncate text-2xl font-semibold">{categoryName}</h2>
+        <h2 className={`${sectionTitle} m-0 min-w-0 truncate`}>{categoryName}</h2>
         {!loading && !error && !showForm && editingId === null && (
           <button
             type="button"
-            className={primaryButton}
+            className={`${primaryButton} min-h-10`}
             onClick={() => setShowForm(true)}
           >
+            <Plus className="size-4" aria-hidden="true" />
             Add product
           </button>
         )}
@@ -290,10 +333,10 @@ export default function ProductList({
         </p>
       )}
       {!loading && !error && products.length > 0 && (
-        <ul className="flex flex-col gap-3">
+        <ul className="grid gap-3 xl:grid-cols-2">
           {products.map((product, index) =>
             product.id === editingId ? (
-              <li key={product.id}>
+              <li key={product.id} className="xl:col-span-2">
                 <ProductForm
                   product={product}
                   onSubmit={handleUpdate}

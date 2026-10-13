@@ -1,5 +1,10 @@
+import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
+import { button, input, muted, primaryButton } from "../utils/styles";
+
+// Icon action that reads on both the mobile chip (brand-600) and the desktop row.
+const actionButton =
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-40 md:size-9 md:rounded-lg md:text-neutral-500 md:hover:bg-brand-100 md:hover:text-brand-800 md:focus-visible:ring-brand-500/40";
 
 // `onRename` resolves to true when the category was saved.
 function CategoryRow({
@@ -38,7 +43,7 @@ function CategoryRow({
 
   if (editing) {
     return (
-      <li className="rounded-lg bg-neutral-50 p-2">
+      <li className="w-72 max-w-full shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 p-2 md:w-auto">
         <form onSubmit={handleSave} className="flex flex-col gap-2">
           <input
             type="text"
@@ -68,57 +73,66 @@ function CategoryRow({
     );
   }
 
+  // Actions are shown for the selected category only: pick one to manage it.
   return (
     <li
-      className={`rounded-lg p-1 ${
+      className={`flex shrink-0 items-center rounded-full border md:flex-wrap md:rounded-lg md:border-0 ${
         isSelected
-          ? "bg-brand-50"
-          : "hover:bg-neutral-50"
+          ? "border-brand-600 bg-brand-600 text-white md:bg-brand-50 md:text-brand-700"
+          : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 md:border-transparent md:bg-transparent"
       }`}
     >
       <button
         type="button"
         aria-label={`Select ${category.name}`}
         aria-current={isSelected ? "true" : undefined}
-        className="w-full truncate rounded-md px-2 py-1.5 text-left text-sm font-medium text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:text-brand-700"
+        className="min-h-10 max-w-48 truncate rounded-full px-4 text-left text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 md:max-w-none md:flex-1 md:basis-full md:rounded-lg md:px-3"
         onClick={() => onSelect(category.id)}
       >
         {category.name}
-      </button>{" "}
-      <div className="flex flex-wrap gap-0.5 px-1">
+      </button>
+      <div
+        className={`items-center pr-1 md:basis-full md:px-1 md:pb-1 ${
+          isSelected ? "flex" : "hidden"
+        }`}
+      >
         <button
           type="button"
           aria-label={`Move ${category.name} up`}
-          className={ghostButton}
+          title={`Move ${category.name} up`}
+          className={actionButton}
           disabled={isFirst}
           onClick={() => onMove(category.id, "up")}
         >
-          Up
+          <ChevronUp className="size-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           aria-label={`Move ${category.name} down`}
-          className={ghostButton}
+          title={`Move ${category.name} down`}
+          className={actionButton}
           disabled={isLast}
           onClick={() => onMove(category.id, "down")}
         >
-          Down
+          <ChevronDown className="size-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           aria-label={`Edit ${category.name}`}
-          className={ghostButton}
+          title={`Edit ${category.name}`}
+          className={actionButton}
           onClick={startEditing}
         >
-          Edit
+          <Pencil className="size-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           aria-label={`Delete ${category.name}`}
-          className={ghostButton}
+          title={`Delete ${category.name}`}
+          className={`${actionButton} md:hover:bg-red-50 md:hover:text-red-600`}
           onClick={handleDelete}
         >
-          Delete
+          <Trash2 className="size-4" aria-hidden="true" />
         </button>
       </div>
     </li>
@@ -137,8 +151,9 @@ export default function CategoryList({
     return <p className={muted}>No categories yet.</p>;
   }
 
+  // One list: a scrollable chip bar below md, a column from md.
   return (
-    <ol className="flex flex-col gap-1">
+    <ol className="flex flex-row gap-2 overflow-x-auto pb-1 md:flex-col md:gap-1 md:overflow-visible md:pb-0">
       {categories.map((category, index) => (
         <CategoryRow
           key={category.id}
