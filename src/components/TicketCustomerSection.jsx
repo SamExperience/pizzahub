@@ -89,7 +89,7 @@ export default function TicketCustomerSection({
         {searching && !loading && !error && (
           <ul
             aria-label="Matching customers"
-            className="m-0 mt-1 max-h-48 list-none divide-y divide-neutral-200 overflow-y-auto rounded-lg border border-neutral-200 p-0 dark:divide-neutral-800 dark:border-neutral-800"
+            className="m-0 mt-1 max-h-48 list-none divide-y divide-neutral-200 overflow-y-auto rounded-lg border border-neutral-200 p-0"
           >
             {results.length === 0 && (
               <li className={`${muted} px-3 py-2`}>
@@ -100,7 +100,7 @@ export default function TicketCustomerSection({
               <li key={customer.id}>
                 <button
                   type="button"
-                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 focus:outline-none focus-visible:bg-neutral-100 dark:hover:bg-neutral-800 dark:focus-visible:bg-neutral-800"
+                  className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 focus:outline-none focus-visible:bg-neutral-100"
                   onClick={() => onSelect(customer)}
                 >
                   <span className="font-medium">{customer.firstName}</span>

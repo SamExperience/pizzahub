@@ -52,20 +52,20 @@ function ProductRow({
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <strong className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          <strong className="text-base font-semibold text-neutral-900">
             {product.name}
           </strong>{" "}
-          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+          <span className="text-sm font-medium text-brand-700">
             {formatPricing(product)}
           </span>
           {!available && (
-            <em className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+            <em className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700">
               Unavailable
             </em>
           )}
         </div>
         {product.description && (
-          <p className="text-sm text-neutral-700 dark:text-neutral-300">
+          <p className="text-sm text-neutral-700">
             {product.description}
           </p>
         )}
@@ -284,7 +284,7 @@ export default function ProductList({
       )}
       {!loading && !error && products.length === 0 && (
         <p
-          className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center dark:border-neutral-700 ${muted}`}
+          className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`}
         >
           No products in this category yet.
         </p>

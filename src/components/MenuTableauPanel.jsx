@@ -19,7 +19,7 @@ function ProductCard({ product, onSelect }) {
       <button
         type="button"
         disabled={!available}
-        className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white text-left shadow-sm transition-colors hover:border-purple-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-purple-500 dark:disabled:hover:border-neutral-800"
+        className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white text-left shadow-sm transition-colors hover:border-brand-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200"
         onClick={() => onSelect(product)}
       >
         {product.imageUrl && (
@@ -30,14 +30,14 @@ function ProductCard({ product, onSelect }) {
           />
         )}
         <div className="flex flex-1 flex-col gap-1 p-3">
-          <strong className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          <strong className="text-sm font-semibold text-neutral-900">
             {product.name}
           </strong>
-          <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+          <span className="text-sm font-medium text-brand-700">
             {formatCardPrice(product)}
           </span>
           {!available && (
-            <em className="w-fit rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+            <em className="w-fit rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700">
               Unavailable
             </em>
           )}
@@ -127,15 +127,15 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const emptyBox = `rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center dark:border-neutral-700 ${muted}`;
+  const emptyBox = `rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`;
 
   return (
     <section
       role="dialog"
       aria-label="Add product"
-      className="absolute inset-y-0 left-0 right-0 z-10 flex flex-col bg-neutral-50 text-left shadow-xl md:right-[28rem] dark:bg-neutral-950"
+      className="absolute inset-y-0 left-0 right-0 z-10 flex flex-col bg-neutral-50 text-left shadow-xl md:right-[28rem]"
     >
-      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900">
+      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
         <h2 className="m-0 text-xl font-semibold">Add product</h2>
         <button
           type="button"
@@ -168,7 +168,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         <div className="grid min-h-0 flex-1 grid-cols-[10rem_1fr] sm:grid-cols-[14rem_1fr]">
           <nav
             aria-label="Categories"
-            className="overflow-y-auto border-r border-neutral-200 bg-white p-2 dark:border-neutral-800 dark:bg-neutral-900"
+            className="overflow-y-auto border-r border-neutral-200 bg-white p-2"
           >
             <ul className="m-0 flex list-none flex-col gap-1 p-0">
               {categories.map((category) => (
@@ -178,7 +178,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
                     aria-current={
                       category.id === categoryId ? "true" : undefined
                     }
-                    className="w-full rounded-lg px-3 py-3 text-left text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 aria-[current=true]:bg-purple-600 aria-[current=true]:text-white dark:text-neutral-100 dark:hover:bg-neutral-800"
+                    className="w-full rounded-lg px-3 py-3 text-left text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:bg-brand-600 aria-[current=true]:text-white"
                     onClick={() => setSelectedCategoryId(category.id)}
                   >
                     {category.name}

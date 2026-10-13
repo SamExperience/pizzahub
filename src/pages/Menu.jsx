@@ -141,7 +141,7 @@ export default function Menu() {
               />
             ) : (
               <p
-                className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center dark:border-neutral-700 ${muted}`}
+                className={`rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center ${muted}`}
               >
                 Create a category to start adding products.
               </p>

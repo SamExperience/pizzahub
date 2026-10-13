@@ -2,6 +2,7 @@ import { useStore } from "../contexts/StoreContext";
 import StoreCard from "../components/StoreCard";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
+import { pageTitle } from "../utils/styles";
 
 export default function StoreSelection() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function StoreSelection() {
 
   return (
     <div>
-      <h1>Store Selection</h1>
+      <h1 className={pageTitle}>Store Selection</h1>
       {errorStore && (
         <p>
           Unable to load your store.

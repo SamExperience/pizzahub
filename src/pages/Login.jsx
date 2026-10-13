@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { register, login } from "../services/auth.service";
 import { loginWithGoogle } from "../services/auth.service";
+import { pageTitle } from "../utils/styles";
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
@@ -35,7 +36,7 @@ export default function Login() {
   return (
     <main>
       <section id="login">
-        <h1>{isSignup ? "Sign up" : "Log in"}</h1>
+        <h1 className={pageTitle}>{isSignup ? "Sign up" : "Log in"}</h1>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <label htmlFor="email">Email</label>
@@ -106,7 +107,7 @@ export default function Login() {
           {!isSignup && "Login with google"}
           <button
             onClick={handleLoginWithGoogle}
-            className="flex items-center gap-3 rounded-full border border-neutral-200 bg-white px-6 py-3 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="flex items-center gap-3 rounded-full border border-neutral-200 bg-white px-6 py-3 text-sm font-medium text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
               <path

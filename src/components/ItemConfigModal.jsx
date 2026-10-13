@@ -8,7 +8,7 @@ import { formatPrice } from "../utils/format";
 import { button, ghostButton, input, muted, primaryButton } from "../utils/styles";
 
 const pillBase =
-  "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400";
+  "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400";
 
 // Item configuration step of the ticket creation. Step 1 (only when the
 // product has sizes) picks the size; step 2 picks cooking level,
@@ -87,8 +87,8 @@ export default function ItemConfigModal({
   const pill = (selected) =>
     `${pillBase} ${
       selected
-        ? "border-purple-600 bg-purple-600 text-white dark:border-purple-500 dark:bg-purple-500"
-        : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+        ? "border-brand-600 bg-brand-600 text-white"
+        : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
     }`;
 
   return (
@@ -101,9 +101,9 @@ export default function ItemConfigModal({
       <section
         role="dialog"
         aria-label={`Configure ${name}`}
-        className="relative flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white text-left shadow-xl dark:bg-neutral-900"
+        className="relative flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white text-left shadow-xl"
       >
-        <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3">
           <div className="flex min-w-0 items-center gap-2">
             {sizes.length > 0 && !choosingSize && (
               <button
@@ -137,11 +137,11 @@ export default function ItemConfigModal({
                 <li key={item.name}>
                   <button
                     type="button"
-                    className="flex h-full w-full flex-col items-center gap-1 rounded-xl border border-neutral-200 bg-white px-3 py-5 text-center transition-colors hover:border-purple-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-purple-500"
+                    className="flex h-full w-full flex-col items-center gap-1 rounded-xl border border-neutral-200 bg-white px-3 py-5 text-center transition-colors hover:border-brand-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
                     onClick={() => setSize(item.name)}
                   >
                     <strong className="text-base font-semibold">{item.name}</strong>
-                    <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                    <span className="text-sm font-medium text-brand-700">
                       {/* The Item's own size keeps its saved price. */}
                       {formatPrice(
                         item.name === initialItem?.size ? initialItem.unitPrice : item.price,
@@ -165,7 +165,7 @@ export default function ItemConfigModal({
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
-                  <p className="m-0 text-sm text-amber-700 dark:text-amber-300">
+                  <p className="m-0 text-sm text-amber-700">
                     This product is no longer sellable: only the customizations can
                     change and the quantity can only be lowered.
                   </p>
@@ -221,7 +221,7 @@ export default function ItemConfigModal({
                     {customizations.map((text, index) => (
                       <li
                         key={`${text}-${index}`}
-                        className="flex items-center gap-1 rounded-full bg-purple-100 py-1 pr-1 pl-3 text-sm text-purple-800 dark:bg-purple-950 dark:text-purple-200"
+                        className="flex items-center gap-1 rounded-full bg-brand-100 py-1 pr-1 pl-3 text-sm text-brand-800"
                       >
                         {text}
                         <button
@@ -269,7 +269,7 @@ export default function ItemConfigModal({
               </div>
             </div>
 
-            <footer className="border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <footer className="border-t border-neutral-200 px-4 py-3">
               <button
                 type="button"
                 className={`${primaryButton} w-full py-2.5`}

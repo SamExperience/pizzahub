@@ -43,14 +43,14 @@ export default function TicketSummary({
             return (
               <li
                 key={`${item.productId}-${index}`}
-                className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700"
+                className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3"
               >
                 <div className="flex items-start justify-between gap-2 text-sm">
                   <div className="min-w-0">
                     <span className="font-medium">{item.productName}</span>
                     {details && <p className={`m-0 ${muted}`}>{details}</p>}
                     {statusLabel && (
-                      <em className="mt-1 block w-fit rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                      <em className="mt-1 block w-fit rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700">
                         {statusLabel}
                       </em>
                     )}
@@ -113,7 +113,7 @@ export default function TicketSummary({
           })}
         </ul>
       )}
-      <div className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-3 text-base dark:border-neutral-700">
+      <div className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-3 text-base">
         <span className="font-medium">Total</span>
         <strong aria-label="Total">{formatPrice(calculateOrderTotal(items))}</strong>
       </div>

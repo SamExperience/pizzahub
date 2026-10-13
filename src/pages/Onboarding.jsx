@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { createOnboardingWorkspace } from "../services/onboarding.service";
+import { pageTitle } from "../utils/styles";
 
 const initialFormData = {
   companyName: "",
@@ -56,7 +57,7 @@ export default function Onboarding() {
 
   return (
     <div>
-      <h1>Onboarding</h1>
+      <h1 className={pageTitle}>Onboarding</h1>
 
 
       <main>

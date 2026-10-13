@@ -38,7 +38,7 @@ function CategoryRow({
 
   if (editing) {
     return (
-      <li className="rounded-lg bg-neutral-50 p-2 dark:bg-neutral-800/50">
+      <li className="rounded-lg bg-neutral-50 p-2">
         <form onSubmit={handleSave} className="flex flex-col gap-2">
           <input
             type="text"
@@ -72,15 +72,15 @@ function CategoryRow({
     <li
       className={`rounded-lg p-1 ${
         isSelected
-          ? "bg-purple-50 dark:bg-purple-950/40"
-          : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+          ? "bg-brand-50"
+          : "hover:bg-neutral-50"
       }`}
     >
       <button
         type="button"
         aria-label={`Select ${category.name}`}
         aria-current={isSelected ? "true" : undefined}
-        className="w-full truncate rounded-md px-2 py-1.5 text-left text-sm font-medium text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 aria-[current=true]:text-purple-700 dark:text-neutral-100 dark:aria-[current=true]:text-purple-300"
+        className="w-full truncate rounded-md px-2 py-1.5 text-left text-sm font-medium text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:text-brand-700"
         onClick={() => onSelect(category.id)}
       >
         {category.name}

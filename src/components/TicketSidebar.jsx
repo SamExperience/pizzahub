@@ -299,9 +299,9 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       <aside
         role="dialog"
         aria-label={isEdit ? "Edit ticket" : "Create ticket"}
-        className="relative flex h-full w-full max-w-md flex-col bg-white text-left shadow-xl dark:bg-neutral-900"
+        className="relative flex h-full w-full max-w-md flex-col bg-white text-left shadow-xl"
       >
-        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <h2 className="m-0 text-xl font-semibold">
             {isEdit ? "Edit Ticket" : "Create Ticket"}
           </h2>
@@ -323,10 +323,10 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
               {ORDER_TYPE_OPTIONS.map(({ value, label }) => (
                 <label
                   key={value}
-                  className={`cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-purple-400 ${
+                  className={`cursor-pointer rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
                     orderType === value
-                      ? "border-purple-600 bg-purple-600 text-white dark:border-purple-500 dark:bg-purple-500"
-                      : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                      ? "border-brand-600 bg-brand-600 text-white"
+                      : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
                   }`}
                 >
                   <input
@@ -411,7 +411,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           )}
         </div>
 
-        <footer className="flex justify-end gap-2 border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <footer className="flex justify-end gap-2 border-t border-neutral-200 px-4 py-3">
           <button type="button" className={button} disabled={saving} onClick={onClose}>
             Cancel
           </button>

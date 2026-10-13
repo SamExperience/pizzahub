@@ -11,11 +11,11 @@ import {
 const EMPTY_SIZE = { name: "", price: "" };
 
 const fieldLabel =
-  "flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300";
+  "flex flex-col gap-1 text-sm font-medium text-neutral-700";
 const fieldsetClass =
-  "flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700";
+  "flex flex-col gap-2 rounded-lg border border-neutral-200 p-3";
 const legendClass =
-  "px-1 text-sm font-medium text-neutral-700 dark:text-neutral-300";
+  "px-1 text-sm font-medium text-neutral-700";
 
 const isValidPrice = (value) =>
   value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -284,22 +284,22 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           type="file"
           accept="image/*"
           aria-label="Product image"
-          className="text-sm text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 dark:text-neutral-400 dark:file:bg-neutral-800 dark:file:text-neutral-200"
+          className="text-sm text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200"
           onChange={(event) => setImageFile(event.target.files[0] ?? null)}
         />
       </fieldset>
 
-      <label className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+      <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
         <input
           type="checkbox"
-          className="size-4 accent-purple-600"
+          className="size-4 accent-brand-600"
           checked={isAvailable}
           onChange={(event) => setIsAvailable(event.target.checked)}
         />
         Available
       </label>
 
-      <div className="flex justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+      <div className="flex justify-end gap-2 border-t border-neutral-200 pt-4">
         <button type="button" className={button} onClick={onCancel}>
           Cancel
         </button>

@@ -119,7 +119,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
   };
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
+    <article className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-3">
       <header className="flex items-center justify-between gap-2 text-sm font-semibold">
         <span>{ORDER_TYPE_LABEL[order.orderType] ?? order.orderType}</span>
         <time>{formatTime(order.scheduledTime)}</time>
@@ -130,8 +130,8 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
           <TicketItem key={`${item.productId}-${index}`} item={item} />
         ))}
       </ul>
-      <footer className="flex items-center justify-between gap-2 border-t border-neutral-200 pt-2 text-sm dark:border-neutral-700">
-        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+      <footer className="flex items-center justify-between gap-2 border-t border-neutral-200 pt-2 text-sm">
+        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
           {order.status}
         </span>
         <strong>{formatPrice(order.total)}</strong>
