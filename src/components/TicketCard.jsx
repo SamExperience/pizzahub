@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  Bike,
   Ban,
   ChevronDown,
   ChevronLeft,
@@ -20,6 +19,11 @@ import {
 } from "../services/order.service";
 import { formatPrice, formatTime } from "../utils/format";
 import {
+  ORDER_TYPE_BADGE,
+  ORDER_TYPE_ICON,
+  ORDER_TYPE_LABEL,
+} from "../utils/orderType";
+import {
   alert,
   badge,
   button,
@@ -28,21 +32,6 @@ import {
   primaryButton,
   statusStyles,
 } from "../utils/styles";
-
-const ORDER_TYPE_LABEL = {
-  [ORDER_TYPE.TAKEAWAY]: "Takeaway",
-  [ORDER_TYPE.DELIVERY]: "Delivery",
-};
-
-const ORDER_TYPE_ICON = {
-  [ORDER_TYPE.TAKEAWAY]: ShoppingBag,
-  [ORDER_TYPE.DELIVERY]: Bike,
-};
-
-const ORDER_TYPE_BADGE = {
-  [ORDER_TYPE.TAKEAWAY]: "bg-neutral-100 text-neutral-700",
-  [ORDER_TYPE.DELIVERY]: "bg-sky-50 text-sky-800",
-};
 
 // Visible labels of the status moves, keyed by target status; moves without
 // a label are icon-only ("Move to <status>").
