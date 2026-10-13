@@ -1,21 +1,20 @@
+import { Plus, X } from "lucide-react";
 import { useState } from "react";
-import {
-  button,
-  card,
-  ghostButton,
-  input,
-  muted,
-  primaryButton,
-} from "../utils/styles";
+import { button, card, input, muted, primaryButton } from "../utils/styles";
 
 const EMPTY_SIZE = { name: "", price: "" };
 
 const fieldLabel =
-  "flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300";
+  "flex flex-col gap-1 text-sm font-medium text-neutral-700";
 const fieldsetClass =
-  "flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700";
-const legendClass =
-  "px-1 text-sm font-medium text-neutral-700 dark:text-neutral-300";
+  "m-0 flex min-w-0 flex-col gap-3 border-0 p-0";
+const sectionClass = "border-t border-neutral-200 pt-4";
+const legendClass = "mb-3 p-0 text-sm font-semibold text-neutral-900";
+const fieldInput = `${input} min-h-10`;
+// Square 40px icon button for removing a row.
+const removeButton =
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
+const addButton = `${button} min-h-10 self-start`;
 
 const isValidPrice = (value) =>
   value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -30,14 +29,15 @@ const cleanList = (items) => {
 // Repeatable text inputs with an add and a remove button.
 function TextListField({ legend, itemLabel, addLabel, items, onChange }) {
   return (
+    <div className={sectionClass}>
     <fieldset className={fieldsetClass}>
       <legend className={legendClass}>{legend}</legend>
       {items.map((item, index) => (
-        <div key={index} className="flex gap-2">
+        <div key={index} className="flex min-w-0 items-center gap-2">
           <input
             type="text"
             aria-label={`${itemLabel} ${index + 1}`}
-            className={input}
+            className={fieldInput}
             value={item}
             onChange={(event) =>
               onChange(
@@ -50,21 +50,24 @@ function TextListField({ legend, itemLabel, addLabel, items, onChange }) {
           <button
             type="button"
             aria-label={`Remove ${itemLabel.toLowerCase()} ${index + 1}`}
-            className={ghostButton}
+            title={`Remove ${itemLabel.toLowerCase()} ${index + 1}`}
+            className={removeButton}
             onClick={() => onChange(items.filter((_, i) => i !== index))}
           >
-            Remove
+            <X className="size-4" aria-hidden="true" />
           </button>
         </div>
       ))}
       <button
         type="button"
-        className={`${button} self-start`}
+        className={addButton}
         onClick={() => onChange([...items, ""])}
       >
+        <Plus className="size-4" aria-hidden="true" />
         {addLabel}
       </button>
     </fieldset>
+    </div>
   );
 }
 
@@ -146,47 +149,53 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className={`${card} flex flex-col gap-4`}>
-      <label className={fieldLabel}>
-        Name
-        <input
-          type="text"
-          className={input}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className={fieldLabel}>
-        Description
-        <textarea
-          rows={2}
-          className={input}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-      </label>
-
-      {!hasSizes && (
-        <label className={`${fieldLabel} sm:max-w-48`}>
-          Price
+      <fieldset className={fieldsetClass}>
+        <legend className={legendClass}>Basics</legend>
+        <label className={fieldLabel}>
+          Name
           <input
-            type="number"
-            min="0"
-            step="0.01"
-            className={input}
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
+            type="text"
+            className={fieldInput}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
           />
         </label>
-      )}
+        <label className={fieldLabel}>
+          Description
+          <textarea
+            rows={2}
+            className={input}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </label>
+        {!hasSizes && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={fieldLabel}>
+              Price
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={fieldInput}
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+              />
+            </label>
+          </div>
+        )}
+      </fieldset>
+
+      <div className={sectionClass}>
       <fieldset className={fieldsetClass}>
         <legend className={legendClass}>Sizes</legend>
         {sizes.map((size, index) => (
-          <div key={index} className="flex gap-2">
+          <div key={index} className="flex min-w-0 items-center gap-2">
             <input
               type="text"
               aria-label={`Size ${index + 1} name`}
               placeholder="Size"
-              className={input}
+              className={fieldInput}
               value={size.name}
               onChange={(event) => updateSize(index, "name", event.target.value)}
             />
@@ -196,7 +205,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
               step="0.01"
               aria-label={`Size ${index + 1} price`}
               placeholder="Price"
-              className={`${input} max-w-32`}
+              className={`${fieldInput} w-24! shrink-0 sm:w-28!`}
               value={size.price}
               onChange={(event) =>
                 updateSize(index, "price", event.target.value)
@@ -205,23 +214,26 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
             <button
               type="button"
               aria-label={`Remove size ${index + 1}`}
-              className={ghostButton}
+              title={`Remove size ${index + 1}`}
+              className={removeButton}
               onClick={() =>
                 setSizes((current) => current.filter((_, i) => i !== index))
               }
             >
-              Remove
+              <X className="size-4" aria-hidden="true" />
             </button>
           </div>
         ))}
         <button
           type="button"
-          className={`${button} self-start`}
+          className={addButton}
           onClick={() => setSizes((current) => [...current, EMPTY_SIZE])}
         >
+          <Plus className="size-4" aria-hidden="true" />
           Add size
         </button>
       </fieldset>
+      </div>
 
       <TextListField
         legend="Ingredients"
@@ -242,7 +254,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
         <label className={`${fieldLabel} sm:max-w-64`}>
           Default cooking level
           <select
-            className={input}
+            className={fieldInput}
             value={selectedDefault}
             onChange={(event) => setDefaultCookingLevel(event.target.value)}
           >
@@ -259,6 +271,22 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
         <p className={muted}>Required: choose the default cooking level.</p>
       )}
 
+      <div className={sectionClass}>
+      <fieldset className={fieldsetClass}>
+        <legend className={legendClass}>Availability</legend>
+        <label className="flex min-h-10 items-center gap-2 text-sm font-medium text-neutral-700">
+          <input
+            type="checkbox"
+            className="size-4 rounded accent-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1"
+            checked={isAvailable}
+            onChange={(event) => setIsAvailable(event.target.checked)}
+          />
+          Available
+        </label>
+      </fieldset>
+      </div>
+
+      <div className={sectionClass}>
       <fieldset className={fieldsetClass}>
         <legend className={legendClass}>Image</legend>
         {currentImageUrl && !imageFile && (
@@ -270,7 +298,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
             />
             <button
               type="button"
-              className={button}
+              className={`${button} min-h-10`}
               onClick={() => setRemoveImage(true)}
             >
               Remove image
@@ -284,26 +312,25 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           type="file"
           accept="image/*"
           aria-label="Product image"
-          className="text-sm text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 dark:text-neutral-400 dark:file:bg-neutral-800 dark:file:text-neutral-200"
+          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
           onChange={(event) => setImageFile(event.target.files[0] ?? null)}
         />
       </fieldset>
+      </div>
 
-      <label className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
-        <input
-          type="checkbox"
-          className="size-4 accent-purple-600"
-          checked={isAvailable}
-          onChange={(event) => setIsAvailable(event.target.checked)}
-        />
-        Available
-      </label>
-
-      <div className="flex justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-        <button type="button" className={button} onClick={onCancel}>
+      <div className="flex flex-col-reverse gap-2 border-t border-neutral-200 pt-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          className={`${button} min-h-11`}
+          onClick={onCancel}
+        >
           Cancel
         </button>
-        <button type="submit" className={primaryButton} disabled={!canSubmit}>
+        <button
+          type="submit"
+          className={`${primaryButton} min-h-11`}
+          disabled={!canSubmit}
+        >
           Save product
         </button>
       </div>

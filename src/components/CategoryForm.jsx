@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { input, primaryButton } from "../utils/styles";
 
@@ -15,20 +16,21 @@ export default function CategoryForm({ onSubmit }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       <input
         type="text"
         aria-label="New category name"
         placeholder="New category"
-        className={input}
+        className={`${input} min-h-10`}
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
       <button
         type="submit"
-        className={`${primaryButton} shrink-0`}
+        className={`${primaryButton} min-h-10 w-full`}
         disabled={!name.trim()}
       >
+        <Plus className="size-4" aria-hidden="true" />
         Add category
       </button>
     </form>

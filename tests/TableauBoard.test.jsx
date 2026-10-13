@@ -1,9 +1,20 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TableauBoard from "../src/components/TableauBoard";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
+
+// Product names of a column's tickets in display order (details expanded).
+const columnProducts = (title) => {
+  const column = within(screen.getByRole("heading", { name: title }).closest("section"));
+  column
+    .getAllByRole("button", { name: "Show details" })
+    .forEach((toggle) => fireEvent.click(toggle));
+  return column
+    .getAllByRole("article")
+    .map((article) => /1 x (\w+)/.exec(article.textContent)[1]);
+};
 
 describe("TableauBoard", () => {
   afterEach(() => {
@@ -67,14 +78,9 @@ describe("TableauBoard", () => {
       />,
     );
 
-    const names = (title) =>
-      within(screen.getByRole("heading", { name: title }).closest("section"))
-        .getAllByRole("article")
-        .map((article) => /1 x (\w+)/.exec(article.textContent)[1]);
-
-    expect(names("Pending")).toEqual(["Early", "Late"]);
-    expect(names("In progress")).toEqual(["Sooner", "Later"]);
-    expect(names("Completed")).toEqual(["Last", "First"]);
+    expect(columnProducts("Pending")).toEqual(["Early", "Late"]);
+    expect(columnProducts("In progress")).toEqual(["Sooner", "Later"]);
+    expect(columnProducts("Completed")).toEqual(["Last", "First"]);
   });
 
   it("keeps the received (creation) order inside a column when times are equal", () => {
@@ -94,14 +100,7 @@ describe("TableauBoard", () => {
       />,
     );
 
-    const pending = screen
-      .getByRole("heading", { name: "Pending" })
-      .closest("section");
-    const names = within(pending)
-      .getAllByRole("article")
-      .map((article) => /1 x (\w+)/.exec(article.textContent)[1]);
-
-    expect(names).toEqual(["First", "Second", "Third"]);
+    expect(columnProducts("Pending")).toEqual(["First", "Second", "Third"]);
   });
 
   it("shows only the loading message while loading", () => {
@@ -136,9 +135,7 @@ describe("TableauBoard", () => {
       />,
     );
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Move to In progress" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
     expect(onChangeStatus).toHaveBeenCalledWith(
       { id: "a", status: "Pending" },
       "In progress",
@@ -152,5 +149,28 @@ describe("TableauBoard", () => {
     expect(screen.getByText(/Unable to load the tickets/)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("shows mobile status tabs with counts and switches the selected tab", async () => {
+    render(
+      <TableauBoard
+        orders={[
+          { id: "a", status: "Pending" },
+          { id: "b", status: "Pending" },
+          { id: "c", status: "Completed" },
+        ]}
+      />,
+    );
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    expect(tabs[0].textContent).toBe("Pending2");
+    expect(tabs[2].textContent).toBe("Completed1");
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+
+    await userEvent.click(tabs[2]);
+
+    expect(tabs[2].getAttribute("aria-selected")).toBe("true");
+    expect(tabs[0].getAttribute("aria-selected")).toBe("false");
   });
 });
