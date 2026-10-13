@@ -421,7 +421,8 @@ describe("TicketSidebar item reconfiguration", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Water" }));
     await userEvent.click(await screen.findByRole("button", { name: "Increase quantity" }));
-    await userEvent.click(screen.getByRole("button", { name: "Update item · €4.00" }));
+    expect(screen.getByLabelText("Line total").textContent).toBe(formatPrice(4));
+    await userEvent.click(screen.getByRole("button", { name: "Update item" }));
 
     expect(screen.getAllByLabelText("Quantity of Water")).toHaveLength(1);
     expect(screen.getByLabelText("Quantity of Water").textContent).toBe("2");

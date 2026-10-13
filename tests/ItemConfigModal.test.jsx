@@ -151,13 +151,22 @@ describe("ItemConfigModal reconfiguration", () => {
   it("prefills the Item options and keeps the saved price for the same size", async () => {
     const { onAdd } = renderModal(PIZZA, { initialItem: ITEM });
 
-    expect(screen.getByRole("heading", { name: "Margherita · Small" })).toBeTruthy();
+    expect(screen.getByText("Edit item")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Margherita" })).toBeTruthy();
+    expect(
+      screen.getByText("Before: 2 x Margherita · Small · Rare · No basil · €10.00"),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Small/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "Rare" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("No basil")).toBeTruthy();
     expect(screen.getByLabelText("Quantity").textContent).toBe("2");
+    expect(screen.getByText("Saved price kept: €5.00 each")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to sizes" })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Medium" }));
-    await userEvent.click(screen.getByRole("button", { name: "Update item · €10.00" }));
+    expect(screen.getByLabelText("Line total").textContent).toBe("€10.00");
+    expect(screen.queryByLabelText("Before")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Update item" }));
 
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -174,14 +183,17 @@ describe("ItemConfigModal reconfiguration", () => {
   it("uses the current menu price when the size changes", async () => {
     const { onAdd } = renderModal(PIZZA, { initialItem: ITEM });
 
-    await userEvent.click(screen.getByRole("button", { name: "Back to sizes" }));
-
-    // The Item's own size shows its saved price, the others the menu price.
+    // The Item's own size shows its saved price and "before", the others the menu price.
     expect(screen.getByRole("button", { name: /Small/ }).textContent).toContain("€5.00");
+    expect(screen.getByRole("button", { name: /Small/ }).textContent).toContain("before");
     expect(screen.getByRole("button", { name: /Large/ }).textContent).toContain("€10.00");
 
     await userEvent.click(screen.getByRole("button", { name: /Large/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Update item · €20.00" }));
+
+    expect(screen.getByText("Size changed: new menu price €10.00 each")).toBeTruthy();
+    expect(screen.getByLabelText("Line total").textContent).toBe("€20.00");
+    expect(screen.getByLabelText("Before").textContent).toBe("€10.00");
+    await userEvent.click(screen.getByRole("button", { name: "Update item" }));
 
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining({ size: "Large", unitPrice: 10, subtotal: 20 }),
@@ -191,8 +203,9 @@ describe("ItemConfigModal reconfiguration", () => {
   it("asks for the size again when the Item's size is no longer offered", () => {
     renderModal(PIZZA, { initialItem: { ...ITEM, size: "Medium" } });
 
-    expect(screen.getByRole("button", { name: /Large/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Update item/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Large/ }).getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByText("Choose a size")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Update item" }).disabled).toBe(true);
   });
 
   it("allows only customizations and a lower quantity in restricted mode", async () => {
@@ -203,9 +216,11 @@ describe("ItemConfigModal reconfiguration", () => {
     });
 
     expect(screen.getByRole("dialog", { name: "Configure Margherita" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Margherita · Small" })).toBeTruthy();
-    expect(screen.getByText("Rare · €5.00 each")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Margherita" })).toBeTruthy();
     expect(screen.getByText(/no longer sellable/)).toBeTruthy();
+    expect(screen.getByText("Small").parentElement.textContent).toContain("(locked)");
+    expect(screen.getByText("Rare").parentElement.textContent).toContain("(locked)");
+    expect(screen.getByText("Saved price kept: €5.00 each · max 3")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Back to sizes" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Medium" })).toBeNull();
     expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(true);
@@ -214,7 +229,7 @@ describe("ItemConfigModal reconfiguration", () => {
     expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(false);
     await userEvent.click(screen.getByRole("button", { name: "Remove No basil" }));
     await userEvent.type(screen.getByLabelText("Customizations"), "Cut in 8{Enter}");
-    await userEvent.click(screen.getByRole("button", { name: "Update item · €10.00" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item" }));
 
     expect(onAdd).toHaveBeenCalledWith({
       ...ITEM,
@@ -222,6 +237,15 @@ describe("ItemConfigModal reconfiguration", () => {
       quantity: 2,
       subtotal: 10,
     });
+  });
+
+  it("closes from Cancel without updating the Item", async () => {
+    const { onAdd, onClose } = renderModal(PIZZA, { initialItem: ITEM });
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onClose).toHaveBeenCalled();
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it("falls back to the default cooking level when the Item's one is gone", () => {
