@@ -8,7 +8,7 @@ import {
   ORDER_TYPE_ICON,
   ORDER_TYPE_LABEL,
 } from "../utils/orderType";
-import { badge, card, muted, statusStyles } from "../utils/styles";
+import { badge, muted, statusStyles } from "../utils/styles";
 
 const fullName = (customer) =>
   [customer.firstName, customer.lastName].filter(Boolean).join(" ");
@@ -41,7 +41,7 @@ function OrderDetail({ id, order, customer, loadingCustomer }) {
   return (
     <div
       id={id}
-      className="grid gap-4 border-t border-neutral-100 px-3 pb-3 pt-3 md:grid-cols-2"
+      className="grid gap-4 border-t border-neutral-100 px-4 py-3 @xl:grid-cols-2 @xl:gap-8"
     >
       <ul aria-label="Items" className="m-0 flex list-none flex-col gap-2 p-0">
         {(order.items ?? []).map((item, index) => (
@@ -99,21 +99,21 @@ function OrderRow({ order, customers, expanded, onToggle }) {
   const TypeIcon = ORDER_TYPE_ICON[order.orderType] ?? ShoppingBag;
 
   return (
-    <li className={`${card} flex flex-col p-0 ${cancelled ? "opacity-60" : ""}`}>
+    <li className={`flex flex-col rounded-xl border border-neutral-200 bg-white shadow-sm ${cancelled ? "opacity-60" : ""}`}>
       <button
         type="button"
-        className="flex w-full flex-col gap-2 rounded-xl p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 sm:flex-row sm:items-center sm:gap-4"
+        className="flex w-full flex-col gap-2 rounded-xl px-4 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 @xl:flex-row @xl:items-center @xl:gap-4"
         aria-expanded={expanded}
         aria-controls={detailId}
         onClick={onToggle}
       >
-        <div className="flex min-w-0 items-baseline gap-2 sm:flex-1">
+        <div className="flex min-w-0 items-baseline gap-2 @xl:flex-1">
           <time className="shrink-0 text-lg font-bold tabular-nums text-neutral-900">
             {formatTime(order.createdAt)}
           </time>
           <CustomerName customers={customers} customerId={order.customerId} />
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 @xl:justify-end">
           <span
             className={`${badge} ${ORDER_TYPE_BADGE[order.orderType] ?? "bg-neutral-100 text-neutral-700"}`}
           >
@@ -125,7 +125,7 @@ function OrderRow({ order, customers, expanded, onToggle }) {
           >
             {order.status}
           </span>
-          <strong className="ml-auto text-base tabular-nums sm:ml-0 sm:w-20 sm:text-right">
+          <strong className="ml-auto text-base tabular-nums @xl:ml-0 @xl:w-20 @xl:text-right">
             {formatPrice(order.total)}
           </strong>
           <ChevronDown
@@ -152,7 +152,7 @@ export default function OrderHistoryList({ orders, customers }) {
   const [expandedId, setExpandedId] = useState(null);
 
   return (
-    <ul aria-label="Orders" className="m-0 flex list-none flex-col gap-2 p-0">
+    <ul aria-label="Orders" className="@container m-0 flex list-none flex-col gap-2 p-0">
       {orders.map((order) => (
         <OrderRow
           key={order.id}

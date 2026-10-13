@@ -48,6 +48,9 @@ const orders = [
   { id: "o1", customerId: "c1", orderType: "takeaway", status: "Pending", total: 12.5, createdAt: at(11, 5) },
 ];
 
+const orderRows = () =>
+  within(screen.getByRole("list", { name: "Orders" })).getAllByRole("listitem");
+
 const flush = () => act(async () => {});
 
 const renderDashboard = async () => {
@@ -71,6 +74,17 @@ describe("Dashboard page", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("shows the section sidebar with Order history selected by default", async () => {
+    await renderDashboard();
+
+    const nav = screen.getByRole("navigation", { name: "Dashboard sections" });
+    const item = within(nav).getByRole("button", { name: "Order history" });
+    expect(item.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "Dashboard" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Order history" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Orders" })).toBeTruthy();
   });
 
   it("defaults the day field to today and limits it to today", async () => {
@@ -133,7 +147,7 @@ describe("Dashboard page", () => {
   it("greys out a Cancelled row and labels it Cancelled", async () => {
     await renderDashboard();
 
-    const rows = screen.getAllByRole("listitem");
+    const rows = orderRows();
     expect(within(rows[0]).getByText("Cancelled")).toBeTruthy();
     expect(rows[0].className).toContain("opacity-60");
     expect(rows[1].className).not.toContain("opacity-60");
@@ -165,7 +179,7 @@ describe("Dashboard page", () => {
 
     expect(mocks.getOrders).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(orderRows()).toHaveLength(2);
   });
 
   it("reads the customers once per Company, not on day change", async () => {
@@ -206,10 +220,10 @@ describe("Dashboard page", () => {
 
     changeDay(toValue(yesterday));
     await flush();
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(orderRows()).toHaveLength(2);
 
     await act(async () => resolveFirst([orders[1]]));
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(orderRows()).toHaveLength(2);
   });
 });
