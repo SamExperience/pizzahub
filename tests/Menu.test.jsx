@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Menu from "../src/pages/Menu";
@@ -37,6 +37,12 @@ vi.mock("../src/services/product.service", () => ({
 
 const store = { id: "store-1", name: "Pizza Roma" };
 const refreshMenuReady = vi.fn();
+
+// Clicks a button of the open confirmation dialog.
+const clickDialog = (name) =>
+  userEvent.click(
+    within(screen.getByRole("alertdialog")).getByRole("button", { name }),
+  );
 
 describe("Menu page", () => {
   beforeEach(() => {
@@ -187,15 +193,15 @@ describe("Menu page", () => {
     it("deletes a category only after confirmation", async () => {
       await renderMenu();
       deleteCategoryById.mockResolvedValue();
-      const confirm = vi.spyOn(window, "confirm");
 
-      confirm.mockReturnValueOnce(false);
       await userEvent.click(screen.getByLabelText("Delete Pizze"));
+      await clickDialog("Keep");
       expect(deleteCategoryById).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
 
-      confirm.mockReturnValueOnce(true);
       getCategoriesByMenuId.mockResolvedValue([{ ...bevande, position: 1 }]);
       await userEvent.click(screen.getByLabelText("Delete Pizze"));
+      await clickDialog("Delete category");
 
       await waitFor(() =>
       expect(screen.queryByLabelText("Select Pizze")).toBeNull(),
@@ -272,10 +278,10 @@ describe("Menu page", () => {
     it("selects the first remaining category when the selected one is deleted", async () => {
       await renderMenu();
       deleteCategoryById.mockResolvedValue();
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       getCategoriesByMenuId.mockResolvedValue([{ ...bevande, position: 1 }]);
 
       await userEvent.click(screen.getByLabelText("Delete Pizze"));
+      await clickDialog("Delete category");
 
       await waitFor(() =>
         expect(getProductsByCategoryId).toHaveBeenLastCalledWith("c2"),

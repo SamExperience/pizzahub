@@ -3,6 +3,7 @@ import { Navigate } from "react-router";
 import { useAuth } from "../src/contexts/AuthContext";
 import Login from "../src/pages/Login";
 import PublicRoute from "../src/components/PublicRoute";
+import LoadingState from "../src/components/LoadingState";
 
 vi.mock("../src/contexts/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -20,7 +21,7 @@ describe("PublicRoute", () => {
       loadingLogin: true,
     });
 
-    expect(PublicRoute()).toBeNull();
+    expect(PublicRoute().type).toBe(LoadingState);
   });
 
   it("shows Login when the user is not authenticated", () => {

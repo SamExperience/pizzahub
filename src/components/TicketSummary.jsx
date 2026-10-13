@@ -1,7 +1,7 @@
-import { calculateOrderTotal } from "../services/order.service";
+import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { formatPrice } from "../utils/format";
-import { button, dangerButton, muted } from "../utils/styles";
+import { emptyBox, iconButton, muted, primaryButton } from "../utils/styles";
 import FieldError from "./FieldError";
 
 const STATUS_LABEL = {
@@ -9,12 +9,22 @@ const STATUS_LABEL = {
   [ITEM_PRODUCT_STATUS.DELETED]: "No longer on the menu",
 };
 
-// Ticket summary: the added Items with quantity controls, reconfiguration,
-// removal and the automatic total. Per Item index: maxQuantities caps the
-// quantity (null = no limit), itemStatuses labels Products no longer
-// sellable and itemMessages shows a message under the Item.
+// Stepper button inside the quantity pill: 40px touch target, smaller in
+// wide containers.
+const stepButton =
+  "inline-flex size-10 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-30 @sm:size-8";
+
+const rowIconButton = `${iconButton} size-10 @sm:size-9`;
+
+// Ticket summary: header with the item count and "Add product", then one
+// compact row per Item with quantity controls, reconfiguration and removal.
+// Rows sit on one line in wide containers and on two lines otherwise. Per
+// Item index: maxQuantities caps the quantity (null = no limit), itemStatuses
+// labels Products no longer sellable and itemMessages shows a message under
+// the Item.
 export default function TicketSummary({
   items,
+  onAddProduct,
   onChangeQuantity,
   onRemove,
   onEdit,
@@ -22,13 +32,29 @@ export default function TicketSummary({
   itemStatuses = [],
   itemMessages = {},
 }) {
+  const count = items.reduce((total, item) => total + (item.quantity ?? 0), 0);
+
   return (
-    <section aria-label="Ticket summary">
-      <h3 className="m-0 mb-2 text-sm font-medium">Ticket summary</h3>
+    <section aria-label="Ticket summary" className="@container flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="m-0 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+          Items{count > 0 && ` · ${count}`}
+        </h3>
+        {onAddProduct && (
+          <button
+            type="button"
+            className={`${primaryButton} min-h-10 px-3`}
+            onClick={onAddProduct}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Add product
+          </button>
+        )}
+      </div>
       {items.length === 0 ? (
-        <p className={`${muted} m-0`}>No products added yet.</p>
+        <p className={`${emptyBox} m-0 py-6!`}>No products added yet.</p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        <ul className="m-0 list-none divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white p-0 shadow-sm">
           {items.map((item, index) => {
             const details = [
               item.size,
@@ -43,80 +69,82 @@ export default function TicketSummary({
             return (
               <li
                 key={`${item.productId}-${index}`}
-                className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700"
+                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 px-3 py-2.5 @sm:grid-cols-[auto_1fr_auto_auto]"
               >
-                <div className="flex items-start justify-between gap-2 text-sm">
-                  <div className="min-w-0">
-                    <span className="font-medium">{item.productName}</span>
-                    {details && <p className={`m-0 ${muted}`}>{details}</p>}
-                    {statusLabel && (
-                      <em className="mt-1 block w-fit rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-medium not-italic text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
-                        {statusLabel}
-                      </em>
-                    )}
-                  </div>
-                  <span className="shrink-0 font-medium">
-                    {formatPrice(item.subtotal)}
+                <div className="order-1 min-w-0 text-sm @sm:order-2">
+                  <span className="font-semibold text-neutral-900">
+                    {item.productName}
                   </span>
+                  {details && <p className={`m-0 text-xs ${muted}`}>{details}</p>}
+                  {statusLabel && (
+                    <em className="mt-1 block w-fit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium not-italic text-amber-800">
+                      {statusLabel}
+                    </em>
+                  )}
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      className={button}
-                      aria-label={`Decrease quantity of ${item.productName}`}
-                      disabled={item.quantity <= 1}
-                      onClick={() => onChangeQuantity(index, item.quantity - 1)}
-                    >
-                      −
-                    </button>
-                    <output
-                      aria-label={`Quantity of ${item.productName}`}
-                      className="min-w-6 text-center text-base font-semibold"
-                    >
-                      {item.quantity}
-                    </output>
-                    <button
-                      type="button"
-                      className={button}
-                      aria-label={`Increase quantity of ${item.productName}`}
-                      disabled={maxQuantity !== null && item.quantity >= maxQuantity}
-                      onClick={() => onChangeQuantity(index, item.quantity + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {onEdit && (
-                      <button
-                        type="button"
-                        className={button}
-                        aria-label={`Edit ${item.productName}`}
-                        onClick={() => onEdit(index)}
-                      >
-                        Edit
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={dangerButton}
-                      aria-label={`Remove ${item.productName}`}
-                      onClick={() => onRemove(index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
+                <span className="order-2 text-right text-sm font-semibold text-neutral-900 tabular-nums @sm:order-3">
+                  {formatPrice(item.subtotal)}
+                </span>
+                <div className="order-3 flex w-fit items-center gap-1 rounded-full border border-neutral-200 p-0.5 @sm:order-1">
+                  <button
+                    type="button"
+                    className={stepButton}
+                    aria-label={`Decrease quantity of ${item.productName}`}
+                    title={`Decrease quantity of ${item.productName}`}
+                    disabled={item.quantity <= 1}
+                    onClick={() => onChangeQuantity(index, item.quantity - 1)}
+                  >
+                    <Minus className="size-4" aria-hidden="true" />
+                  </button>
+                  <output
+                    aria-label={`Quantity of ${item.productName}`}
+                    className="min-w-6 text-center text-sm font-semibold tabular-nums"
+                  >
+                    {item.quantity}
+                  </output>
+                  <button
+                    type="button"
+                    className={stepButton}
+                    aria-label={`Increase quantity of ${item.productName}`}
+                    title={`Increase quantity of ${item.productName}`}
+                    disabled={maxQuantity !== null && item.quantity >= maxQuantity}
+                    onClick={() => onChangeQuantity(index, item.quantity + 1)}
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                  </button>
                 </div>
-                <FieldError message={itemMessages[index]} />
+                <div className="order-4 flex items-center justify-end gap-0.5">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      className={rowIconButton}
+                      aria-label={`Edit ${item.productName}`}
+                      title="Edit"
+                      onClick={() => onEdit(index)}
+                    >
+                      <Pencil className="size-4" aria-hidden="true" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`${rowIconButton} text-red-600 hover:bg-red-50 hover:text-red-700`}
+                    aria-label={`Remove ${item.productName}`}
+                    title="Remove"
+                    onClick={() => onRemove(index)}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </button>
+                </div>
+                {itemMessages[index] && (
+                  <div className="order-5 col-span-full">
+                    <FieldError message={itemMessages[index]} />
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
       )}
-      <div className="mt-3 flex items-center justify-between border-t border-neutral-200 pt-3 text-base dark:border-neutral-700">
-        <span className="font-medium">Total</span>
-        <strong aria-label="Total">{formatPrice(calculateOrderTotal(items))}</strong>
-      </div>
     </section>
   );
 }

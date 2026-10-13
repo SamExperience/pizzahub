@@ -1,0 +1,127 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { useAuth } from "../src/contexts/AuthContext";
+import { useStore } from "../src/contexts/StoreContext";
+import AppLayout from "../src/components/AppLayout";
+
+vi.mock("../src/contexts/AuthContext", () => ({
+  useAuth: vi.fn(),
+}));
+
+vi.mock("../src/contexts/StoreContext", () => ({
+  useStore: vi.fn(),
+}));
+
+const logout = vi.fn();
+
+function renderShell(path) {
+  const router = createMemoryRouter(
+    [
+      {
+        element: <AppLayout />,
+        children: ["/stores", "/tableau", "/menu", "/dashboard"].map((p) => ({
+          path: p,
+          element: <p>page {p}</p>,
+        })),
+      },
+    ],
+    { initialEntries: [path] },
+  );
+
+  return render(<RouterProvider router={router} />);
+}
+
+describe("App shell", () => {
+  beforeEach(() => {
+    cleanup();
+    logout.mockReset();
+    useAuth.mockReturnValue({
+      authUser: { email: "sam@example.com" },
+      userProfile: { displayName: "Sam" },
+      logout,
+    });
+    useStore.mockReturnValue({ selectedStore: { id: "s1", name: "Napoli" } });
+  });
+
+  it("shows the active store and the user display name", () => {
+    renderShell("/tableau");
+
+    expect(screen.getAllByText("Napoli").length).toBeGreaterThan(0);
+    expect(screen.getByText("Sam")).toBeTruthy();
+    expect(screen.queryByText(/Company Name/)).toBeNull();
+    expect(screen.queryByText(/John Doe/)).toBeNull();
+  });
+
+  it("falls back to the email when there is no display name", () => {
+    useAuth.mockReturnValue({
+      authUser: { email: "sam@example.com" },
+      userProfile: null,
+      logout,
+    });
+
+    renderShell("/tableau");
+
+    expect(screen.getByText("sam@example.com")).toBeTruthy();
+  });
+
+  it("renders the main links and marks the active one", () => {
+    renderShell("/menu");
+
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    for (const name of ["Stores", "Tableau", "Menu", "Dashboard"]) {
+      expect(nav.querySelector(`a[href="/${name.toLowerCase()}"]`)).toBeTruthy();
+    }
+    expect(screen.getByRole("link", { name: "Menu" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Tableau" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("toggles the mobile menu", async () => {
+    const user = userEvent.setup();
+    renderShell("/tableau");
+
+    const toggle = screen.getByRole("button", { name: "Open menu" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getAllByRole("link", { name: "Dashboard" })).toHaveLength(1);
+
+    await user.click(toggle);
+
+    const opened = screen.getByRole("button", { name: "Close menu" });
+    expect(opened.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getAllByRole("link", { name: "Dashboard" })).toHaveLength(2);
+
+    await user.click(opened);
+    expect(screen.getByRole("button", { name: "Open menu" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes the mobile menu after navigating", async () => {
+    const user = userEvent.setup();
+    renderShell("/tableau");
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+    await user.click(screen.getAllByRole("link", { name: "Dashboard" })[1]);
+
+    expect(screen.getByRole("button", { name: "Open menu" })).toBeTruthy();
+    expect(screen.getByText("page /dashboard")).toBeTruthy();
+  });
+
+  it("uses the minimal layout on /stores", () => {
+    renderShell("/stores");
+
+    expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /menu/i })).toBeNull();
+    expect(screen.queryByText("Napoli")).toBeNull();
+    expect(screen.getByText("Sam")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Logout" })).toBeTruthy();
+  });
+
+  it("calls logout when clicking Logout", async () => {
+    const user = userEvent.setup();
+    renderShell("/stores");
+
+    await user.click(screen.getByRole("button", { name: "Logout" }));
+
+    expect(logout).toHaveBeenCalledTimes(1);
+  });
+});

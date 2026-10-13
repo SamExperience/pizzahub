@@ -6,7 +6,7 @@ export default function FieldError({ id, message }) {
     <p
       id={id}
       role="alert"
-      className="m-0 mt-1 text-sm text-red-600 dark:text-red-400"
+      className="m-0 mt-1 text-sm text-red-600"
     >
       {message}
     </p>

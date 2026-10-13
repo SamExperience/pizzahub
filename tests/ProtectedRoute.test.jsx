@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../src/contexts/AuthContext";
 import { useStore } from "../src/contexts/StoreContext";
 import ProtectedRoute from "../src/components/ProtectedRoute";
+import LoadingState from "../src/components/LoadingState";
 
 vi.mock("../src/contexts/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -31,14 +32,14 @@ describe("ProtectedRoute", () => {
     });
   });
 
-  it("renders nothing while authentication is loading", () => {
+  it("shows the loading state while authentication is loading", () => {
     useAuth.mockReturnValue({
       authUser: null,
       userProfile: null,
       loadingLogin: true,
     });
 
-    expect(ProtectedRoute()).toBeNull();
+    expect(ProtectedRoute().type).toBe(LoadingState);
   });
 
   it("redirects unauthenticated users to login", () => {
@@ -107,7 +108,7 @@ describe("ProtectedRoute", () => {
       pathname: "/dashboard",
     });
 
-    expect(ProtectedRoute()).toBeNull();
+    expect(ProtectedRoute().type).toBe(LoadingState);
   });
 
   it("redirects users with a profile away from onboarding to store selection", () => {
@@ -231,7 +232,7 @@ describe("ProtectedRoute", () => {
     it("renders nothing while the readiness is unknown", () => {
       setMenuReady(null, "/tableau");
 
-      expect(ProtectedRoute()).toBeNull();
+      expect(ProtectedRoute().type).toBe(LoadingState);
     });
 
     it.each(["/tableau", "/dashboard", "/stores"])(
