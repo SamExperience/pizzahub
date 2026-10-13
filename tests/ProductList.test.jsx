@@ -30,6 +30,14 @@ const clickDialog = (name) =>
     within(screen.getByRole("alertdialog")).getByRole("button", { name }),
   );
 
+// Expands the row of a product by clicking its title button.
+const expandRow = (name) =>
+  userEvent.click(
+    within(screen.getByText(name).closest("li")).getByRole("button", {
+      expanded: false,
+    }),
+  );
+
 describe("ProductList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,16 +67,16 @@ describe("ProductList", () => {
     render(<ProductList categoryId="c1" categoryName="Pizze" />);
 
     await screen.findByText("Margherita");
-    expect(
-      screen.getAllByRole("listitem").map((item) => item.textContent),
-    ).toEqual([
-      expect.stringContaining("Margherita €7.00"),
-      expect.stringContaining("Diavola €9.50"),
-    ]);
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(within(items[0]).getByText("Margherita")).toBeTruthy();
+    expect(within(items[0]).getAllByText("€7.00").length).toBeGreaterThan(0);
+    expect(within(items[1]).getByText("Diavola")).toBeTruthy();
+    expect(within(items[1]).getAllByText("€9.50").length).toBeGreaterThan(0);
     expect(getProductsByCategoryId).toHaveBeenCalledWith("c1");
   });
 
-  it("shows one price per size when the product has sizes", async () => {
+  it("shows a price range summary and one price per size once expanded", async () => {
     getProductsByCategoryId.mockResolvedValue([
       {
         id: "p1",
@@ -83,9 +91,76 @@ describe("ProductList", () => {
 
     render(<ProductList categoryId="c1" categoryName="Pizze" />);
 
-    expect(
-      await screen.findByText(/Small: €6\.00 · Large: €9\.00/),
-    ).toBeTruthy();
+    expect((await screen.findAllByText("€6.00 – €9.00")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2 sizes").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Small")).toBeNull();
+
+    await expandRow("Margherita");
+
+    expect(screen.getByText("Small")).toBeTruthy();
+    expect(screen.getByText("Large")).toBeTruthy();
+    expect(screen.getAllByText("€6.00").length).toBe(1);
+    expect(screen.getAllByText("€9.00").length).toBe(1);
+  });
+
+  it("shows a single price when all sizes cost the same", async () => {
+    getProductsByCategoryId.mockResolvedValue([
+      {
+        id: "p1",
+        name: "Margherita",
+        price: null,
+        sizes: [
+          { name: "Small", price: 6 },
+          { name: "Large", price: 6 },
+        ],
+      },
+    ]);
+
+    render(<ProductList categoryId="c1" categoryName="Pizze" />);
+
+    expect((await screen.findAllByText("€6.00")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/–/)).toBeNull();
+  });
+
+  it("toggles the expansion of a row", async () => {
+    getProductsByCategoryId.mockResolvedValue([
+      { id: "p1", name: "Margherita", price: 7, sizes: null },
+    ]);
+
+    render(<ProductList categoryId="c1" categoryName="Pizze" />);
+
+    const toggle = (await screen.findByText("Margherita")).closest("button");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("No details yet.")).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("No details yet.")).toBeTruthy();
+    expect(screen.getByText("Price")).toBeTruthy();
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("No details yet.")).toBeNull();
+  });
+
+  it("expands a row when clicking on it but not on its buttons", async () => {
+    getProductsByCategoryId.mockResolvedValue([
+      { id: "p1", name: "Margherita", price: 7, sizes: null, position: 1 },
+    ]);
+    moveProductById.mockResolvedValue();
+
+    render(<ProductList categoryId="c1" categoryName="Pizze" />);
+
+    const item = (await screen.findByText("Margherita")).closest("li");
+    const toggle = within(item).getAllByRole("button", { expanded: false })[0];
+
+    await userEvent.click(
+      screen.getByRole("switch", { name: "Mark unavailable Margherita" }),
+    );
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    await userEvent.click(item.firstElementChild);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("marks unavailable products and shows the description", async () => {
@@ -103,27 +178,41 @@ describe("ProductList", () => {
     render(<ProductList categoryId="c1" categoryName="Pizze" />);
 
     expect(await screen.findByText("Unavailable")).toBeTruthy();
-    expect(screen.getByText("Tomato and mozzarella")).toBeTruthy();
+    // Collapsed rows preview the ingredients, not the description.
+    expect(screen.queryByText("Tomato and mozzarella")).toBeNull();
+
+    await expandRow("Margherita");
+    expect(screen.getAllByText("Tomato and mozzarella")).toHaveLength(1);
   });
 
-  it("shows the ingredients when the product has them", async () => {
+  it("shows the full ingredients and cooking levels once expanded", async () => {
     getProductsByCategoryId.mockResolvedValue([
       {
         id: "p1",
         name: "Margherita",
         price: 7,
         sizes: null,
-        ingredients: ["tomato", "mozzarella"],
+        ingredients: ["a", "b", "c", "d", "e", "f"],
+        availableCookingLevels: ["Rare", "Medium"],
+        defaultCookingLevel: "Medium",
       },
-      { id: "p2", name: "Diavola", price: 9, sizes: null, ingredients: null },
     ]);
 
     render(<ProductList categoryId="c1" categoryName="Pizze" />);
 
-    expect(
-      await screen.findByText("Ingredients: tomato, mozzarella"),
-    ).toBeTruthy();
-    expect(screen.getAllByText(/Ingredients:/)).toHaveLength(1);
+    await screen.findByText("Margherita");
+    expect(screen.queryByText("Ingredients")).toBeNull();
+    // The collapsed row previews the ingredient list.
+    expect(screen.getByText("a, b, c, d, e, f")).toBeTruthy();
+
+    await expandRow("Margherita");
+
+    expect(screen.getByText("Ingredients")).toBeTruthy();
+    expect(screen.getAllByText(/a, b, c, d, e, f/)).toHaveLength(1);
+    expect(screen.getByText(/Cooking levels/)).toBeTruthy();
+    expect(screen.getByText("Medium").tagName).toBe("STRONG");
+    expect(screen.getByText("Rare")).toBeTruthy();
+    expect(screen.queryByText("No details yet.")).toBeNull();
   });
 
   it("shows the empty state", async () => {
@@ -232,9 +321,9 @@ describe("ProductList", () => {
       updateProductById.mockResolvedValue();
 
       render(<ProductList categoryId="c1" categoryName="Pizze" />);
-      await userEvent.click(
-        await screen.findByRole("button", { name: "Edit Margherita" }),
-      );
+      await screen.findByText("Margherita");
+      await expandRow("Margherita");
+      await userEvent.click(screen.getByRole("button", { name: "Edit Margherita" }));
       const nameInput = screen.getByLabelText("Name");
       expect(nameInput.value).toBe("Margherita");
       await userEvent.clear(nameInput);
@@ -254,9 +343,9 @@ describe("ProductList", () => {
       updateProductById.mockRejectedValue(new Error("Product name is required"));
 
       render(<ProductList categoryId="c1" categoryName="Pizze" />);
-      await userEvent.click(
-        await screen.findByRole("button", { name: "Edit Margherita" }),
-      );
+      await screen.findByText("Margherita");
+      await expandRow("Margherita");
+      await userEvent.click(screen.getByRole("button", { name: "Edit Margherita" }));
       await userEvent.click(screen.getByRole("button", { name: "Save product" }));
 
       expect((await screen.findByRole("alert")).textContent).toBe(
@@ -269,9 +358,9 @@ describe("ProductList", () => {
       getProductsByCategoryId.mockResolvedValue(existing);
 
       render(<ProductList categoryId="c1" categoryName="Pizze" />);
-      await userEvent.click(
-        await screen.findByRole("button", { name: "Edit Margherita" }),
-      );
+      await screen.findByText("Margherita");
+      await expandRow("Margherita");
+      await userEvent.click(screen.getByRole("button", { name: "Edit Margherita" }));
       await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
       expect(screen.queryByRole("button", { name: "Save product" })).toBeNull();
@@ -297,6 +386,20 @@ describe("ProductList", () => {
       await waitFor(() => expect(screen.queryByText("Margherita")).toBeNull());
       expect(deleteProductById).toHaveBeenCalledWith("p1");
       expect(onChange).toHaveBeenCalled();
+    });
+
+    it("offers the delete action in the expanded panel too", async () => {
+      getProductsByCategoryId.mockResolvedValue(existing);
+
+      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+      await screen.findByText("Margherita");
+      await expandRow("Margherita");
+      const buttons = screen.getAllByRole("button", { name: "Delete Margherita" });
+      expect(buttons).toHaveLength(2);
+      await userEvent.click(buttons[1]);
+      await clickDialog("Delete product");
+
+      expect(deleteProductById).toHaveBeenCalledWith("p1");
     });
 
     it("does not delete when the confirmation is declined", async () => {
@@ -386,13 +489,13 @@ describe("ProductList", () => {
 
       render(<ProductList categoryId="c1" categoryName="Pizze" />);
       await userEvent.click(
-        await screen.findByRole("button", { name: "Mark unavailable Margherita" }),
+        await screen.findByRole("switch", { name: "Mark unavailable Margherita" }),
       );
 
       expect(await screen.findByText("Unavailable")).toBeTruthy();
       expect(setProductAvailability).toHaveBeenCalledWith("p1", false);
       expect(
-        screen.getByRole("button", { name: "Mark available Margherita" }),
+        screen.getByRole("switch", { name: "Mark available Margherita" }),
       ).toBeTruthy();
     });
   });
@@ -475,9 +578,9 @@ describe("ProductList", () => {
       uploadProductImage.mockResolvedValue("https://example.com/new.png");
 
       renderList();
-      await userEvent.click(
-        await screen.findByRole("button", { name: "Edit Margherita" }),
-      );
+      await screen.findByText("Margherita");
+      await expandRow("Margherita");
+      await userEvent.click(screen.getByRole("button", { name: "Edit Margherita" }));
       await userEvent.upload(screen.getByLabelText("Product image"), file);
       await userEvent.click(screen.getByRole("button", { name: "Save product" }));
 
@@ -495,9 +598,9 @@ describe("ProductList", () => {
       getProductsByCategoryId.mockResolvedValue(withImage);
 
       renderList();
-      await userEvent.click(
-        await screen.findByRole("button", { name: "Edit Margherita" }),
-      );
+      await screen.findByText("Margherita");
+      await expandRow("Margherita");
+      await userEvent.click(screen.getByRole("button", { name: "Edit Margherita" }));
       await userEvent.click(
         screen.getByRole("button", { name: "Remove image" }),
       );

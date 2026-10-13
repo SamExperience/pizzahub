@@ -123,6 +123,7 @@ export default function Menu() {
             <h2 className="m-0 text-sm font-semibold uppercase tracking-wide text-neutral-500">
               Categories
             </h2>
+            <CategoryForm onSubmit={handleCreate} />
             {actionError && (
               <p role="alert" className={alert}>
                 {actionError.message}
@@ -136,7 +137,6 @@ export default function Menu() {
               onDelete={handleDelete}
               onMove={handleMove}
             />
-            <CategoryForm onSubmit={handleCreate} />
           </aside>
           <section className="min-w-0">
             {selectedCategory ? (

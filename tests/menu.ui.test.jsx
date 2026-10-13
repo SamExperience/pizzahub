@@ -218,7 +218,7 @@ describe("Menu management through the UI", () => {
     await addProduct("Margherita", "7");
     await addProduct("Diavola", "9.5");
     expect(productNames()).toEqual(["Margherita", "Diavola"]);
-    expect(screen.getByText(/€9\.50/)).toBeTruthy();
+    expect(screen.getAllByText(/€9\.50/).length).toBeGreaterThan(0);
 
     // Sizes, ingredients and cooking levels.
     await userEvent.click(screen.getByText("Add product"));
@@ -241,8 +241,18 @@ describe("Menu management through the UI", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Save product" }));
 
-    expect(await screen.findByText(/Small: €8\.00 · Large: €12\.00/)).toBeTruthy();
-    expect(screen.getByText("Ingredients: ham")).toBeTruthy();
+    expect(
+      (await screen.findAllByText("€8.00 – €12.00")).length,
+    ).toBeGreaterThan(0);
+    await userEvent.click(
+      within(screen.getByText("Capricciosa").closest("li")).getByRole("button", {
+        expanded: false,
+      }),
+    );
+    expect(screen.getByText("Small")).toBeTruthy();
+    expect(screen.getByText("Large")).toBeTruthy();
+    expect(screen.getByText("Ingredients")).toBeTruthy();
+    expect(screen.getByText(/ham/)).toBeTruthy();
     expect(createProduct).toHaveBeenLastCalledWith(
       "cat-1",
       expect.objectContaining({
@@ -258,6 +268,11 @@ describe("Menu management through the UI", () => {
     );
 
     // Edit.
+    await userEvent.click(
+      within(screen.getByText("Diavola").closest("li")).getByRole("button", {
+        expanded: false,
+      }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Edit Diavola" }));
     const name = screen.getByLabelText("Name");
     await userEvent.clear(name);
@@ -267,11 +282,11 @@ describe("Menu management through the UI", () => {
 
     // Availability.
     await userEvent.click(
-      screen.getByRole("button", { name: "Mark unavailable Margherita" }),
+      screen.getByRole("switch", { name: "Mark unavailable Margherita" }),
     );
     expect(await screen.findByText("Unavailable")).toBeTruthy();
     await userEvent.click(
-      screen.getByRole("button", { name: "Mark available Margherita" }),
+      screen.getByRole("switch", { name: "Mark available Margherita" }),
     );
     await vi.waitFor(() => expect(screen.queryByText("Unavailable")).toBeNull());
 
@@ -320,6 +335,11 @@ describe("Menu management through the UI", () => {
       expect.any(File),
     );
 
+    await userEvent.click(
+      within(screen.getByText("Margherita").closest("li")).getByRole("button", {
+        expanded: false,
+      }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Edit Margherita" }));
     await userEvent.click(screen.getByRole("button", { name: "Remove image" }));
     await userEvent.click(screen.getByRole("button", { name: "Save product" }));
