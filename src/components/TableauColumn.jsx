@@ -2,6 +2,7 @@ import { emptyBox, statusStyles } from "../utils/styles";
 import TicketCard from "./TicketCard";
 
 // One status column of the Tableau: header with ticket count, then the tickets.
+// From lg the column takes the board height and only the ticket list scrolls.
 // panelId/tabId/className let the board expose it as a mobile tab panel.
 export default function TableauColumn({
   title,
@@ -20,7 +21,7 @@ export default function TableauColumn({
       id={panelId}
       role={panelId ? "tabpanel" : undefined}
       aria-labelledby={tabId}
-      className={`flex min-w-0 flex-col gap-3 rounded-xl border-t-4 bg-neutral-100/70 p-3 ${styles?.accent ?? "border-t-neutral-300"} ${className}`}
+      className={`flex min-w-0 flex-col gap-3 rounded-xl border-t-4 bg-neutral-100/70 p-3 lg:min-h-0 ${styles?.accent ?? "border-t-neutral-300"} ${className}`}
     >
       <header className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -40,13 +41,11 @@ export default function TableauColumn({
         </span>
       </header>
       {orders.length === 0 ? (
-        <p
-          className={`${emptyBox} m-0`}
-        >
+        <p className={`${emptyBox} m-0`}>
           No tickets
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0 lg:max-h-[calc(100svh-12rem)] lg:overflow-y-auto">
+        <ul className="m-0 flex list-none flex-col gap-3 p-0 lg:-mx-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-1 lg:pb-1">
           {orders.map((order) => (
             <li key={order.id}>
               <TicketCard

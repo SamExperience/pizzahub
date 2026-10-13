@@ -14,7 +14,10 @@ import {
 
 // Presentational Tableau: three status columns (each in its display order,
 // see sortColumnOrders) plus loading and error states. Below md the columns
-// are shown one at a time through tabs; from md they sit side by side.
+// are shown one at a time through tabs and "Create Ticket" is a floating
+// button; from md they sit side by side, and from lg the board fills the
+// viewport (below the header and its 1px border) with each column scrolling
+// on its own.
 export default function TableauBoard({
   orders = [],
   loading = false,
@@ -38,19 +41,19 @@ export default function TableauBoard({
   }));
 
   return (
-    <div className="flex flex-col gap-4 text-left">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 text-left max-md:pb-20 lg:h-[calc(100svh-5.5rem-1px)]">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className={`m-0 ${pageTitle}`}>Tableau</h1>
           <p className={`m-0 ${muted}`}>Today's tickets</p>
         </div>
         <button
           type="button"
-          className={`${primaryButton} min-h-11 w-full sm:min-h-10 sm:w-auto`}
+          className={`${primaryButton} min-h-10 max-md:fixed max-md:right-4 max-md:bottom-6 max-md:z-20 max-md:size-14 max-md:rounded-full max-md:p-0 max-md:shadow-xl`}
           onClick={onCreateTicket}
         >
-          <Plus className="size-4" aria-hidden="true" />
-          Create Ticket
+          <Plus className="size-4 max-md:size-7" aria-hidden="true" />
+          <span className="max-md:sr-only">Create Ticket</span>
         </button>
       </div>
       {loading && <LoadingState />}
@@ -98,7 +101,7 @@ export default function TableauBoard({
               );
             })}
           </div>
-          <div className="flex flex-col items-stretch gap-4 md:snap-x md:flex-row md:overflow-x-auto lg:grid lg:grid-cols-3 lg:items-start lg:overflow-visible">
+          <div className="flex flex-col items-stretch gap-4 md:snap-x md:flex-row md:overflow-x-auto lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-3 lg:overflow-visible">
             {columns.map(({ status, slug, orders: columnOrders }) => (
               <TableauColumn
                 key={status}
