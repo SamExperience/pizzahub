@@ -1,6 +1,6 @@
 # PizzaHub
 
-PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu, create, edit and cancel tickets (orders), move them through their statuses, follow the Store's orders of the day in real time on the Tableau and browse the Store's order history by day on the Dashboard. The interface is responsive and usable on desktop, tablet and mobile. The project is an MVP under active development; this document describes only what is implemented today.
+PizzaHub is a web application for pizzeria staff. It lets a team register, set up its Company and Store, select the Store to work on and manage that Store's Menu, create, edit and cancel tickets (orders), move them through their statuses, follow the Store's orders of the day in real time on the Tableau browse the Store's order history by day on the Dashboard and subscribe to a demo plan through Stripe Checkout in test mode. The interface is responsive and usable on desktop, tablet and mobile. The project is an MVP under active development; this document describes only what is implemented today.
 
 ## Implemented features
 
@@ -81,6 +81,17 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - Clicking a row expands a read-only detail in place (one row at a time): the stored item snapshots (quantity, size, cooking level, customizations, subtotal), the customer name, phone and, for delivery, address, the created, scheduled and completed times and the total.
 - The Company's Customers are read once, not on every day change. Loading, empty and error states (with a retry action).
 
+### Subscription (Stripe test mode)
+
+- Stripe runs in **test mode only**: the Cloud Functions refuse any Stripe secret key that does not start with `sk_test_`, so no real payment is possible. No Stripe key is ever shipped to the client.
+- One demo plan: a single monthly Stripe Price, paid through Stripe Checkout in subscription mode.
+- The Dashboard sidebar has a **Subscription** section (also reachable at `/dashboard?section=subscription`). It shows the current status (Active, Past due, Canceled, Incomplete, …), the renewal date of an active subscription and a **Subscribe** button that redirects to Stripe Checkout. Back from Checkout, a "payment being processed" message is shown until the webhook writes the final status; the section updates in real time.
+- While the Company's subscription is not active, a warning banner with a **Manage subscription** link is shown under the header on every app page (once the Menu is ready). It is hidden while loading or on read errors and never blocks any feature.
+- The subscription status of each Company is stored in `subscriptions/{companyId}` (status, Stripe customer and subscription ids, price, current period end, cancel at period end, last event time).
+- Backend: two Firebase Cloud Functions (v2, Node.js 22, region `europe-west6`), the only server-side code of the project:
+  - `createCheckoutSession` (callable): requires a signed-in User with the `admin` role, takes the Company from the User profile (never from the request), refuses when the subscription is already active, reuses the Company's Stripe Customer when one exists and returns the Checkout URL. Success and cancel URLs point to the Dashboard of `APP_URL`.
+  - `stripeWebhook` (HTTP): verifies the Stripe signature on the raw request body (missing or invalid signature: `400`), handles `checkout.session.completed` and `customer.subscription.created`, `updated` and `deleted`, ignores events older than the last one applied (Stripe does not guarantee ordering) and acknowledges any other event type with `200`.
+
 ### Security
 
 - Firestore and Storage security rules restrict access to authenticated Users and isolate data per Company and Store; access across Companies and Stores is denied.
@@ -91,6 +102,7 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - Users can read, create and update the Orders of their Store. An Order has 1 to 50 items. An update is either a status change (with the matching completion time) or a content edit (customer, order type, scheduled time, items, total); cancelled Orders cannot be updated and Orders can never be deleted.
 - Users can read, create and update the Customers of their Company. A Delivery Order requires a Customer with a non-blank phone, street, street number, postal code and city.
 - Product images must be images smaller than 5 MB.
+- `subscriptions/{companyId}` can be read only by the Users of that Company and can never be written by clients: only the Cloud Functions (Admin SDK) write it.
 
 ### Data validation
 
@@ -103,6 +115,8 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - [React](https://react.dev/) 19 and [Vite](https://vite.dev/) 8
 - [React Router](https://reactrouter.com/) 8
 - [Firebase](https://firebase.google.com/) 12: Authentication, Cloud Firestore, Cloud Storage
+- [Cloud Functions for Firebase](https://firebase.google.com/docs/functions) v2 (firebase-functions 7, firebase-admin 14) on Node.js 22
+- [Stripe](https://docs.stripe.com/) Node.js SDK 23 (test mode, Stripe Checkout)
 - [Tailwind CSS](https://tailwindcss.com/) v4 (Vite plugin)
 - [Lucide](https://lucide.dev/) icons (lucide-react)
 - [Vitest](https://vitest.dev/) and Testing Library
@@ -114,6 +128,7 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 
 - Node.js 24 (see `.nvmrc`)
 - Java 21 or later, required by the Firebase Emulator Suite
+- For the subscription: a Stripe account in test mode (or a Stripe sandbox) with one recurring monthly Price, and the [Stripe CLI](https://docs.stripe.com/stripe-cli) to forward webhooks locally. The Cloud Functions target the Node.js 22 runtime.
 
 ### Setup
 
@@ -124,9 +139,31 @@ cp .env.example .env
 
 Fill in the `VITE_FIREBASE_*` values in `.env` with your Firebase project configuration.
 
+Install the Cloud Functions dependencies and create their local configuration (both files are git-ignored):
+
+```bash
+npm install --prefix functions
+```
+
+`functions/.env.local` holds the non-secret params:
+
+```dotenv
+STRIPE_PRICE_ID=price_...
+APP_URL=http://localhost:5173
+```
+
+`functions/.secret.local` holds the secrets used by the emulator:
+
+```dotenv
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+Outside the emulator, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are read from Google Secret Manager (`firebase functions:secrets:set <NAME>`), and `STRIPE_PRICE_ID` and `APP_URL` from `functions/.env.<projectId>` or prompted on deploy.
+
 ### Run locally
 
-In development mode the app always connects to the local Firebase emulators (Auth on port 9099, Firestore on 8080, Storage on 9199). Start them first, then the dev server in a second terminal:
+In development mode the app always connects to the local Firebase emulators (Auth on port 9099, Firestore on 8080, Storage on 9199, Functions on 5001). Start them first, then the dev server in a second terminal:
 
 ```bash
 npm run emulator
@@ -137,6 +174,16 @@ The Emulator Suite UI is enabled and its address is printed when the emulators s
 
 `npm run emulator` imports the local emulator data from `emulator-data/`, which is git-ignored and must exist: on a fresh clone create the empty folder first (`mkdir emulator-data`) and the emulators start without data. Run `npm run emulator:export` while the emulators are running to save the current data there. The test suite clears the emulator data.
 
+### Stripe webhooks locally
+
+With the emulators running, forward the Stripe test events to the webhook function with the Stripe CLI (replace `<projectId>` with your Firebase project id):
+
+```bash
+stripe listen --forward-to http://localhost:5001/<projectId>/europe-west6/stripeWebhook
+```
+
+Copy the `whsec_...` signing secret printed by `stripe listen` into `STRIPE_WEBHOOK_SECRET` in `functions/.secret.local` and restart the emulators. Then subscribe from the Dashboard with a Stripe test card: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0341` is declined (any future expiry date and any CVC). A test subscription can be cancelled with `stripe subscriptions cancel <subscriptionId>`; the status in the Dashboard and the banner update automatically.
+
 ## Scripts
 
 | Script | Description |
@@ -146,6 +193,7 @@ The Emulator Suite UI is enabled and its address is printed when the emulators s
 | `npm run preview` | Serve the production build locally. |
 | `npm run lint` | Run Oxlint. |
 | `npm test` | Run the Vitest suite (requires the emulators). |
+| `npm run test:functions` | Run the Cloud Functions unit tests (Stripe and Firestore are mocked; no emulator needed). |
 | `npm run emulator` | Start the Firebase emulators with the data in `emulator-data/`. |
 | `npm run emulator:export` | Export the running emulators' data to `emulator-data/`. |
 
@@ -160,16 +208,22 @@ npx firebase-tools emulators:exec --only auth,firestore,storage "npm test -- --r
 ```text
 src/
   pages/        Route-level pages (Login, Onboarding, StoreSelection, Menu, Tableau, Dashboard)
-  components/   Reusable UI components (app shell with header and navigation, route guards, shared loading state and confirmation dialog, category and product UI, Tableau board and ticket cards, ticket sidebar for creation and editing, customer section, menu panel, item configuration and ticket summary, Dashboard order history list and detail)
+  components/   Reusable UI components (app shell with header and navigation, route guards, shared loading state and confirmation dialog, category and product UI, Tableau board and ticket cards, ticket sidebar for creation and editing, customer section, menu panel, item configuration and ticket summary, Dashboard order history list and detail, Dashboard subscription section and subscription banner)
   contexts/     React contexts for auth state and the active Store
-  services/     Firebase data layer, one service per entity; components never call Firebase directly
+  services/     Firebase data layer, one service per entity plus the billing service (Checkout and subscription status); components never call Firebase directly
   utils/        Shared helpers, including the shared Tailwind class sets and the field length limits
   routes.jsx    Route definitions
 tests/          Unit, UI and security-rules tests
+functions/      Cloud Functions (Stripe test mode)
+  index.js      Function exports
+  config.js     Region, secrets, params and the test-mode Stripe client
+  checkout.js   createCheckoutSession callable
+  webhook.js    stripeWebhook HTTP endpoint
+  tests/        Functions unit tests
 firestore.rules Firestore security rules
 firestore.indexes.json Firestore composite indexes (a Store's orders by day)
 storage.rules   Storage security rules
-firebase.json   Firebase Hosting, rules and emulator configuration
+firebase.json   Firebase Hosting, rules, functions and emulator configuration
 ```
 
 ## Continuous integration and releases
