@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest --no-file-parallelism",
-    "emulator": "firebase emulators:start"
+    "emulator": "firebase emulators:start --import=./emulator-data",
+    "emulator:export": "firebase emulators:export ./emulator-data"
   },
   "dependencies": {
     "firebase": "12.19.0",

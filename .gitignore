@@ -32,3 +32,6 @@ skills-lock.json
 
 ROADMAP.txt
 docs
+
+# Firebase emulator backup (owner data, never committed)
+emulator-data/
