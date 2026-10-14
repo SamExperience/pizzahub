@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest --no-file-parallelism",
+    "test:functions": "npm --prefix functions test -- --run",
     "emulator": "firebase emulators:start --import=./emulator-data",
     "emulator:export": "firebase emulators:export ./emulator-data"
   },

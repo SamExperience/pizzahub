@@ -19,3 +19,12 @@ export const formatAddress = (address) =>
   [formatStreet(address), [address?.postalCode, address?.city].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(", ");
+
+// Localized date from a Firestore Timestamp (or Date); empty string when missing.
+export const formatDate = (timestamp) => {
+  const date = timestamp?.toDate ? timestamp.toDate() : timestamp;
+
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" });
+};

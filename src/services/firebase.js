@@ -6,6 +6,7 @@ import { getFirestore } from "firebase/firestore";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator } from "firebase/firestore";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -17,9 +18,12 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 //storage service
 export const storage = getStorage(app);
+//cloud functions service (same region as the deployed functions)
+export const functions = getFunctions(app, "europe-west6");
 
 if (import.meta.env.DEV || import.meta.env.MODE === "test") {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
   connectStorageEmulator(storage, "127.0.0.1", 9199);
+  connectFunctionsEmulator(functions, "localhost", 5001);
 }

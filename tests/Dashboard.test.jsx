@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router";
 import Dashboard from "../src/pages/Dashboard";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
@@ -23,6 +24,18 @@ vi.mock("../src/services/customer.service", async (importOriginal) => ({
 
 vi.mock("../src/contexts/StoreContext", () => ({
   useStore: () => mocks.store,
+}));
+
+vi.mock("../src/contexts/AuthContext", () => ({
+  useAuth: () => ({ userProfile: { companyId: "company-1" } }),
+}));
+
+vi.mock("../src/services/billing.service", async (importOriginal) => ({
+  ...(await importOriginal()),
+  subscribeToSubscription: vi.fn((companyId, onChange) => {
+    onChange({ id: companyId, status: "active" });
+    return () => {};
+  }),
 }));
 
 const pad = (value) => String(value).padStart(2, "0");
@@ -53,8 +66,12 @@ const orderRows = () =>
 
 const flush = () => act(async () => {});
 
-const renderDashboard = async () => {
-  render(<Dashboard />);
+const renderDashboard = async (path = "/dashboard") => {
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Dashboard />
+    </MemoryRouter>,
+  );
   await flush();
 };
 
@@ -225,5 +242,88 @@ describe("Dashboard page", () => {
     await act(async () => resolveFirst([orders[1]]));
 
     expect(orderRows()).toHaveLength(2);
+  });
+});
+
+describe("Dashboard sections", () => {
+  beforeEach(() => {
+    mocks.getOrders.mockReset();
+    mocks.getOrders.mockResolvedValue([]);
+    mocks.getCustomers.mockReset();
+    mocks.getCustomers.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("lists the Subscription section and opens it on click", async () => {
+    const user = userEvent.setup();
+    await renderDashboard();
+
+    await user.click(screen.getByRole("button", { name: "Subscription" }));
+
+    expect(screen.getByRole("button", { name: "Subscription" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { name: "Subscription" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Order history" })).toBeNull();
+  });
+
+  it.each(["/dashboard?checkout=success", "/dashboard?checkout=cancel", "/dashboard?section=subscription"])(
+    "opens the Subscription section for %s",
+    async (path) => {
+      await renderDashboard(path);
+
+      expect(screen.getByRole("heading", { name: "Subscription" })).toBeTruthy();
+      expect(mocks.getOrders).not.toHaveBeenCalled();
+    },
+  );
+
+  it("opens Order history for an unrelated query string", async () => {
+    await renderDashboard("/dashboard?section=other");
+
+    expect(screen.getByRole("heading", { name: "Order history" })).toBeTruthy();
+  });
+});
+
+describe("Dashboard sections", () => {
+  beforeEach(() => {
+    mocks.getOrders.mockReset();
+    mocks.getOrders.mockResolvedValue([]);
+    mocks.getCustomers.mockReset();
+    mocks.getCustomers.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("lists the Subscription section and opens it on click", async () => {
+    const user = userEvent.setup();
+    await renderDashboard();
+
+    await user.click(screen.getByRole("button", { name: "Subscription" }));
+
+    expect(
+      screen.getByRole("button", { name: "Subscription" }).getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("heading", { name: "Subscription" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Order history" })).toBeNull();
+  });
+
+  it.each([
+    "/dashboard?checkout=success",
+    "/dashboard?checkout=cancel",
+    "/dashboard?section=subscription",
+  ])("opens the Subscription section for %s", async (path) => {
+    await renderDashboard(path);
+
+    expect(screen.getByRole("heading", { name: "Subscription" })).toBeTruthy();
+    expect(mocks.getOrders).not.toHaveBeenCalled();
+  });
+
+  it("opens Order history for an unrelated query string", async () => {
+    await renderDashboard("/dashboard?section=other");
+
+    expect(screen.getByRole("heading", { name: "Order history" })).toBeTruthy();
   });
 });
