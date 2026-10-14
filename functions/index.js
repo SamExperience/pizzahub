@@ -1,4 +1,5 @@
-import { setGlobalOptions } from "firebase-functions/v2";
+import { initializeApp } from "firebase-admin/app";
 
-// Same region as the project's Firestore database and Storage bucket (europe-west6, Zurich).
-setGlobalOptions({ region: "europe-west6", maxInstances: 10 });
+initializeApp();
+
+export { createCheckoutSession } from "./checkout.js";
