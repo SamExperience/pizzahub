@@ -104,6 +104,15 @@ describe("SubscriptionSection", () => {
     expect(screen.queryByText(/Renews on/)).toBeNull();
   });
 
+  it("hides the period date when the subscription is no longer active", () => {
+    renderSection();
+    emit({ status: "canceled", currentPeriodEnd: periodEnd, cancelAtPeriodEnd: false });
+
+    expect(screen.getByText("Canceled")).toBeTruthy();
+    expect(screen.queryByText(/Renews on|Ends on/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Subscribe" })).toBeTruthy();
+  });
+
   it("labels an inactive Stripe status and offers Subscribe", () => {
     renderSection();
     emit({ status: "past_due", currentPeriodEnd: null, cancelAtPeriodEnd: false });

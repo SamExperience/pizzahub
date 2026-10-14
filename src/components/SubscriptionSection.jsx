@@ -37,7 +37,8 @@ export default function SubscriptionSection() {
   // is shown only while the webhook has not written a final status yet.
   const processing =
     checkout === "success" && (!subscription || subscription.status === "incomplete");
-  const endDate = formatDate(subscription?.currentPeriodEnd);
+  // The period date is meaningful only for an active subscription.
+  const endDate = active ? formatDate(subscription.currentPeriodEnd) : null;
 
   const handleSubscribe = async () => {
     setCheckoutError(null);
