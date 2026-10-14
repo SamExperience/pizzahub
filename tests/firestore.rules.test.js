@@ -1903,3 +1903,49 @@ describe("owner delete", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("subscriptions rules", () => {
+  // Subscription of company A, seeded with the rules bypassed as the Cloud
+  // Functions would write it.
+  beforeAll(async () => {
+    await seedDoc(
+      "subscriptions",
+      { status: "active", stripeCustomerId: "cus_test_a" },
+      storeA.companyId,
+    );
+  });
+
+  it("lets the owner read the own Company subscription", async () => {
+    await signInAs(storeA);
+    const snapshot = await getDoc(doc(db, "subscriptions", storeA.companyId));
+    expect(snapshot.data().status).toBe("active");
+  });
+
+  it("denies another Company and unauthenticated reads", async () => {
+    await signInAs(storeB);
+    await expect(
+      getDoc(doc(db, "subscriptions", storeA.companyId)),
+    ).rejects.toThrow();
+    await signout();
+    await expect(
+      getDoc(doc(db, "subscriptions", storeA.companyId)),
+    ).rejects.toThrow();
+  });
+
+  it("denies every client write, owner included", async () => {
+    await signInAs(storeB);
+    await expect(
+      setDoc(doc(db, "subscriptions", storeB.companyId), {
+        status: "active",
+        stripeCustomerId: "cus_fake",
+      }),
+    ).rejects.toThrow();
+    await signInAs(storeA);
+    const ref = doc(db, "subscriptions", storeA.companyId);
+    await expect(updateDoc(ref, { status: "canceled" })).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+    await expect(
+      setDoc(doc(db, "subscriptions", storeB.companyId), { status: "active" }),
+    ).rejects.toThrow();
+  });
+});
