@@ -83,10 +83,20 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 
 ### Security
 
-- Firestore and Storage security rules restrict access to authenticated Users and isolate data per Company and Store.
-- Users can read, create and update the Orders of their Store. An update is either a status change (with the matching completion time) or a content edit (customer, order type, scheduled time, items, total); Store and creation time are immutable, cancelled Orders cannot be updated and Orders can never be deleted.
-- Users can read, create and update the Customers of their Company.
-- Written Orders and Customers are checked for allowed and required fields.
+- Firestore and Storage security rules restrict access to authenticated Users and isolate data per Company and Store; access across Companies and Stores is denied.
+- Each Company has one User, created during Onboarding with the `admin` role. Dedicated rules allow a signed-in User to create only their own Company, Store and User profile, together, and never to change them afterwards: a User cannot edit their own Company, Store or role.
+- Writes to business data (Menu, Categories, Products, product images, Customers, Orders) require the `admin` role.
+- Every written document is checked for allowed fields, required fields on creation, value types and length limits. Updates cannot remove required fields or change immutable ones (such as Company, Store and creation time).
+- Products have either a single price or prices per size, never both.
+- Users can read, create and update the Orders of their Store. An Order has 1 to 50 items. An update is either a status change (with the matching completion time) or a content edit (customer, order type, scheduled time, items, total); cancelled Orders cannot be updated and Orders can never be deleted.
+- Users can read, create and update the Customers of their Company. A Delivery Order requires a Customer with a non-blank phone, street, street number, postal code and city.
+- Product images must be images smaller than 5 MB.
+
+### Data validation
+
+- Maximum field lengths (names, address parts, phone, description, list elements) and the 50-element cap on lists and Order items are defined once in `src/utils/fieldLimits.js` and repeated in the Firestore rules.
+- Forms limit their inputs to these lengths and stop adding list elements and items at the cap.
+- Services validate the same limits and the required fields before writing, so invalid data is rejected with a clear error before it reaches Firestore.
 
 ## Tech stack
 
@@ -125,6 +135,8 @@ npm run dev
 
 The Emulator Suite UI is enabled and its address is printed when the emulators start.
 
+`npm run emulator` imports the local emulator data from `emulator-data/`, which is git-ignored and must exist: on a fresh clone create the empty folder first (`mkdir emulator-data`) and the emulators start without data. Run `npm run emulator:export` while the emulators are running to save the current data there. The test suite clears the emulator data.
+
 ## Scripts
 
 | Script | Description |
@@ -134,7 +146,8 @@ The Emulator Suite UI is enabled and its address is printed when the emulators s
 | `npm run preview` | Serve the production build locally. |
 | `npm run lint` | Run Oxlint. |
 | `npm test` | Run the Vitest suite (requires the emulators). |
-| `npm run emulator` | Start the Firebase emulators. |
+| `npm run emulator` | Start the Firebase emulators with the data in `emulator-data/`. |
+| `npm run emulator:export` | Export the running emulators' data to `emulator-data/`. |
 
 Tests run against the emulators using the configuration in `.env.test`. To start the emulators, run the suite once and stop them, use the same command as CI:
 
@@ -150,7 +163,7 @@ src/
   components/   Reusable UI components (app shell with header and navigation, route guards, shared loading state and confirmation dialog, category and product UI, Tableau board and ticket cards, ticket sidebar for creation and editing, customer section, menu panel, item configuration and ticket summary, Dashboard order history list and detail)
   contexts/     React contexts for auth state and the active Store
   services/     Firebase data layer, one service per entity; components never call Firebase directly
-  utils/        Shared helpers, including the shared Tailwind class sets
+  utils/        Shared helpers, including the shared Tailwind class sets and the field length limits
   routes.jsx    Route definitions
 tests/          Unit, UI and security-rules tests
 firestore.rules Firestore security rules
