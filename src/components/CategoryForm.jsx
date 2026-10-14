@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { input, primaryButton } from "../utils/styles";
 
 // `onSubmit` resolves to true when the category was saved.
@@ -22,6 +23,7 @@ export default function CategoryForm({ onSubmit }) {
         aria-label="New category name"
         placeholder="New category"
         className={`${input} min-h-10`}
+        maxLength={FIELD_LIMITS.NAME}
         value={name}
         onChange={(event) => setName(event.target.value)}
       />

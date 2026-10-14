@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ItemConfigModal from "../src/components/ItemConfigModal";
+import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
 
@@ -255,4 +256,35 @@ describe("ItemConfigModal reconfiguration", () => {
       "true",
     );
   });
+});
+
+describe("ItemConfigModal field limits", () => {
+  afterEach(cleanup);
+
+  it("limits the customization input to LIST_ITEM", () => {
+    renderModal(WATER);
+
+    expect(screen.getByLabelText("Customizations").getAttribute("maxlength")).toBe(
+      String(FIELD_LIMITS.LIST_ITEM),
+    );
+  });
+
+  it("disables the customization Add button at LIST_SIZE and ignores more input", async () => {
+    const { onAdd } = renderModal(WATER);
+    const field = screen.getByLabelText("Customizations");
+
+    for (let index = 0; index < FIELD_LIMITS.LIST_SIZE; index += 1)
+      await userEvent.type(field, `Note ${index}{Enter}`);
+
+    expect(screen.getByRole("button", { name: "Add" }).disabled).toBe(true);
+    expect(
+      screen.getByText(`Maximum ${FIELD_LIMITS.LIST_SIZE} customizations reached.`),
+    ).toBeTruthy();
+
+    await userEvent.type(field, "Extra{Enter}");
+    await userEvent.click(screen.getByRole("button", { name: /Add to ticket/ }));
+
+    expect(onAdd.mock.calls[0][0].customizations).toHaveLength(FIELD_LIMITS.LIST_SIZE);
+    expect(onAdd.mock.calls[0][0].customizations).not.toContain("Extra");
+  }, 20000);
 });

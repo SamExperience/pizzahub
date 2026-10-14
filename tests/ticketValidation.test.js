@@ -1,3 +1,4 @@
+import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 import { describe, expect, it } from "vitest";
 import { validateTicketForm } from "../src/utils/ticketValidation";
 
@@ -62,5 +63,24 @@ describe("validateTicketForm", () => {
     expect(
       validate({ scheduledTime: "11:30", originalTime: "11:00" }).scheduledTime,
     ).toBe("Scheduled time is in the past");
+  });
+});
+
+describe("validateTicketForm item limit", () => {
+  const itemsOf = (count) =>
+    Array.from({ length: count }, (_, index) => ({ productId: `p${index}`, subtotal: 2 }));
+
+  it("accepts a ticket with exactly LIST_SIZE items", () => {
+    expect(validate({ items: itemsOf(FIELD_LIMITS.LIST_SIZE) })).toEqual({});
+  });
+
+  it("rejects a ticket with more than LIST_SIZE items", () => {
+    expect(validate({ items: itemsOf(FIELD_LIMITS.LIST_SIZE + 1) }).items).toBe(
+      `Maximum ${FIELD_LIMITS.LIST_SIZE} products per ticket.`,
+    );
+  });
+
+  it("rejects a ticket with no items", () => {
+    expect(validate({ items: [] }).items).toBe("Add at least one product");
   });
 });

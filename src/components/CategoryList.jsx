@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { button, emptyBox, input, primaryButton } from "../utils/styles";
 import ConfirmDialog from "./ConfirmDialog";
 
@@ -43,6 +44,7 @@ function CategoryRow({
             type="text"
             aria-label="Category name"
             className={input}
+            maxLength={FIELD_LIMITS.NAME}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
