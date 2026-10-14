@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ProductForm from "../src/components/ProductForm";
+import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 
 describe("ProductForm", () => {
   const onSubmit = vi.fn();
@@ -324,5 +325,96 @@ describe("ProductForm", () => {
         expect.objectContaining({ imageFile: file, removeImage: false }),
       );
     });
+  });
+});
+
+describe("ProductForm field limits", () => {
+  const PRODUCT = {
+    name: "Margherita",
+    description: "Tomato and mozzarella",
+    price: 7,
+    sizes: null,
+    ingredients: ["Basil"],
+    availableCookingLevels: null,
+    defaultCookingLevel: null,
+    isAvailable: true,
+  };
+  const listOf = (count, prefix) =>
+    Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`);
+
+  afterEach(cleanup);
+
+  it("limits the name, description and list inputs to FIELD_LIMITS", () => {
+    render(<ProductForm product={PRODUCT} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByLabelText("Name").getAttribute("maxlength")).toBe(
+      String(FIELD_LIMITS.NAME),
+    );
+    expect(screen.getByLabelText("Description").getAttribute("maxlength")).toBe(
+      String(FIELD_LIMITS.DESCRIPTION),
+    );
+    expect(screen.getByLabelText("Ingredient 1").getAttribute("maxlength")).toBe(
+      String(FIELD_LIMITS.LIST_ITEM),
+    );
+  });
+
+  it("limits the size name input to LIST_ITEM", async () => {
+    render(<ProductForm product={PRODUCT} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Add size" }));
+
+    expect(screen.getByLabelText("Size 1 name").getAttribute("maxlength")).toBe(
+      String(FIELD_LIMITS.LIST_ITEM),
+    );
+  });
+
+  it("disables adding an ingredient at LIST_SIZE and shows the reason", () => {
+    const ingredients = listOf(FIELD_LIMITS.LIST_SIZE, "Ingredient");
+
+    render(
+      <ProductForm
+        product={{ ...PRODUCT, ingredients }}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Add ingredient" }).disabled).toBe(true);
+    expect(
+      screen.getByText(`Maximum ${FIELD_LIMITS.LIST_SIZE} ingredients reached.`),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add cooking level" }).disabled).toBe(false);
+  });
+
+  it("allows adding the last ingredient and then disables the control", async () => {
+    const ingredients = listOf(FIELD_LIMITS.LIST_SIZE - 1, "Ingredient");
+
+    render(
+      <ProductForm
+        product={{ ...PRODUCT, ingredients }}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const addButton = screen.getByRole("button", { name: "Add ingredient" });
+
+    expect(addButton.disabled).toBe(false);
+    await userEvent.click(addButton);
+    expect(addButton.disabled).toBe(true);
+  });
+
+  it("disables adding a size at LIST_SIZE", () => {
+    const sizes = listOf(FIELD_LIMITS.LIST_SIZE, "Size").map((name) => ({
+      name,
+      price: 5,
+    }));
+
+    render(
+      <ProductForm product={{ ...PRODUCT, sizes }} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Add size" }).disabled).toBe(true);
+    expect(screen.getByText(`Maximum ${FIELD_LIMITS.LIST_SIZE} sizes reached.`)).toBeTruthy();
   });
 });

@@ -9,6 +9,8 @@ import {
 } from "firebase/firestore";
 
 import { getCategoriesByMenuId } from "./category.service";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
+import { requireText } from "../utils/textValidation";
 import { db } from "./firebase";
 
 export const getMenuByStoreId = async (storeId) => {
@@ -33,11 +35,14 @@ export const getMenuByStoreId = async (storeId) => {
 };
 
 export const createMenu = async (storeId, nameMenu) => {
+  if (!storeId) throw new Error("Store ID is required");
+
+  const name = requireText(nameMenu, FIELD_LIMITS.NAME, "Menu name");
   const menuRef = collection(db, "menus");
 
   const data = {
     storeId: storeId,
-    name: nameMenu,
+    name,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };

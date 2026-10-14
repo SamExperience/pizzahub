@@ -811,3 +811,110 @@ describe("getItemProduct", () => {
     await expect(getItemProduct("")).rejects.toThrow("Product ID is required");
   });
 });
+
+describe("product field limits", () => {
+  let limitCategory;
+  let nextPosition = 1;
+  const base = () => ({ name: `Limit ${nextPosition}`, position: nextPosition++, price: 5 });
+
+  beforeAll(async () => {
+    limitCategory = await createCategory(category.menuId, "Limits", 70);
+  });
+
+  it("limits the name to 100 characters on create and update", async () => {
+    await expect(
+      createProduct(limitCategory.id, { ...base(), name: "a".repeat(101) }),
+    ).rejects.toThrow("Product name must be at most 100 characters");
+
+    const product = await createProduct(limitCategory.id, {
+      ...base(),
+      name: "a".repeat(100),
+    });
+    await expect(
+      updateProductById(product.id, { name: "b".repeat(101) }),
+    ).rejects.toThrow("Product name must be at most 100 characters");
+  });
+
+  it("limits and trims the description", async () => {
+    await expect(
+      createProduct(limitCategory.id, { ...base(), description: "a".repeat(501) }),
+    ).rejects.toThrow("Product description must be at most 500 characters");
+
+    const product = await createProduct(limitCategory.id, {
+      ...base(),
+      description: ` ${"a".repeat(500)} `,
+    });
+    expect(product.description).toHaveLength(500);
+
+    await updateProductById(product.id, { description: "   " });
+    expect((await getProductById(product.id)).description).toBeNull();
+    await expect(
+      updateProductById(product.id, { description: "a".repeat(501) }),
+    ).rejects.toThrow("Product description must be at most 500 characters");
+  });
+
+  it("limits the number and length of ingredients", async () => {
+    const list = (count) => Array.from({ length: count }, (_, i) => `i${i}`);
+
+    await expect(
+      createProduct(limitCategory.id, { ...base(), ingredients: list(51) }),
+    ).rejects.toThrow("Product ingredients must have at most 50 elements");
+    await expect(
+      createProduct(limitCategory.id, { ...base(), ingredients: ["a".repeat(101)] }),
+    ).rejects.toThrow("Each product ingredients value must be at most 100 characters");
+
+    const product = await createProduct(limitCategory.id, {
+      ...base(),
+      ingredients: [...list(49), "a".repeat(100)],
+    });
+    expect(product.ingredients).toHaveLength(50);
+    await expect(
+      updateProductById(product.id, { ingredients: list(51) }),
+    ).rejects.toThrow("Product ingredients must have at most 50 elements");
+  });
+
+  it("limits cooking levels", () => {
+    const levels = (count) => Array.from({ length: count }, (_, i) => `l${i}`);
+
+    expect(() =>
+      validateProductCookingLevels({
+        availableCookingLevels: levels(51),
+        defaultCookingLevel: "l0",
+      }),
+    ).toThrow("Product cooking levels must have at most 50 elements");
+    expect(() =>
+      validateProductCookingLevels({
+        availableCookingLevels: ["a".repeat(101)],
+        defaultCookingLevel: "a".repeat(101),
+      }),
+    ).toThrow("must be at most 100 characters");
+    expect(
+      validateProductCookingLevels({
+        availableCookingLevels: levels(50),
+        defaultCookingLevel: "l0",
+      }).availableCookingLevels,
+    ).toHaveLength(50);
+  });
+
+  it("limits sizes and requires unique names", () => {
+    const sizes = (count) =>
+      Array.from({ length: count }, (_, i) => ({ name: `s${i}`, price: 1 }));
+
+    expect(validateProductPricing({ sizes: sizes(50), price: null }).sizes).toHaveLength(50);
+    expect(() => validateProductPricing({ sizes: sizes(51), price: null })).toThrow(
+      "Product sizes must have at most 50 elements",
+    );
+    expect(() =>
+      validateProductPricing({ sizes: [{ name: "a".repeat(101), price: 1 }], price: null }),
+    ).toThrow("Product size name must be at most 100 characters");
+    expect(() =>
+      validateProductPricing({
+        sizes: [
+          { name: "M", price: 1 },
+          { name: " m ", price: 2 },
+        ],
+        price: null,
+      }),
+    ).toThrow("Product size names must be unique");
+  });
+});

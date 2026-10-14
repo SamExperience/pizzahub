@@ -3,17 +3,18 @@ import { MapPin, Pencil, Phone } from "lucide-react";
 import { filterCustomersByFirstName } from "../services/customer.service";
 import { ORDER_TYPE } from "../services/order.service";
 import LoadingState from "./LoadingState";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { alert, button, ghostButton, input, label, muted } from "../utils/styles";
 import FieldError from "./FieldError";
 
 // Address grid: street + number, then postal code + city, then country
 // (postal code, city and country share one row from sm).
 const ADDRESS_INPUTS = [
-  { field: "street", label: "Street", required: true, span: "col-span-4" },
-  { field: "streetNumber", label: "Street number", required: true, span: "col-span-2" },
-  { field: "postalCode", label: "Postal code", required: true, span: "col-span-2" },
-  { field: "city", label: "City", required: true, span: "col-span-4 sm:col-span-2" },
-  { field: "country", label: "Country", required: false, span: "col-span-6 sm:col-span-2" },
+  { field: "street", label: "Street", required: true, span: "col-span-4", max: FIELD_LIMITS.ADDRESS_LINE },
+  { field: "streetNumber", label: "Street number", required: true, span: "col-span-2", max: FIELD_LIMITS.STREET_NUMBER },
+  { field: "postalCode", label: "Postal code", required: true, span: "col-span-2", max: FIELD_LIMITS.POSTAL_CODE },
+  { field: "city", label: "City", required: true, span: "col-span-4 sm:col-span-2", max: FIELD_LIMITS.ADDRESS_LINE },
+  { field: "country", label: "Country", required: false, span: "col-span-6 sm:col-span-2", max: FIELD_LIMITS.ADDRESS_LINE },
 ];
 
 const fieldInput = `${input} min-h-11 sm:min-h-10`;
@@ -152,6 +153,7 @@ export default function TicketCustomerSection({
               type="text"
               autoComplete="off"
               className={fieldInput}
+              maxLength={FIELD_LIMITS.NAME}
               placeholder="Search or enter a new customer"
               value={form.firstName}
               aria-invalid={Boolean(errors.firstName)}
@@ -199,6 +201,7 @@ export default function TicketCustomerSection({
                 id="customerLastName"
                 type="text"
                 className={fieldInput}
+                maxLength={FIELD_LIMITS.NAME}
                 value={form.lastName}
                 onChange={(event) => setField("lastName", event.target.value)}
               />
@@ -213,6 +216,7 @@ export default function TicketCustomerSection({
                 id="customerPhone"
                 type="tel"
                 className={fieldInput}
+                maxLength={FIELD_LIMITS.PHONE}
                 value={form.phone}
                 aria-invalid={Boolean(errors.phone)}
                 aria-describedby={errors.phone ? "customerPhone-error" : undefined}
@@ -224,7 +228,7 @@ export default function TicketCustomerSection({
 
           {isDelivery && (
             <div className="grid grid-cols-6 gap-3">
-              {ADDRESS_INPUTS.map(({ field, label: text, required, span }) => (
+              {ADDRESS_INPUTS.map(({ field, label: text, required, span, max }) => (
                 <div key={field} className={`min-w-0 ${span}`}>
                   <label htmlFor={`customer-${field}`} className={`${fieldLabel} truncate`}>
                     {text}
@@ -234,6 +238,7 @@ export default function TicketCustomerSection({
                     id={`customer-${field}`}
                     type="text"
                     className={fieldInput}
+                    maxLength={max}
                     value={form.address[field]}
                     aria-invalid={Boolean(errors[field])}
                     aria-describedby={errors[field] ? `customer-${field}-error` : undefined}

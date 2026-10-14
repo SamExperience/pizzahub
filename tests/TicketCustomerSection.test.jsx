@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TicketCustomerSection from "../src/components/TicketCustomerSection";
+import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 import { ORDER_TYPE } from "../src/services/order.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../src/utils/customerForm";
 
@@ -152,5 +153,28 @@ describe("TicketCustomerSection", () => {
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("TicketCustomerSection field limits", () => {
+  afterEach(cleanup);
+
+  it("limits the customer and address inputs to FIELD_LIMITS", () => {
+    render(<Harness orderType={ORDER_TYPE.DELIVERY} />);
+
+    const limits = [
+      [/First name/, FIELD_LIMITS.NAME],
+      ["Last name", FIELD_LIMITS.NAME],
+      [/Phone/, FIELD_LIMITS.PHONE],
+      [/^Street \*/, FIELD_LIMITS.ADDRESS_LINE],
+      [/^Street number/, FIELD_LIMITS.STREET_NUMBER],
+      [/^Postal code/, FIELD_LIMITS.POSTAL_CODE],
+      [/^City/, FIELD_LIMITS.ADDRESS_LINE],
+      [/^Country/, FIELD_LIMITS.ADDRESS_LINE],
+    ];
+
+    limits.forEach(([name, max]) => {
+      expect(screen.getByLabelText(name).getAttribute("maxlength")).toBe(String(max));
+    });
   });
 });

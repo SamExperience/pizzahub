@@ -536,3 +536,36 @@ describe("updateCategoryById", () => {
     expect(categories[0].name).toBe("New Pizzas");
   });
 });
+
+describe("category name length", () => {
+  it("rejects a name longer than 100 characters on create", async () => {
+    await expect(createCategory("menu1", "a".repeat(101), 1)).rejects.toThrow(
+      "Category name must be at most 100 characters",
+    );
+  });
+
+  it("accepts 100 characters and rejects 101 on create and update", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Category Limit Company",
+      storeName: "Category Limit Store",
+      street: "Rue du Lyon",
+      streetNumber: "9",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+    const menu = await createMenu(result.storeId, "Menu principale");
+    const category = await createCategory(menu.id, `${"a".repeat(100)} `, 1);
+
+    expect(category.name).toHaveLength(100);
+    await expect(
+      updateCategoryById(category.id, { name: "b".repeat(101) }),
+    ).rejects.toThrow("Category name must be at most 100 characters");
+    await expect(
+      updateCategoryById(category.id, { name: "b".repeat(100) }),
+    ).resolves.toBeUndefined();
+  });
+});

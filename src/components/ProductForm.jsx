@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { button, card, input, muted, primaryButton } from "../utils/styles";
 
 const EMPTY_SIZE = { name: "", price: "" };
@@ -27,7 +28,9 @@ const cleanList = (items) => {
 };
 
 // Repeatable text inputs with an add and a remove button.
-function TextListField({ legend, itemLabel, addLabel, items, onChange }) {
+function TextListField({ legend, itemLabel, addLabel, limitLabel, items, onChange }) {
+  const isFull = items.length >= FIELD_LIMITS.LIST_SIZE;
+
   return (
     <div className={sectionClass}>
     <fieldset className={fieldsetClass}>
@@ -38,6 +41,7 @@ function TextListField({ legend, itemLabel, addLabel, items, onChange }) {
             type="text"
             aria-label={`${itemLabel} ${index + 1}`}
             className={fieldInput}
+            maxLength={FIELD_LIMITS.LIST_ITEM}
             value={item}
             onChange={(event) =>
               onChange(
@@ -61,11 +65,17 @@ function TextListField({ legend, itemLabel, addLabel, items, onChange }) {
       <button
         type="button"
         className={addButton}
+        disabled={isFull}
         onClick={() => onChange([...items, ""])}
       >
         <Plus className="size-4" aria-hidden="true" />
         {addLabel}
       </button>
+      {isFull && (
+        <p className={muted}>
+          {`Maximum ${FIELD_LIMITS.LIST_SIZE} ${limitLabel} reached.`}
+        </p>
+      )}
     </fieldset>
     </div>
   );
@@ -156,6 +166,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           <input
             type="text"
             className={fieldInput}
+            maxLength={FIELD_LIMITS.NAME}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -165,6 +176,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           <textarea
             rows={2}
             className={input}
+            maxLength={FIELD_LIMITS.DESCRIPTION}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
           />
@@ -196,6 +208,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
               aria-label={`Size ${index + 1} name`}
               placeholder="Size"
               className={fieldInput}
+              maxLength={FIELD_LIMITS.LIST_ITEM}
               value={size.name}
               onChange={(event) => updateSize(index, "name", event.target.value)}
             />
@@ -227,11 +240,17 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
         <button
           type="button"
           className={addButton}
+          disabled={sizes.length >= FIELD_LIMITS.LIST_SIZE}
           onClick={() => setSizes((current) => [...current, EMPTY_SIZE])}
         >
           <Plus className="size-4" aria-hidden="true" />
           Add size
         </button>
+        {sizes.length >= FIELD_LIMITS.LIST_SIZE && (
+          <p className={muted}>
+            {`Maximum ${FIELD_LIMITS.LIST_SIZE} sizes reached.`}
+          </p>
+        )}
       </fieldset>
       </div>
 
@@ -239,6 +258,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
         legend="Ingredients"
         itemLabel="Ingredient"
         addLabel="Add ingredient"
+        limitLabel="ingredients"
         items={ingredients}
         onChange={setIngredients}
       />
@@ -247,6 +267,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
         legend="Cooking levels"
         itemLabel="Cooking level"
         addLabel="Add cooking level"
+        limitLabel="cooking levels"
         items={cookingLevels}
         onChange={setCookingLevels}
       />

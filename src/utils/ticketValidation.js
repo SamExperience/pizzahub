@@ -1,6 +1,7 @@
 // Field-level validation of the ticket form, used to show inline errors
 // before saving. The services keep the authoritative validation.
 import { ORDER_TYPE } from "../services/order.service";
+import { FIELD_LIMITS } from "./fieldLimits";
 import { timeToDate } from "./ticketTime";
 
 const DELIVERY_ADDRESS_LABELS = {
@@ -46,6 +47,8 @@ export const validateTicketForm = ({
     errors.scheduledTime = "Scheduled time is in the past";
 
   if (!items?.length) errors.items = "Add at least one product";
+  else if (items.length > FIELD_LIMITS.LIST_SIZE)
+    errors.items = `Maximum ${FIELD_LIMITS.LIST_SIZE} products per ticket.`;
 
   return errors;
 };

@@ -5,6 +5,7 @@ import {
   editRestrictedItem,
   reconfigureItem,
 } from "../services/order.service";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { formatPrice } from "../utils/format";
 import {
   button,
@@ -105,10 +106,13 @@ export default function ItemConfigModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  const customizationsFull = customizations.length >= FIELD_LIMITS.LIST_SIZE;
+
   const addCustomization = () => {
     const text = customizationText.trim();
 
-    if (text) setCustomizations((list) => [...list, text]);
+    if (text && !customizationsFull)
+      setCustomizations((list) => [...list, text]);
 
     setCustomizationText("");
   };
@@ -318,6 +322,7 @@ export default function ItemConfigModal({
                     id="customization"
                     type="text"
                     className={`${input} min-h-11`}
+                    maxLength={FIELD_LIMITS.LIST_ITEM}
                     placeholder="e.g. no onions"
                     value={customizationText}
                     onChange={(event) => setCustomizationText(event.target.value)}
@@ -331,11 +336,17 @@ export default function ItemConfigModal({
                   <button
                     type="button"
                     className={`${button} min-h-11 px-4`}
+                    disabled={customizationsFull}
                     onClick={addCustomization}
                   >
                     Add
                   </button>
                 </div>
+                {customizationsFull && (
+                  <p className={`${muted} mt-1 text-xs`}>
+                    {`Maximum ${FIELD_LIMITS.LIST_SIZE} customizations reached.`}
+                  </p>
+                )}
                 {customizations.length > 0 && (
                   <ul className="m-0 mt-2 flex list-none flex-wrap gap-2 p-0">
                     {customizations.map((text, index) => (

@@ -903,3 +903,96 @@ describe("subscribeToTodayOrders", () => {
     expect(firestore.onSnapshot).not.toHaveBeenCalled();
   });
 });
+
+describe("order field limits", () => {
+  const itemsOf = (count) =>
+    Array.from({ length: count }, () => buildItemSnapshot(drink, { quantity: 1 }));
+  const withItem = (changes) => ({
+    ...validOrder(),
+    items: [{ ...validOrder().items[0], ...changes }],
+  });
+
+  it("accepts 1 and 50 items and rejects 0 and 51", () => {
+    expect(validateOrder({ ...validOrder(), items: itemsOf(1) }).items).toHaveLength(1);
+    expect(validateOrder({ ...validOrder(), items: itemsOf(50) }).items).toHaveLength(50);
+    expect(() => validateOrder({ ...validOrder(), items: itemsOf(0) })).toThrow(
+      "Order must have at least one item",
+    );
+    expect(() => validateOrder({ ...validOrder(), items: itemsOf(51) })).toThrow(
+      "Order must have at most 50 elements",
+    );
+  });
+
+  it("applies the item count limits on create and edit", async () => {
+    const batch = { set: vi.fn(), update: vi.fn(), commit: vi.fn() };
+    firestore.writeBatch.mockReturnValue(batch);
+    const base = {
+      companyId: "company1",
+      orderId: "o1",
+      storeId: "store1",
+      customerData: { firstName: "Mario" },
+      ...validOrder(),
+    };
+
+    for (const count of [0, 51]) {
+      await expect(createOrder({ ...base, items: itemsOf(count) })).rejects.toThrow();
+      await expect(updateOrder({ ...base, items: itemsOf(count) })).rejects.toThrow();
+    }
+    await expect(createOrder({ ...base, items: itemsOf(50) })).resolves.toBeDefined();
+    await expect(updateOrder({ ...base, items: itemsOf(50) })).resolves.toBeUndefined();
+  });
+
+  it("rejects an invalid quantity", () => {
+    for (const quantity of [0, 1.5])
+      expect(() => validateOrder(withItem({ quantity }))).toThrow(
+        "Item quantity must be a positive integer",
+      );
+  });
+
+  it("rejects negative or non-finite prices and a missing product", () => {
+    expect(() => validateOrder(withItem({ unitPrice: -1 }))).toThrow(
+      "Item unit price must be a non-negative number",
+    );
+    expect(() => validateOrder(withItem({ subtotal: -1 }))).toThrow(
+      "Item subtotal must be a non-negative number",
+    );
+    expect(() => validateOrder(withItem({ subtotal: Infinity }))).toThrow(
+      "Item subtotal must be a non-negative number",
+    );
+    expect(() => validateOrder(withItem({ productId: " " }))).toThrow(
+      "Item product ID is required",
+    );
+    expect(() => validateOrder(withItem({ productName: "" }))).toThrow(
+      "Item product name is required",
+    );
+  });
+
+  it("limits the customizations of a saved item", () => {
+    const texts = (count, length = 1) => Array.from({ length: count }, () => "a".repeat(length));
+
+    expect(() => validateOrder(withItem({ customizations: texts(50, 100) }))).not.toThrow();
+    expect(() => validateOrder(withItem({ customizations: texts(51) }))).toThrow(
+      "Item customizations must have at most 50 elements",
+    );
+    expect(() => validateOrder(withItem({ customizations: texts(1, 101) }))).toThrow(
+      "Each item customization must be at most 100 characters",
+    );
+  });
+
+  it("limits the customizations when items are built or edited", () => {
+    const tooMany = Array.from({ length: 51 }, (_, i) => `c${i}`);
+    const tooLong = ["a".repeat(101)];
+
+    expect(() => buildItemSnapshot(drink, { quantity: 1, customizations: tooMany })).toThrow(
+      "Item customizations must have at most 50 elements",
+    );
+    expect(() => buildItemSnapshot(drink, { quantity: 1, customizations: tooLong })).toThrow(
+      "Each item customization must be at most 100 characters",
+    );
+
+    const item = buildItemSnapshot(drink, { quantity: 2 });
+    expect(() => editRestrictedItem(item, { customizations: tooLong, quantity: 1 }, 2)).toThrow(
+      "Each item customization must be at most 100 characters",
+    );
+  });
+});
