@@ -307,6 +307,16 @@ service cloud.firestore {
         && (!data.keys().hasAny(["position"]) || isPosition(data.position));
     }
 
+    // Decision A1: a product with sizes has price null; a product without
+    // sizes (null or empty) needs a price (its range is checked above).
+    function hasValidPricing(data) {
+      let sizes = data.get("sizes", null);
+
+      return sizes is list && sizes.size() > 0
+        ? data.get("price", null) == null
+        : data.get("price", null) is number;
+    }
+
     function isValidProductCreate(data) {
       return data.keys().hasOnly([
           "categoryId", "name", "description", "ingredients", "sizes", "price",
@@ -319,12 +329,14 @@ service cloud.firestore {
           "imageUrl", "position", "createdAt", "updatedAt"
         ])
         && isValidProductFields(data)
+        && hasValidPricing(data)
         && data.createdAt == request.time
         && data.updatedAt == request.time;
     }
 
     // Keys are never removed by the app, so none can be removed here either;
-    // categoryId and createdAt never change.
+    // categoryId and createdAt never change. Pricing is checked when the
+    // update touches sizes or price, so legacy products stay editable.
     function isValidProductUpdate(data) {
       let changed = data.diff(resource.data);
 
@@ -340,6 +352,8 @@ service cloud.firestore {
         ])
         && !changed.affectedKeys().hasAny(["categoryId", "createdAt"])
         && isValidProductFields(data)
+        && (!changed.affectedKeys().hasAny(["sizes", "price"])
+          || hasValidPricing(data))
         && data.updatedAt == request.time;
     }
 

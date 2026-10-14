@@ -1594,6 +1594,48 @@ describe("product validation rules", () => {
     await expect(create({ createdAt: new Date() })).rejects.toThrow();
   });
 
+  it("requires either a price or sizes on creation (decision A1)", async () => {
+    await signInAs(storeA);
+    const sizes = [{ name: "M", price: 12 }];
+
+    await expect(create({ sizes: null, price: null })).rejects.toThrow();
+    await expect(create({ sizes: [], price: null })).rejects.toThrow();
+    await expect(create({ sizes, price: 12 })).rejects.toThrow();
+    await expect(create({ sizes: [], price: 8 })).resolves.toBeDefined();
+    await expect(create({ sizes, price: null })).resolves.toBeDefined();
+  });
+
+  it("checks pricing on updates that touch sizes or price", async () => {
+    await signInAs(storeA);
+    const ref = await create();
+    const touch = (data) =>
+      updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+    const sizes = [{ name: "M", price: 12 }];
+
+    await expect(touch({ price: null })).rejects.toThrow();
+    await expect(touch({ sizes })).rejects.toThrow();
+    await expect(touch({ sizes, price: null })).resolves.toBeUndefined();
+    await expect(touch({ price: 9 })).rejects.toThrow();
+    await expect(touch({ sizes: null, price: 9 })).resolves.toBeUndefined();
+
+    // A legacy product without price or sizes stays editable until its
+    // pricing is touched, which then must be valid.
+    const legacy = doc(
+      db,
+      "products",
+      await seedDoc("products", { categoryId: storeA.categoryId, name: "Old" }),
+    );
+    await expect(
+      updateDoc(legacy, { isAvailable: false, updatedAt: serverTimestamp() }),
+    ).resolves.toBeUndefined();
+    await expect(
+      updateDoc(legacy, { sizes: null, updatedAt: serverTimestamp() }),
+    ).rejects.toThrow();
+    await expect(
+      updateDoc(legacy, { price: 7, updatedAt: serverTimestamp() }),
+    ).resolves.toBeUndefined();
+  });
+
   describe("update", () => {
     let ref;
     const touch = (data = {}) =>
