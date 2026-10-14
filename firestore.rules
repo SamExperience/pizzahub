@@ -566,5 +566,14 @@ service cloud.firestore {
         && request.resource.data.companyId == resource.data.companyId
         && isValidCustomerUpdate(request.resource.data);
     }
+
+    // Subscription status of a Company (document id = companyId). Written
+    // only by Cloud Functions: the Admin SDK bypasses these rules.
+    match /subscriptions/{companyId} {
+      allow read: if request.auth != null
+        && userCompanyId() == companyId;
+
+      allow write: if false;
+    }
   }
 }

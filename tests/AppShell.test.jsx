@@ -14,6 +14,22 @@ vi.mock("../src/contexts/StoreContext", () => ({
   useStore: vi.fn(),
 }));
 
+const billing = vi.hoisted(() => ({ subscribe: vi.fn() }));
+
+vi.mock("../src/services/billing.service", async (importOriginal) => ({
+  ...(await importOriginal()),
+  subscribeToSubscription: billing.subscribe,
+}));
+
+const BANNER_TEXT = "Your subscription is not active.";
+
+// The listener reports this subscription synchronously.
+const emitting = (subscription) =>
+  billing.subscribe.mockImplementation((companyId, onChange) => {
+    onChange(subscription);
+    return () => {};
+  });
+
 const logout = vi.fn();
 
 function renderShell(path) {
@@ -42,7 +58,9 @@ describe("App shell", () => {
       userProfile: { displayName: "Sam" },
       logout,
     });
-    useStore.mockReturnValue({ selectedStore: { id: "s1", name: "Napoli" } });
+    useStore.mockReturnValue({ selectedStore: { id: "s1", name: "Napoli" }, menuReady: true });
+    billing.subscribe.mockReset();
+    emitting({ status: "active" });
   });
 
   it("shows the active store and the user display name", () => {
@@ -123,5 +141,75 @@ describe("App shell", () => {
     await user.click(screen.getByRole("button", { name: "Logout" }));
 
     expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  describe("subscription banner", () => {
+    beforeEach(() => {
+      useAuth.mockReturnValue({
+        authUser: { email: "sam@example.com" },
+        userProfile: { displayName: "Sam", companyId: "company-1" },
+        logout,
+      });
+    });
+
+    it.each([
+      ["there is no subscription", null],
+      ["the subscription is not active", { status: "canceled" }],
+    ])("is shown with a link to the subscription when %s", (_, subscription) => {
+      emitting(subscription);
+
+      renderShell("/tableau");
+
+      expect(billing.subscribe.mock.calls[0][0]).toBe("company-1");
+      expect(screen.getByText(BANNER_TEXT)).toBeTruthy();
+      expect(
+        screen.getByRole("link", { name: "Manage subscription" }).getAttribute("href"),
+      ).toBe("/dashboard?section=subscription");
+    });
+
+    it("is hidden when the subscription is active", () => {
+      renderShell("/tableau");
+
+      expect(screen.queryByText(BANNER_TEXT)).toBeNull();
+    });
+
+    it("is hidden while loading", () => {
+      billing.subscribe.mockImplementation(() => () => {});
+
+      renderShell("/tableau");
+
+      expect(screen.queryByText(BANNER_TEXT)).toBeNull();
+    });
+
+    it("is hidden when the subscription cannot be read", () => {
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      billing.subscribe.mockImplementation((companyId, onChange, onError) => {
+        onError(new Error("denied"));
+        return () => {};
+      });
+
+      renderShell("/tableau");
+
+      expect(screen.queryByText(BANNER_TEXT)).toBeNull();
+    });
+
+    it("is not shown until the Menu is ready", () => {
+      useStore.mockReturnValue({ selectedStore: { id: "s1", name: "Napoli" }, menuReady: false });
+      emitting(null);
+
+      renderShell("/menu");
+
+      expect(screen.queryByText(BANNER_TEXT)).toBeNull();
+      expect(billing.subscribe).not.toHaveBeenCalled();
+    });
+
+    it("is not shown in the minimal layout", () => {
+      emitting(null);
+
+      renderShell("/stores");
+
+      expect(screen.queryByText(BANNER_TEXT)).toBeNull();
+      expect(billing.subscribe).not.toHaveBeenCalled();
+    });
   });
 });

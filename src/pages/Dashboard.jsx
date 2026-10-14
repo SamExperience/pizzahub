@@ -1,17 +1,40 @@
 import { useState } from "react";
-import { History } from "lucide-react";
+import { useSearchParams } from "react-router";
+import { CreditCard, History } from "lucide-react";
 import OrderHistory from "../components/OrderHistory";
+import SubscriptionSection from "../components/SubscriptionSection";
 import { pageTitle } from "../utils/styles";
 
 // Dashboard sections; adding one is a new entry here.
 const SECTIONS = [
   { id: "orders", label: "Order history", icon: History, Component: OrderHistory },
+  { id: "subscription", label: "Subscription", icon: CreditCard, Component: SubscriptionSection },
 ];
 
+// Section requested by the URL: the Checkout return (?checkout=...) and the
+// subscription banner (?section=subscription) open Subscription.
+const requestedSection = (searchParams) =>
+  searchParams.has("checkout") || searchParams.get("section") === "subscription"
+    ? "subscription"
+    : null;
+
 // Dashboard shell: section sidebar (a top selector on mobile) and the active
-// section. The selection is local state, not a route.
+// section. The selection is local state, not a route; a URL request selects
+// its section on load and whenever the query string changes.
 export default function Dashboard() {
-  const [activeId, setActiveId] = useState(SECTIONS[0].id);
+  const [searchParams] = useSearchParams();
+  const search = searchParams.toString();
+  const [activeId, setActiveId] = useState(
+    () => requestedSection(searchParams) ?? SECTIONS[0].id,
+  );
+  const [prevSearch, setPrevSearch] = useState(search);
+
+  if (search !== prevSearch) {
+    setPrevSearch(search);
+    const requested = requestedSection(searchParams);
+    if (requested) setActiveId(requested);
+  }
+
   const active = SECTIONS.find((section) => section.id === activeId) ?? SECTIONS[0];
   const ActiveSection = active.Component;
 
