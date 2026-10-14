@@ -1,0 +1,121 @@
+import { useId, useState } from "react";
+import { useSearchParams } from "react-router";
+import { Info } from "lucide-react";
+import LoadingState from "./LoadingState";
+import { useAuth } from "../contexts/AuthContext";
+import { isSubscriptionActive, startCheckout } from "../services/billing.service";
+import { formatDate } from "../utils/format";
+import useSubscription from "../utils/useSubscription";
+import { alert, badge, card, muted, primaryButton, sectionTitle } from "../utils/styles";
+
+// Labels of the Stripe statuses (docs/01-data-model.md); unknown ones are shown as received.
+const STATUS_LABELS = {
+  active: "Active",
+  past_due: "Past due",
+  canceled: "Canceled",
+  incomplete: "Incomplete",
+  incomplete_expired: "Incomplete (expired)",
+  unpaid: "Unpaid",
+  paused: "Paused",
+};
+
+const info =
+  "flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800";
+
+// Subscription status of the Company and the Stripe Checkout entry point (test mode).
+export default function SubscriptionSection() {
+  const { userProfile } = useAuth();
+  const { subscription, loading, error } = useSubscription(userProfile?.companyId);
+  const [searchParams] = useSearchParams();
+  const [redirecting, setRedirecting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
+  const titleId = useId();
+
+  const active = isSubscriptionActive(subscription);
+  const checkout = searchParams.get("checkout");
+  const endDate = formatDate(subscription?.currentPeriodEnd);
+
+  const handleSubscribe = async () => {
+    setCheckoutError(null);
+    setRedirecting(true);
+
+    try {
+      // On success the browser leaves the page, so redirecting stays true.
+      await startCheckout();
+    } catch (err) {
+      console.log("Error starting the checkout -> ", err);
+      setCheckoutError(err);
+      setRedirecting(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-4">
+      <h2 id={titleId} className={`${sectionTitle} m-0`}>
+        Subscription
+      </h2>
+      {loading ? (
+        <LoadingState />
+      ) : error ? (
+        <p role="alert" className={`${alert} m-0`}>
+          Unable to load the subscription.
+        </p>
+      ) : (
+        <div className={`${card} flex flex-col gap-4`}>
+          {checkout === "success" && !active && (
+            <p role="status" className={`${info} m-0`}>
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              Payment is being processed. The status updates automatically in a few moments.
+            </p>
+          )}
+          {checkout === "cancel" && !active && (
+            <p role="status" className={`${info} m-0`}>
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              Checkout cancelled. No payment was made.
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-neutral-700">Status</span>
+            <span
+              className={`${badge} ${
+                active ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {subscription
+                ? (STATUS_LABELS[subscription.status] ?? subscription.status)
+                : "No subscription"}
+            </span>
+          </div>
+
+          {endDate && (
+            <p className="m-0 text-sm text-neutral-700">
+              {subscription.cancelAtPeriodEnd ? "Ends on " : "Renews on "}
+              {endDate}
+            </p>
+          )}
+
+          {!active && (
+            <div className="flex flex-col items-start gap-2">
+              <button
+                type="button"
+                className={primaryButton}
+                disabled={redirecting}
+                onClick={handleSubscribe}
+              >
+                {redirecting ? "Redirecting to checkout ..." : "Subscribe"}
+              </button>
+              {checkoutError && (
+                <p role="alert" className={`${alert} m-0`}>
+                  Unable to start the checkout. Please try again.
+                </p>
+              )}
+            </div>
+          )}
+
+          <p className={`${muted} m-0`}>Test mode: no real payments are made.</p>
+        </div>
+      )}
+    </section>
+  );
+}
