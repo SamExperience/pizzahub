@@ -4,6 +4,8 @@ import {
   doc,
   serverTimestamp,
 } from "firebase/firestore";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
+import { optionalText, requireText } from "../utils/textValidation";
 import { db } from "./firebase";
 
 export async function createOnboardingWorkspace({
@@ -17,6 +19,30 @@ export async function createOnboardingWorkspace({
   city,
   country,
 }) {
+  const company = requireText(companyName, FIELD_LIMITS.NAME, "Company name");
+  const store = requireText(storeName, FIELD_LIMITS.NAME, "Store name");
+  const address = {
+    street: requireText(street, FIELD_LIMITS.ADDRESS_LINE, "Street"),
+    streetNumber: optionalText(
+      streetNumber,
+      FIELD_LIMITS.STREET_NUMBER,
+      "Street number",
+    ),
+    postalCode: requireText(
+      postalCode,
+      FIELD_LIMITS.POSTAL_CODE,
+      "Postal code",
+    ),
+    city: requireText(city, FIELD_LIMITS.ADDRESS_LINE, "City"),
+    country: requireText(country, FIELD_LIMITS.ADDRESS_LINE, "Country"),
+  };
+  // The display name comes from the auth provider, not from a form: it is
+  // truncated instead of rejected so a long provider name never blocks sign-up.
+  const displayName =
+    typeof userName === "string" && userName.trim()
+      ? userName.trim().slice(0, FIELD_LIMITS.NAME)
+      : null;
+
   const refCollectionCompanies = collection(db, "companies");
   const refCollectionStore = collection(db, "stores");
   const refCollectionUser = collection(db, "users");
@@ -27,21 +53,15 @@ export async function createOnboardingWorkspace({
 
   await runTransaction(db, async (transaction) => {
     transaction.set(refDocCompanies, {
-      name: companyName,
+      name: company,
       logoUrl: null,
       address: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
     transaction.set(refDocStores, {
-      name: storeName,
-      address: {
-        street: street,
-        streetNumber: streetNumber,
-        postalCode: postalCode,
-        city: city,
-        country: country,
-      },
+      name: store,
+      address,
       companyId: refDocCompanies.id,
       isActive: true,
       imageUrl: null,
@@ -53,7 +73,7 @@ export async function createOnboardingWorkspace({
       companyId: refDocCompanies.id,
       storeId: refDocStores.id,
       role: "admin",
-      displayName: userName,
+      displayName,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

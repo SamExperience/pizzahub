@@ -9,6 +9,8 @@ import {
   where,
 } from "firebase/firestore";
 
+import { FIELD_LIMITS } from "../utils/fieldLimits";
+import { assertMaxLength } from "../utils/textValidation";
 import { db } from "./firebase";
 import { ORDER_TYPE } from "./order.service";
 
@@ -95,6 +97,20 @@ export const filterCustomersByFirstName = (customers, searchText) => {
   );
 };
 
+const CUSTOMER_FIELD_LIMITS = [
+  ["firstName", "First name", FIELD_LIMITS.NAME],
+  ["lastName", "Last name", FIELD_LIMITS.NAME],
+  ["phone", "Phone", FIELD_LIMITS.PHONE],
+];
+
+const CUSTOMER_ADDRESS_FIELD_LIMITS = [
+  ["street", "Street", FIELD_LIMITS.ADDRESS_LINE],
+  ["streetNumber", "Street number", FIELD_LIMITS.STREET_NUMBER],
+  ["postalCode", "Postal code", FIELD_LIMITS.POSTAL_CODE],
+  ["city", "City", FIELD_LIMITS.ADDRESS_LINE],
+  ["country", "Country", FIELD_LIMITS.ADDRESS_LINE],
+];
+
 // Validates the Customer for the order type and returns the normalized data.
 // Takeaway: first name. Delivery: also phone and street, street number,
 // postal code and city.
@@ -105,6 +121,17 @@ export const validateCustomer = (data, orderType) => {
   const customer = normalizeCustomer(data);
 
   if (!customer.firstName) throw new Error("Customer first name is required");
+
+  CUSTOMER_FIELD_LIMITS.forEach(([field, label, max]) =>
+    assertMaxLength(customer[field], max, `Customer ${label.toLowerCase()}`),
+  );
+  CUSTOMER_ADDRESS_FIELD_LIMITS.forEach(([field, label, max]) =>
+    assertMaxLength(
+      customer.address?.[field],
+      max,
+      `Customer ${label.toLowerCase()}`,
+    ),
+  );
 
   if (orderType === ORDER_TYPE.DELIVERY) {
     if (!customer.phone)

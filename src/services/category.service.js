@@ -12,6 +12,8 @@ import {
   writeBatch,
 } from "firebase/firestore";
 
+import { FIELD_LIMITS } from "../utils/fieldLimits";
+import { assertMaxLength } from "../utils/textValidation";
 import { db } from "./firebase";
 import { deleteProductImage, getProductsByCategoryId } from "./product.service";
 
@@ -83,6 +85,7 @@ export const createCategory = async (menuId, nameCategory, position) => {
 
   const normalizedName = nameCategory.trim();
   if (!normalizedName) throw new Error("Category name is required");
+  assertMaxLength(normalizedName, FIELD_LIMITS.NAME, "Category name");
 
   if (!Number.isInteger(position) || position < 1)
     throw new Error("Category position must be a positive integer");
@@ -234,6 +237,8 @@ export const updateCategoryById = async (categoryId, data) => {
     if (!normalizedName) {
       throw new Error("Category name is required");
     }
+
+    assertMaxLength(normalizedName, FIELD_LIMITS.NAME, "Category name");
 
     if (normalizedName !== currentCategory.name) {
       const isNameValid = await validateCategoryName(

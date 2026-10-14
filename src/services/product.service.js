@@ -18,6 +18,8 @@ import {
   uploadBytes,
 } from "firebase/storage";
 
+import { FIELD_LIMITS } from "../utils/fieldLimits";
+import { assertMaxItems, assertMaxLength } from "../utils/textValidation";
 import { db, storage } from "./firebase";
 
 const isValidPrice = (value) =>
@@ -40,15 +42,24 @@ export const validateProductPricing = ({ sizes, price }) => {
       throw new Error("Product price must be null when sizes are defined");
     }
 
+    assertMaxItems(sizes, FIELD_LIMITS.LIST_SIZE, "Product sizes");
+
     const normalizedSizes = sizes.map((size) => {
       const sizeName = typeof size?.name === "string" ? size.name.trim() : "";
 
       if (!sizeName) throw new Error("Product size name is required");
+      assertMaxLength(sizeName, FIELD_LIMITS.LIST_ITEM, "Product size name");
       if (!isValidPrice(size.price))
         throw new Error("Product size price must be a non-negative number");
 
       return { name: sizeName, price: size.price };
     });
+
+    const uniqueNames = new Set(
+      normalizedSizes.map((size) => size.name.toLowerCase()),
+    );
+    if (uniqueNames.size !== normalizedSizes.length)
+      throw new Error("Product size names must be unique");
 
     return { sizes: normalizedSizes, price: null };
   }
@@ -62,6 +73,8 @@ export const validateProductPricing = ({ sizes, price }) => {
 const validateProductName = (name) => {
   if (typeof name !== "string" || !name.trim())
     throw new Error("Product name is required");
+
+  assertMaxLength(name.trim(), FIELD_LIMITS.NAME, "Product name");
 
   return name.trim();
 };
@@ -120,9 +133,12 @@ const normalizeStringList = (value, label) => {
 
   if (!Array.isArray(value)) throw new Error(`Product ${label} must be an array`);
 
+  assertMaxItems(value, FIELD_LIMITS.LIST_SIZE, `Product ${label}`);
+
   const items = value.map((item) => {
     const text = typeof item === "string" ? item.trim() : "";
     if (!text) throw new Error(`Product ${label} must not contain blank values`);
+    assertMaxLength(text, FIELD_LIMITS.LIST_ITEM, `Each product ${label} value`);
     return text;
   });
 
@@ -166,13 +182,21 @@ export const validateProductCookingLevels = ({
   return { availableCookingLevels: levels, defaultCookingLevel: defaultLevel };
 };
 
-const validateOptionalText = (value, label) => {
+const validateOptionalText = (value, label, max = null) => {
   if (value === null || value === undefined) return null;
 
   if (typeof value !== "string") throw new Error(`Product ${label} must be text`);
 
-  return value;
+  if (max === null) return value;
+
+  const text = value.trim();
+  assertMaxLength(text, max, `Product ${label}`);
+
+  return text || null;
 };
+
+const validateProductDescription = (value) =>
+  validateOptionalText(value, "description", FIELD_LIMITS.DESCRIPTION);
 
 export const createProduct = async (categoryId, data) => {
   if (!categoryId) throw new Error("Category ID is required");
@@ -189,7 +213,7 @@ export const createProduct = async (categoryId, data) => {
   const { sizes, price } = validateProductPricing(data);
   const { availableCookingLevels, defaultCookingLevel } =
     validateProductCookingLevels(data);
-  const description = validateOptionalText(data.description, "description");
+  const description = validateProductDescription(data.description);
   const imageUrl = validateOptionalText(data.imageUrl, "image URL");
   const ingredients = normalizeStringList(data.ingredients, "ingredients");
 
@@ -306,7 +330,7 @@ export const updateProductById = async (productId, data) => {
   }
 
   if (has("description"))
-    updates.description = validateOptionalText(data.description, "description");
+    updates.description = validateProductDescription(data.description);
 
   if (has("imageUrl"))
     updates.imageUrl = validateOptionalText(data.imageUrl, "image URL");
