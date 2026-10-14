@@ -33,6 +33,10 @@ export default function SubscriptionSection() {
 
   const active = isSubscriptionActive(subscription);
   const checkout = searchParams.get("checkout");
+  // The ?checkout=success URL stays after the return from Checkout: the message
+  // is shown only while the webhook has not written a final status yet.
+  const processing =
+    checkout === "success" && (!subscription || subscription.status === "incomplete");
   const endDate = formatDate(subscription?.currentPeriodEnd);
 
   const handleSubscribe = async () => {
@@ -62,7 +66,7 @@ export default function SubscriptionSection() {
         </p>
       ) : (
         <div className={`${card} flex flex-col gap-4`}>
-          {checkout === "success" && !active && (
+          {processing && (
             <p role="status" className={`${info} m-0`}>
               <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               Payment is being processed. The status updates automatically in a few moments.

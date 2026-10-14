@@ -158,6 +158,21 @@ describe("SubscriptionSection", () => {
     expect(screen.getByText("Active")).toBeTruthy();
   });
 
+  it("keeps the processing message while the subscription is incomplete", () => {
+    renderSection("/dashboard?checkout=success");
+    emit({ status: "incomplete", currentPeriodEnd: null, cancelAtPeriodEnd: false });
+
+    expect(screen.getByText(/Payment is being processed/)).toBeTruthy();
+  });
+
+  it("hides the processing message once the subscription has a final status", () => {
+    renderSection("/dashboard?checkout=success");
+    emit({ status: "canceled", currentPeriodEnd: periodEnd, cancelAtPeriodEnd: false });
+
+    expect(screen.queryByText(/Payment is being processed/)).toBeNull();
+    expect(screen.getByText("Canceled")).toBeTruthy();
+  });
+
   it("shows the cancelled message after a cancelled checkout", () => {
     renderSection("/dashboard?checkout=cancel");
     emit(null);
