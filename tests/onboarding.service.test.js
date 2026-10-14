@@ -118,3 +118,87 @@ describe("createOnboardingWorkspace", () => {
     });
   });
 });
+
+describe("createOnboardingWorkspace validation", () => {
+  const validData = {
+    uid: "uid1",
+    userName: "Test User",
+    companyName: "Test Company",
+    storeName: "Test Store",
+    street: "Rue du Lyon",
+    streetNumber: "3",
+    postalCode: "1201",
+    city: "Genève",
+    country: "Switzerland",
+  };
+
+  const registerUser = async () => {
+    const credential = await createUserWithEmailAndPassword(
+      auth,
+      `onboarding-${randomUUID()}@test.local`,
+      "Password123!",
+    );
+    return credential.user.uid;
+  };
+
+  afterEach(async () => {
+    await signOut(auth);
+    await clearFirestoreEmulator();
+  });
+
+  it.each([
+    ["companyName", "Company name"],
+    ["storeName", "Store name"],
+    ["street", "Street"],
+    ["postalCode", "Postal code"],
+    ["city", "City"],
+    ["country", "Country"],
+  ])("rejects a blank %s", async (field, label) => {
+    await expect(
+      createOnboardingWorkspace({ ...validData, [field]: "   " }),
+    ).rejects.toThrow(`${label} is required`);
+  });
+
+  it.each([
+    ["companyName", 101, "Company name"],
+    ["storeName", 101, "Store name"],
+    ["street", 101, "Street"],
+    ["streetNumber", 21, "Street number"],
+    ["postalCode", 21, "Postal code"],
+    ["city", 101, "City"],
+    ["country", 101, "Country"],
+  ])("rejects a too long %s", async (field, length, label) => {
+    await expect(
+      createOnboardingWorkspace({ ...validData, [field]: "a".repeat(length) }),
+    ).rejects.toThrow(`${label} must be at most`);
+  });
+
+  it("trims the data, nulls an empty street number and truncates a long display name", async () => {
+    const uid = await registerUser();
+
+    const result = await createOnboardingWorkspace({
+      ...validData,
+      uid,
+      userName: "n".repeat(120),
+      companyName: ` ${"c".repeat(100)} `,
+      streetNumber: "  ",
+    });
+    const [companySnap, storeSnap, userSnap] = await Promise.all([
+      getDoc(doc(db, "companies", result.companyId)),
+      getDoc(doc(db, "stores", result.storeId)),
+      getDoc(doc(db, "users", uid)),
+    ]);
+
+    expect(companySnap.data().name).toBe("c".repeat(100));
+    expect(storeSnap.data().address.streetNumber).toBeNull();
+    expect(userSnap.data().displayName).toBe("n".repeat(100));
+  });
+
+  it("stores a null display name when none is provided", async () => {
+    const uid = await registerUser();
+
+    await createOnboardingWorkspace({ ...validData, uid, userName: null });
+
+    expect((await getDoc(doc(db, "users", uid))).data().displayName).toBeNull();
+  });
+});

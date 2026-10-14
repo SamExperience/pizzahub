@@ -116,3 +116,32 @@ describe("isMenuReady", () => {
     expect(await isMenuReady(storeId)).toBe(true);
   });
 });
+
+describe("createMenu validation", () => {
+  it("requires the store and a non-blank name of at most 100 characters", async () => {
+    await expect(createMenu("", "Menu")).rejects.toThrow("Store ID is required");
+    await expect(createMenu("store1", "   ")).rejects.toThrow("Menu name is required");
+    await expect(createMenu("store1", "a".repeat(101))).rejects.toThrow(
+      "Menu name must be at most 100 characters",
+    );
+  });
+
+  it("accepts a name of 100 characters and trims it", async () => {
+    const user = await registerTestUser();
+    const result = await createOnboardingWorkspace({
+      uid: user.uid,
+      userName: user.displayName,
+      companyName: "Menu Limit Company",
+      storeName: "Menu Limit Store",
+      street: "Rue du Lyon",
+      streetNumber: "8",
+      postalCode: "1201",
+      city: "Genève",
+      country: "Switzerland",
+    });
+
+    const menu = await createMenu(result.storeId, ` ${"a".repeat(100)} `);
+
+    expect(menu.name).toBe("a".repeat(100));
+  });
+});

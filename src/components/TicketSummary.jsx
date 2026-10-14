@@ -1,5 +1,6 @@
 import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ITEM_PRODUCT_STATUS } from "../services/product.service";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { formatPrice } from "../utils/format";
 import { emptyBox, iconButton, muted, primaryButton } from "../utils/styles";
 import FieldError from "./FieldError";
@@ -33,6 +34,8 @@ export default function TicketSummary({
   itemMessages = {},
 }) {
   const count = items.reduce((total, item) => total + (item.quantity ?? 0), 0);
+  // A new line is refused at the limit; quantity changes are not new lines.
+  const linesFull = items.length >= FIELD_LIMITS.LIST_SIZE;
 
   return (
     <section aria-label="Ticket summary" className="@container flex flex-col gap-3">
@@ -44,6 +47,7 @@ export default function TicketSummary({
           <button
             type="button"
             className={`${primaryButton} min-h-10 px-3`}
+            disabled={linesFull}
             onClick={onAddProduct}
           >
             <Plus className="size-4" aria-hidden="true" />
@@ -51,6 +55,11 @@ export default function TicketSummary({
           </button>
         )}
       </div>
+      {onAddProduct && linesFull && (
+        <p className={`${muted} m-0 text-xs`}>
+          {`Maximum ${FIELD_LIMITS.LIST_SIZE} products per ticket.`}
+        </p>
+      )}
       {items.length === 0 ? (
         <p className={`${emptyBox} m-0 py-6!`}>No products added yet.</p>
       ) : (

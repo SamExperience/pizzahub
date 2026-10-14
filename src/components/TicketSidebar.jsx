@@ -10,6 +10,7 @@ import {
 } from "../services/order.service";
 import { getItemProduct, ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { formatPrice } from "../utils/format";
 import {
   alert,
@@ -67,9 +68,14 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   }, [config]);
   // Message under one Item of the summary: { index, text } or null.
   const [itemMessage, setItemMessage] = useState(null);
+  // The product panel can stay open after the last free line is used: a new
+  // line is refused at the limit.
   const selectProduct = useCallback(
-    (product) => setConfig({ product, index: null, restricted: false }),
-    [],
+    (product) => {
+      if (items.length < FIELD_LIMITS.LIST_SIZE)
+        setConfig({ product, index: null, restricted: false });
+    },
+    [items.length],
   );
   const closeConfig = useCallback(() => setConfig(null), []);
   const addItem = useCallback(

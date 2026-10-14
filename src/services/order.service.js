@@ -12,6 +12,8 @@ import {
 } from "firebase/firestore";
 
 import { addCustomerToBatch } from "./customer.service";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
+import { assertMaxItems, assertMaxLength } from "../utils/textValidation";
 import { db } from "./firebase";
 
 export const ORDER_STATUS = {
@@ -36,12 +38,58 @@ export const ORDER_TYPE = {
 
 const roundPrice = (value) => Math.round(value * 100) / 100;
 
-// Trimmed, non-empty customization texts.
-const normalizeCustomizations = (customizations = []) =>
-  customizations
+// Trimmed, non-empty customization texts; at most LIST_SIZE of at most
+// LIST_ITEM characters each.
+const normalizeCustomizations = (customizations = []) => {
+  const texts = customizations
     .filter((text) => typeof text === "string")
     .map((text) => text.trim())
     .filter(Boolean);
+
+  assertMaxItems(texts, FIELD_LIMITS.LIST_SIZE, "Item customizations");
+  texts.forEach((text) =>
+    assertMaxLength(text, FIELD_LIMITS.LIST_ITEM, "Each item customization"),
+  );
+
+  return texts;
+};
+
+const isNonNegativeNumber = (value) =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.trim() !== "";
+
+// Shape of a saved Item, checked before the Order is written.
+const validateOrderItem = (item) => {
+  if (!item || typeof item !== "object") throw new Error("Order item is invalid");
+
+  if (!isNonEmptyString(item.productId))
+    throw new Error("Item product ID is required");
+
+  if (!isNonEmptyString(item.productName))
+    throw new Error("Item product name is required");
+
+  if (!Number.isInteger(item.quantity) || item.quantity < 1)
+    throw new Error("Item quantity must be a positive integer");
+
+  if (!isNonNegativeNumber(item.unitPrice))
+    throw new Error("Item unit price must be a non-negative number");
+
+  if (!isNonNegativeNumber(item.subtotal))
+    throw new Error("Item subtotal must be a non-negative number");
+
+  if (!Array.isArray(item.customizations))
+    throw new Error("Item customizations must be an array");
+
+  assertMaxItems(item.customizations, FIELD_LIMITS.LIST_SIZE, "Item customizations");
+  item.customizations.forEach((text) => {
+    if (typeof text !== "string")
+      throw new Error("Item customizations must be text");
+
+    assertMaxLength(text, FIELD_LIMITS.LIST_ITEM, "Each item customization");
+  });
+};
 
 // Item snapshot for a Product and the options chosen on the ticket. The
 // Product data is copied so historical Orders stay correct.
@@ -146,10 +194,17 @@ export const validateOrder = ({ items, orderType, scheduledTime }) => {
   if (!Array.isArray(items) || items.length === 0)
     throw new Error("Order must have at least one item");
 
+  assertMaxItems(items, FIELD_LIMITS.LIST_SIZE, "Order");
+  items.forEach(validateOrderItem);
+
   if (!(scheduledTime instanceof Date) || Number.isNaN(scheduledTime.getTime()))
     throw new Error("Scheduled time is required");
 
-  return { items, orderType, scheduledTime, total: calculateOrderTotal(items) };
+  const total = calculateOrderTotal(items);
+
+  if (!isNonNegativeNumber(total)) throw new Error("Order total is invalid");
+
+  return { items, orderType, scheduledTime, total };
 };
 
 // Creates the Order with status Pending. The Customer (created or updated

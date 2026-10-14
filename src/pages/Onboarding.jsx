@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { createOnboardingWorkspace } from "../services/onboarding.service";
+import { FIELD_LIMITS } from "../utils/fieldLimits";
 import {
   alert,
   card,
@@ -24,6 +25,11 @@ const initialFormData = {
 };
 
 const fieldStack = "flex flex-col gap-1.5";
+
+// Validation errors of the service are readable messages (they are plain
+// Errors); Firebase errors carry a code and keep the generic text.
+const validationMessage = (err) =>
+  err instanceof Error && !err.code ? err.message : null;
 
 export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
@@ -88,6 +94,7 @@ export default function Onboarding() {
               name="companyName"
               type="text"
               className={input}
+              maxLength={FIELD_LIMITS.NAME}
               placeholder="Write name here..."
               value={formData.companyName}
               onChange={handleChange}
@@ -111,6 +118,7 @@ export default function Onboarding() {
               name="storeName"
               type="text"
               className={input}
+              maxLength={FIELD_LIMITS.NAME}
               placeholder="Write name here..."
               value={formData.storeName}
               onChange={handleChange}
@@ -128,6 +136,7 @@ export default function Onboarding() {
                 name="street"
                 type="text"
                 className={input}
+                maxLength={FIELD_LIMITS.ADDRESS_LINE}
                 placeholder="Rue du Lyon"
                 value={formData.street}
                 onChange={handleChange}
@@ -144,6 +153,7 @@ export default function Onboarding() {
                 name="streetNumber"
                 type="text"
                 className={input}
+                maxLength={FIELD_LIMITS.STREET_NUMBER}
                 placeholder="3"
                 value={formData.streetNumber}
                 onChange={handleChange}
@@ -160,6 +170,7 @@ export default function Onboarding() {
                 name="postalCode"
                 type="text"
                 className={input}
+                maxLength={FIELD_LIMITS.POSTAL_CODE}
                 placeholder="1201"
                 value={formData.postalCode}
                 onChange={handleChange}
@@ -176,6 +187,7 @@ export default function Onboarding() {
                 name="city"
                 type="text"
                 className={input}
+                maxLength={FIELD_LIMITS.ADDRESS_LINE}
                 placeholder="Genève"
                 value={formData.city}
                 onChange={handleChange}
@@ -192,6 +204,7 @@ export default function Onboarding() {
                 name="country"
                 type="text"
                 className={input}
+                maxLength={FIELD_LIMITS.ADDRESS_LINE}
                 value={formData.country}
                 onChange={handleChange}
                 required
@@ -202,7 +215,8 @@ export default function Onboarding() {
 
         {error && (
           <div role="alert" className={alert}>
-            Unable to create workspace. Please try again.
+            {validationMessage(error) ??
+              "Unable to create workspace. Please try again."}
           </div>
         )}
 

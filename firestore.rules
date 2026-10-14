@@ -3,6 +3,116 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Field limits. They mirror FIELD_LIMITS in src/utils/fieldLimits.js and
+    // must be kept in sync with it. A required text is non-blank: the RE2
+    // regex must fully match whitespace-only (or empty) strings to reject them.
+    // The length of single list elements is not checked here.
+    function isName(v) {
+      return v is string && v.size() <= 100 && !v.matches('\\s*');
+    }
+
+    function isAddressLine(v) {
+      return v is string && v.size() <= 100 && !v.matches('\\s*');
+    }
+
+    function isPostalCode(v) {
+      return v is string && v.size() <= 20 && !v.matches('\\s*');
+    }
+
+    // Optional strings: null, or a string within the limit.
+    function isOptName(v) {
+      return v == null || (v is string && v.size() <= 100);
+    }
+
+    function isOptAddressLine(v) {
+      return v == null || (v is string && v.size() <= 100);
+    }
+
+    function isOptStreetNumber(v) {
+      return v == null || (v is string && v.size() <= 20);
+    }
+
+    function isOptPostalCode(v) {
+      return v == null || (v is string && v.size() <= 20);
+    }
+
+    // Company address: optional, every part null or a string within its limit.
+    function isValidCompanyAddress(v) {
+      return v == null
+        || (v is map
+          && v.keys().hasOnly([
+            "street", "streetNumber", "postalCode", "city", "country"
+          ])
+          && isOptAddressLine(v.get("street", null))
+          && isOptStreetNumber(v.get("streetNumber", null))
+          && isOptPostalCode(v.get("postalCode", null))
+          && isOptAddressLine(v.get("city", null))
+          && isOptAddressLine(v.get("country", null)));
+    }
+
+    // Store address: required, street, postalCode, city and country non-blank.
+    function isValidStoreAddress(v) {
+      return v is map
+        && v.keys().hasOnly([
+          "street", "streetNumber", "postalCode", "city", "country"
+        ])
+        && v.keys().hasAll(["street", "postalCode", "city", "country"])
+        && isAddressLine(v.street)
+        && isOptStreetNumber(v.get("streetNumber", null))
+        && isPostalCode(v.postalCode)
+        && isAddressLine(v.city)
+        && isAddressLine(v.country);
+    }
+
+    function isValidCompany(data) {
+      return data.keys().hasOnly([
+          "name", "logoUrl", "address", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "name", "logoUrl", "address", "createdAt", "updatedAt"
+        ])
+        && isName(data.name)
+        && (data.logoUrl == null || data.logoUrl is string)
+        && isValidCompanyAddress(data.address)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidStore(data) {
+      return data.keys().hasOnly([
+          "companyId", "name", "address", "isActive", "imageUrl",
+          "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "companyId", "name", "address", "isActive", "imageUrl",
+          "createdAt", "updatedAt"
+        ])
+        && data.companyId is string
+        && isName(data.name)
+        && isValidStoreAddress(data.address)
+        && data.isActive is bool
+        && (data.imageUrl == null || data.imageUrl is string)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // displayName is optional (it can be null).
+    function isValidUser(data) {
+      return data.keys().hasOnly([
+          "uid", "companyId", "storeId", "role", "displayName",
+          "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "uid", "companyId", "storeId", "role", "createdAt", "updatedAt"
+        ])
+        && data.uid is string
+        && data.companyId is string
+        && data.storeId is string
+        && isOptName(data.get("displayName", null))
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
     match /companies/{companyId} {
       allow read: if request.auth != null
         && get(
@@ -15,7 +125,8 @@ service cloud.firestore {
         ).data.companyId == companyId
         && getAfter(
           /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == "admin";
+        ).data.role == "admin"
+        && isValidCompany(request.resource.data);
     }
 
     match /stores/{storeId} {
@@ -33,7 +144,8 @@ service cloud.firestore {
         ).data.role == "admin"
         && getAfter(
           /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.companyId == request.resource.data.companyId;
+        ).data.companyId == request.resource.data.companyId
+        && isValidStore(request.resource.data);
     }
 
     match /users/{userId} {
@@ -51,14 +163,25 @@ service cloud.firestore {
         ).data.createdAt == request.time
         && getAfter(
           /databases/$(database)/documents/stores/$(request.resource.data.storeId)
-        ).data.createdAt == request.time;
+        ).data.createdAt == request.time
+        && isValidUser(request.resource.data);
+    }
+
+    // Profile of the signed-in user (users/{uid}), read once per request.
+    function userProfile() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data;
     }
 
     // Store of the signed-in user, read from their profile.
     function userStoreId() {
-      return get(
-        /databases/$(database)/documents/users/$(request.auth.uid)
-      ).data.storeId;
+      return userProfile().storeId;
+    }
+
+    // V1 has a single role: every write on business data needs an admin.
+    function isAdmin() {
+      return userProfile().role == "admin";
     }
 
     function menuStoreId(menuId) {
@@ -75,19 +198,163 @@ service cloud.firestore {
       );
     }
 
+    function isValidMenuCreate(data) {
+      return data.keys().hasOnly(["storeId", "name", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["storeId", "name", "createdAt", "updatedAt"])
+        && data.storeId is string
+        && isName(data.name)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Legacy Menus may miss a key, so nothing is required here: keys that are
+    // present are validated, required keys cannot be removed, and storeId and
+    // createdAt never change.
+    function isValidMenuUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly(["storeId", "name", "createdAt", "updatedAt"])
+        && !changed.removedKeys().hasAny([
+          "storeId", "name", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["storeId", "createdAt"])
+        && (!data.keys().hasAny(["name"]) || isName(data.name))
+        && data.updatedAt == request.time;
+    }
+
     match /menus/{menuId} {
       allow read: if request.auth != null
         && resource.data.storeId == userStoreId();
 
       allow create: if request.auth != null
-        && request.resource.data.storeId == userStoreId();
+        && isAdmin()
+        && request.resource.data.storeId == userStoreId()
+        && isValidMenuCreate(request.resource.data);
 
       allow update: if request.auth != null
+        && isAdmin()
         && request.resource.data.storeId == resource.data.storeId
-        && resource.data.storeId == userStoreId();
+        && resource.data.storeId == userStoreId()
+        && isValidMenuUpdate(request.resource.data);
 
       allow delete: if request.auth != null
+        && isAdmin()
         && resource.data.storeId == userStoreId();
+    }
+
+    function isDescription(v) {
+      return v == null || (v is string && v.size() <= 500);
+    }
+
+    // Optional list: null, or a list within the size limit. The elements are
+    // not checked because the rules cannot iterate over a list.
+    function isOptList(v) {
+      return v == null || (v is list && v.size() <= 50);
+    }
+
+    function isPosition(v) {
+      return v is int && v >= 1;
+    }
+
+    function isValidCategoryFields(data) {
+      return (!data.keys().hasAny(["menuId"]) || data.menuId is string)
+        && (!data.keys().hasAny(["name"]) || isName(data.name))
+        && (!data.keys().hasAny(["position"]) || isPosition(data.position));
+    }
+
+    function isValidCategoryCreate(data) {
+      return data.keys().hasOnly([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && isValidCategoryFields(data)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Same approach as the Menu update: keys that are present are validated,
+    // required keys cannot be removed, menuId and createdAt never change.
+    function isValidCategoryUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.removedKeys().hasAny([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["menuId", "createdAt"])
+        && isValidCategoryFields(data)
+        && data.updatedAt == request.time;
+    }
+
+    // Shape of the product fields that are present (all of them on create).
+    // Nullable fields accept null; price is an int or a float.
+    function isValidProductFields(data) {
+      return (!data.keys().hasAny(["categoryId"]) || data.categoryId is string)
+        && (!data.keys().hasAny(["name"]) || isName(data.name))
+        && isDescription(data.get("description", null))
+        && isOptList(data.get("ingredients", null))
+        && isOptList(data.get("sizes", null))
+        && (data.get("price", null) == null
+          || (data.price is number && data.price >= 0))
+        && isOptList(data.get("availableCookingLevels", null))
+        && isOptName(data.get("defaultCookingLevel", null))
+        && (!data.keys().hasAny(["isAvailable"]) || data.isAvailable is bool)
+        && (data.get("imageUrl", null) == null || data.imageUrl is string)
+        && (!data.keys().hasAny(["position"]) || isPosition(data.position));
+    }
+
+    // Decision A1: a product with sizes has price null; a product without
+    // sizes (null or empty) needs a price (its range is checked above).
+    function hasValidPricing(data) {
+      let sizes = data.get("sizes", null);
+
+      return sizes is list && sizes.size() > 0
+        ? data.get("price", null) == null
+        : data.get("price", null) is number;
+    }
+
+    function isValidProductCreate(data) {
+      return data.keys().hasOnly([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && isValidProductFields(data)
+        && hasValidPricing(data)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Keys are never removed by the app, so none can be removed here either;
+    // categoryId and createdAt never change. Pricing is checked when the
+    // update touches sizes or price, so legacy products stay editable.
+    function isValidProductUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.removedKeys().hasAny([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["categoryId", "createdAt"])
+        && isValidProductFields(data)
+        && (!changed.affectedKeys().hasAny(["sizes", "price"])
+          || hasValidPricing(data))
+        && data.updatedAt == request.time;
     }
 
     match /categories/{categoryId} {
@@ -95,13 +362,18 @@ service cloud.firestore {
         && menuStoreId(resource.data.menuId) == userStoreId();
 
       allow create: if request.auth != null
-        && menuStoreId(request.resource.data.menuId) == userStoreId();
+        && isAdmin()
+        && menuStoreId(request.resource.data.menuId) == userStoreId()
+        && isValidCategoryCreate(request.resource.data);
 
       allow update: if request.auth != null
+        && isAdmin()
         && request.resource.data.menuId == resource.data.menuId
-        && menuStoreId(resource.data.menuId) == userStoreId();
+        && menuStoreId(resource.data.menuId) == userStoreId()
+        && isValidCategoryUpdate(request.resource.data);
 
       allow delete: if request.auth != null
+        && isAdmin()
         && menuStoreId(resource.data.menuId) == userStoreId();
     }
 
@@ -110,32 +382,70 @@ service cloud.firestore {
         && categoryStoreId(resource.data.categoryId) == userStoreId();
 
       allow create: if request.auth != null
-        && categoryStoreId(request.resource.data.categoryId) == userStoreId();
+        && isAdmin()
+        && categoryStoreId(request.resource.data.categoryId) == userStoreId()
+        && isValidProductCreate(request.resource.data);
 
       allow update: if request.auth != null
+        && isAdmin()
         && request.resource.data.categoryId == resource.data.categoryId
-        && categoryStoreId(resource.data.categoryId) == userStoreId();
+        && categoryStoreId(resource.data.categoryId) == userStoreId()
+        && isValidProductUpdate(request.resource.data);
 
       allow delete: if request.auth != null
+        && isAdmin()
         && categoryStoreId(resource.data.categoryId) == userStoreId();
     }
 
     // Company of the signed-in user, read from their profile.
     function userCompanyId() {
-      return get(
-        /databases/$(database)/documents/users/$(request.auth.uid)
-      ).data.companyId;
+      return userProfile().companyId;
     }
 
-    // Customer fields a client may write, and common shape checks.
-    function isValidCustomer(data) {
+    // Optional phone: null, or a string within the limit.
+    function isOptPhone(v) {
+      return v == null || (v is string && v.size() <= 30);
+    }
+
+    // Shape of the Customer fields that are present (all of them on create).
+    // Optional fields can be null or absent; the address reuses the optional
+    // Company address check.
+    function isValidCustomerFields(data) {
+      return (!data.keys().hasAny(["companyId"]) || data.companyId is string)
+        && (!data.keys().hasAny(["firstName"]) || isName(data.firstName))
+        && isOptName(data.get("lastName", null))
+        && isOptPhone(data.get("phone", null))
+        && isValidCompanyAddress(data.get("address", null));
+    }
+
+    function isValidCustomerCreate(data) {
       return data.keys().hasOnly([
           "companyId", "firstName", "lastName", "phone", "address",
           "createdAt", "updatedAt"
         ])
-        && data.keys().hasAll(["companyId", "firstName", "createdAt", "updatedAt"])
-        && data.firstName is string
-        && data.firstName.size() > 0
+        && data.keys().hasAll([
+          "companyId", "firstName", "createdAt", "updatedAt"
+        ])
+        && isValidCustomerFields(data)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Legacy Customers may miss a key, so nothing is required here: keys that
+    // are present are validated, required keys cannot be removed, and
+    // companyId and createdAt never change.
+    function isValidCustomerUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly([
+          "companyId", "firstName", "lastName", "phone", "address",
+          "createdAt", "updatedAt"
+        ])
+        && !changed.removedKeys().hasAny([
+          "companyId", "firstName", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["companyId", "createdAt"])
+        && isValidCustomerFields(data)
         && data.updatedAt == request.time;
     }
 
@@ -146,19 +456,20 @@ service cloud.firestore {
       ).data;
     }
 
-    // Delivery needs phone and street, streetNumber, postalCode, city.
+    // Non-blank text: a string that is not empty or whitespace only.
+    function isFilled(v) {
+      return v is string && !v.matches('\\s*');
+    }
+
+    // Delivery needs a non-blank phone, street, streetNumber, postalCode and
+    // city.
     function hasDeliveryDetails(customer) {
-      return customer.phone is string
-        && customer.phone.size() > 0
-        && customer.address is map
-        && customer.address.street is string
-        && customer.address.street.size() > 0
-        && customer.address.streetNumber is string
-        && customer.address.streetNumber.size() > 0
-        && customer.address.postalCode is string
-        && customer.address.postalCode.size() > 0
-        && customer.address.city is string
-        && customer.address.city.size() > 0;
+      return isFilled(customer.get("phone", null))
+        && customer.get("address", null) is map
+        && isFilled(customer.address.get("street", null))
+        && isFilled(customer.address.get("streetNumber", null))
+        && isFilled(customer.address.get("postalCode", null))
+        && isFilled(customer.address.get("city", null));
     }
 
     // Order content editable on creation and on edit: customer, order type,
@@ -168,7 +479,9 @@ service cloud.firestore {
         && data.orderType in ["takeaway", "delivery"]
         && data.items is list
         && data.items.size() > 0
+        && data.items.size() <= 50
         && data.total is number
+        && data.total >= 0
         && data.scheduledTime is timestamp
         && orderCustomer(data.customerId).companyId == userCompanyId()
         && (data.orderType != "delivery"
@@ -227,9 +540,11 @@ service cloud.firestore {
         && resource.data.storeId == userStoreId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && isValidOrder(request.resource.data);
 
       allow update: if request.auth != null
+        && isAdmin()
         && resource.data.storeId == userStoreId()
         && resource.data.status != "Cancelled"
         && request.resource.data.updatedAt == request.time
@@ -241,15 +556,15 @@ service cloud.firestore {
         && resource.data.companyId == userCompanyId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && request.resource.data.companyId == userCompanyId()
-        && isValidCustomer(request.resource.data)
-        && request.resource.data.createdAt == request.time;
+        && isValidCustomerCreate(request.resource.data);
 
       allow update: if request.auth != null
+        && isAdmin()
         && resource.data.companyId == userCompanyId()
         && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.createdAt == resource.data.createdAt
-        && isValidCustomer(request.resource.data);
+        && isValidCustomerUpdate(request.resource.data);
     }
   }
 }

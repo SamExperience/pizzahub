@@ -328,3 +328,34 @@ describe("addCustomerToBatch", () => {
     ).toThrow("Company ID is required");
   });
 });
+
+describe("validateCustomer field limits", () => {
+  const withFields = (changes, addressChanges = {}) => ({
+    ...deliveryCustomer,
+    ...changes,
+    address: { ...fullAddress, ...addressChanges },
+  });
+  const cases = [
+    ["first name", { firstName: "a".repeat(100) }, { firstName: "a".repeat(101) }, {}, {}],
+    ["last name", { lastName: "a".repeat(100) }, { lastName: "a".repeat(101) }, {}, {}],
+    ["phone", { phone: "1".repeat(30) }, { phone: "1".repeat(31) }, {}, {}],
+    ["street", {}, {}, { street: "a".repeat(100) }, { street: "a".repeat(101) }],
+    ["street number", {}, {}, { streetNumber: "1".repeat(20) }, { streetNumber: "1".repeat(21) }],
+    ["postal code", {}, {}, { postalCode: "1".repeat(20) }, { postalCode: "1".repeat(21) }],
+    ["city", {}, {}, { city: "a".repeat(100) }, { city: "a".repeat(101) }],
+    ["country", {}, {}, { country: "a".repeat(100) }, { country: "a".repeat(101) }],
+  ];
+
+  it.each(cases)("accepts the limit and rejects limit + 1 for %s", (label, ok, ko, aOk, aKo) => {
+    expect(() => validateCustomer(withFields(ok, aOk), "delivery")).not.toThrow();
+    expect(() => validateCustomer(withFields(ko, aKo), "delivery")).toThrow(
+      `Customer ${label} must be at most`,
+    );
+  });
+
+  it("compares the trimmed length", () => {
+    expect(
+      validateCustomer({ firstName: ` ${"a".repeat(100)} ` }, "takeaway").firstName,
+    ).toHaveLength(100);
+  });
+});

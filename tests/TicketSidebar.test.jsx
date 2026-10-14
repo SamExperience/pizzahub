@@ -8,6 +8,7 @@ import { getMenuByStoreId } from "../src/services/menu.service";
 import { createOrder, updateOrder } from "../src/services/order.service";
 import { getItemProduct, getProductsByCategoryId } from "../src/services/product.service";
 import { formatPrice } from "../src/utils/format";
+import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 
 vi.mock("../src/services/firebase", () => ({ db: {} }));
 vi.mock("../src/services/menu.service", () => ({ getMenuByStoreId: vi.fn() }));
@@ -643,5 +644,81 @@ describe("TicketSidebar edit mode", () => {
 
     expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("TicketSidebar line limit", () => {
+  const scheduled = new Date();
+  scheduled.setHours(20, 30, 0, 0);
+  const WATER_LINE = {
+    productName: "Water",
+    size: null,
+    unitPrice: 2,
+    quantity: 1,
+    cookingLevel: null,
+    customizations: [],
+    subtotal: 2,
+  };
+  const orderWithLines = (count) => ({
+    id: "o1",
+    customerId: "c1",
+    orderType: "takeaway",
+    scheduledTime: { toDate: () => scheduled },
+    status: "Pending",
+    items: Array.from({ length: count }, (_, index) => ({
+      ...WATER_LINE,
+      productId: `p${index}`,
+      productName: `Water ${index + 1}`,
+    })),
+    total: 2 * count,
+  });
+
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+    getCustomer.mockResolvedValue(CUSTOMERS[0]);
+    getItemProduct.mockResolvedValue({ status: "sellable", product: WATER });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("disables Add product with a message when the ticket has LIST_SIZE lines", async () => {
+    render(
+      <TicketSidebar
+        companyId="co1"
+        storeId="store-1"
+        order={orderWithLines(FIELD_LIMITS.LIST_SIZE)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await screen.findByText("Water 1");
+
+    expect(screen.getByRole("button", { name: "Add product" }).disabled).toBe(true);
+    expect(
+      screen.getByText(`Maximum ${FIELD_LIMITS.LIST_SIZE} products per ticket.`),
+    ).toBeTruthy();
+    // Quantity changes on existing lines are still allowed.
+    expect(
+      screen.getByRole("button", { name: "Increase quantity of Water 1" }).disabled,
+    ).toBe(false);
+  });
+
+  it("keeps Add product enabled below LIST_SIZE lines", async () => {
+    render(
+      <TicketSidebar
+        companyId="co1"
+        storeId="store-1"
+        order={orderWithLines(FIELD_LIMITS.LIST_SIZE - 1)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await screen.findByText("Water 1");
+
+    expect(screen.getByRole("button", { name: "Add product" }).disabled).toBe(false);
+    expect(screen.queryByText(/Maximum .* products per ticket/)).toBeNull();
   });
 });
