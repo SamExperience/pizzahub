@@ -174,8 +174,10 @@ describe("products rules", () => {
 
 // Orders and customers are read-only for clients, so they are seeded through
 // the Firestore emulator REST API, which bypasses the rules ("Bearer owner").
-const seedDoc = async (collectionName, fields) => {
-  const url = `http://localhost:8080/v1/projects/${app.options.projectId}/databases/(default)/documents/${collectionName}`;
+// An optional documentId fixes the id of the seeded document.
+const seedDoc = async (collectionName, fields, documentId) => {
+  const query = documentId ? `?documentId=${documentId}` : "";
+  const url = `http://localhost:8080/v1/projects/${app.options.projectId}/databases/(default)/documents/${collectionName}${query}`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -922,6 +924,167 @@ describe("companies, stores and users rules", () => {
     await expect(
       setDoc(doc(db, "users", storeA.uid), { uid: storeA.uid, role: "admin" }),
     ).rejects.toThrow();
+  });
+});
+
+describe("non-admin profile", () => {
+  let staff;
+  let order;
+  let customerId;
+
+  // Order and Customer of store A written by its admin; the staff profile
+  // then attempts the same writes on them.
+  beforeAll(async () => {
+    await signInAs(storeA);
+    const customerRef = doc(collection(db, "customers"));
+    const orderRef = doc(collection(db, "orders"));
+    await writeBatch(db)
+      .set(
+        customerRef,
+        customerFields(storeA.companyId, { phone: null, address: null }),
+      )
+      .set(orderRef, orderFields(storeA.storeId, customerRef.id))
+      .commit();
+    customerId = customerRef.id;
+    order = orderRef;
+
+    // Staff profile linked to store A, seeded with the rules bypassed.
+    const account = await registerAccount("staff");
+    await seedDoc(
+      "users",
+      {
+        uid: account.uid,
+        companyId: storeA.companyId,
+        storeId: storeA.storeId,
+        role: "staff",
+      },
+      account.uid,
+    );
+    staff = account;
+  });
+
+  const signInAsStaff = () => signInAs(staff);
+
+  it("lets the profile read its store's menu, category, product, orders and customers", async () => {
+    await signInAsStaff();
+    expect((await getDoc(doc(db, "menus", storeA.menuId))).exists()).toBe(true);
+    expect(
+      (await getDoc(doc(db, "categories", storeA.categoryId))).exists(),
+    ).toBe(true);
+    expect(
+      (await getDoc(doc(db, "products", storeA.productId))).exists(),
+    ).toBe(true);
+    expect((await getDoc(order)).exists()).toBe(true);
+    expect((await getDoc(doc(db, "customers", customerId))).exists()).toBe(
+      true,
+    );
+    const snapshot = await getDocs(
+      query(collection(db, "orders"), where("storeId", "==", storeA.storeId)),
+    );
+    expect(snapshot.docs.map((d) => d.id)).toContain(order.id);
+  });
+
+  it("denies creating, updating and deleting menus", async () => {
+    await signInAsStaff();
+    const ref = doc(db, "menus", storeA.menuId);
+    await expect(
+      addDoc(collection(db, "menus"), { storeId: storeA.storeId, name: "X" }),
+    ).rejects.toThrow();
+    await expect(updateDoc(ref, { name: "Staff" })).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies creating, updating and deleting categories", async () => {
+    await signInAsStaff();
+    const ref = doc(db, "categories", storeA.categoryId);
+    await expect(
+      addDoc(collection(db, "categories"), {
+        menuId: storeA.menuId,
+        name: "X",
+        position: 9,
+      }),
+    ).rejects.toThrow();
+    await expect(updateDoc(ref, { name: "Staff" })).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies creating, updating and deleting products", async () => {
+    await signInAsStaff();
+    const ref = doc(db, "products", storeA.productId);
+    await expect(
+      addDoc(collection(db, "products"), {
+        categoryId: storeA.categoryId,
+        name: "X",
+        price: 1,
+      }),
+    ).rejects.toThrow();
+    await expect(updateDoc(ref, { name: "Staff" })).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies creating, changing the status of and editing orders", async () => {
+    await signInAsStaff();
+    await expect(
+      writeBatch(db)
+        .set(
+          doc(collection(db, "orders")),
+          orderFields(storeA.storeId, customerId),
+        )
+        .commit(),
+    ).rejects.toThrow();
+    await expect(
+      updateDoc(order, {
+        status: "In progress",
+        updatedAt: serverTimestamp(),
+        completedAt: null,
+      }),
+    ).rejects.toThrow();
+    await expect(
+      updateDoc(order, {
+        customerId,
+        orderType: "takeaway",
+        scheduledTime: new Date(Date.now() + 60 * 60 * 1000),
+        items: [{ productId: "p1", productName: "Margherita", quantity: 2 }],
+        total: 20,
+        updatedAt: serverTimestamp(),
+      }),
+    ).rejects.toThrow();
+    await expect(deleteDoc(order)).rejects.toThrow();
+  });
+
+  it("denies creating and updating customers", async () => {
+    await signInAsStaff();
+    await expect(
+      writeBatch(db)
+        .set(doc(collection(db, "customers")), customerFields(storeA.companyId))
+        .commit(),
+    ).rejects.toThrow();
+    await expect(
+      updateDoc(doc(db, "customers", customerId), {
+        firstName: "Staff",
+        updatedAt: serverTimestamp(),
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("still lets the admin owner of the store write", async () => {
+    await signInAs(storeA);
+    await expect(
+      updateDoc(doc(db, "menus", storeA.menuId), { name: "Admin" }),
+    ).resolves.toBeUndefined();
+    await expect(
+      updateDoc(order, {
+        status: "In progress",
+        updatedAt: serverTimestamp(),
+        completedAt: null,
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      updateDoc(doc(db, "customers", customerId), {
+        firstName: "Admin",
+        updatedAt: serverTimestamp(),
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

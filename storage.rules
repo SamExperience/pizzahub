@@ -2,19 +2,34 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    function userStoreId() {
+    // Profile of the signed-in user (users/{uid}), read from Firestore.
+    function userProfile() {
       return firestore.get(
         /databases/(default)/documents/users/$(request.auth.uid)
-      ).data.storeId;
+      ).data;
     }
 
-    // Product images live under products/{storeId}/ and are limited to the
-    // store of the signed-in user (profile read from Firestore).
+    function userStoreId() {
+      return userProfile().storeId;
+    }
+
+    // V1 has a single role: only admins may write product images.
+    function isAdmin() {
+      return userProfile().role == "admin";
+    }
+
+    // Product images live under products/{storeId}/. Any user of the store
+    // can read them; only the store's admin can create, update or delete.
     match /products/{storeId}/{allPaths=**} {
-      allow read, delete: if request.auth != null
+      allow read: if request.auth != null
+        && userStoreId() == storeId;
+
+      allow delete: if request.auth != null
+        && isAdmin()
         && userStoreId() == storeId;
 
       allow create, update: if request.auth != null
+        && isAdmin()
         && userStoreId() == storeId
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');

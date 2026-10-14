@@ -54,11 +54,21 @@ service cloud.firestore {
         ).data.createdAt == request.time;
     }
 
-    // Store of the signed-in user, read from their profile.
-    function userStoreId() {
+    // Profile of the signed-in user (users/{uid}), read once per request.
+    function userProfile() {
       return get(
         /databases/$(database)/documents/users/$(request.auth.uid)
-      ).data.storeId;
+      ).data;
+    }
+
+    // Store of the signed-in user, read from their profile.
+    function userStoreId() {
+      return userProfile().storeId;
+    }
+
+    // V1 has a single role: every write on business data needs an admin.
+    function isAdmin() {
+      return userProfile().role == "admin";
     }
 
     function menuStoreId(menuId) {
@@ -80,13 +90,16 @@ service cloud.firestore {
         && resource.data.storeId == userStoreId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && request.resource.data.storeId == userStoreId();
 
       allow update: if request.auth != null
+        && isAdmin()
         && request.resource.data.storeId == resource.data.storeId
         && resource.data.storeId == userStoreId();
 
       allow delete: if request.auth != null
+        && isAdmin()
         && resource.data.storeId == userStoreId();
     }
 
@@ -95,13 +108,16 @@ service cloud.firestore {
         && menuStoreId(resource.data.menuId) == userStoreId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && menuStoreId(request.resource.data.menuId) == userStoreId();
 
       allow update: if request.auth != null
+        && isAdmin()
         && request.resource.data.menuId == resource.data.menuId
         && menuStoreId(resource.data.menuId) == userStoreId();
 
       allow delete: if request.auth != null
+        && isAdmin()
         && menuStoreId(resource.data.menuId) == userStoreId();
     }
 
@@ -110,21 +126,22 @@ service cloud.firestore {
         && categoryStoreId(resource.data.categoryId) == userStoreId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && categoryStoreId(request.resource.data.categoryId) == userStoreId();
 
       allow update: if request.auth != null
+        && isAdmin()
         && request.resource.data.categoryId == resource.data.categoryId
         && categoryStoreId(resource.data.categoryId) == userStoreId();
 
       allow delete: if request.auth != null
+        && isAdmin()
         && categoryStoreId(resource.data.categoryId) == userStoreId();
     }
 
     // Company of the signed-in user, read from their profile.
     function userCompanyId() {
-      return get(
-        /databases/$(database)/documents/users/$(request.auth.uid)
-      ).data.companyId;
+      return userProfile().companyId;
     }
 
     // Customer fields a client may write, and common shape checks.
@@ -227,9 +244,11 @@ service cloud.firestore {
         && resource.data.storeId == userStoreId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && isValidOrder(request.resource.data);
 
       allow update: if request.auth != null
+        && isAdmin()
         && resource.data.storeId == userStoreId()
         && resource.data.status != "Cancelled"
         && request.resource.data.updatedAt == request.time
@@ -241,11 +260,13 @@ service cloud.firestore {
         && resource.data.companyId == userCompanyId();
 
       allow create: if request.auth != null
+        && isAdmin()
         && request.resource.data.companyId == userCompanyId()
         && isValidCustomer(request.resource.data)
         && request.resource.data.createdAt == request.time;
 
       allow update: if request.auth != null
+        && isAdmin()
         && resource.data.companyId == userCompanyId()
         && request.resource.data.companyId == resource.data.companyId
         && request.resource.data.createdAt == resource.data.createdAt
