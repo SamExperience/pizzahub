@@ -113,7 +113,9 @@ describe("categories rules", () => {
     await signInAs(storeA);
     const ref = doc(db, "categories", storeA.categoryId);
     expect((await getDoc(ref)).exists()).toBe(true);
-    await expect(updateDoc(ref, { name: "Renamed" })).resolves.toBeUndefined();
+    await expect(
+      updateDoc(ref, { name: "Renamed", updatedAt: serverTimestamp() }),
+    ).resolves.toBeUndefined();
   });
 
   it("denies another store read, update and delete", async () => {
@@ -147,7 +149,9 @@ describe("products rules", () => {
     await signInAs(storeA);
     const ref = doc(db, "products", storeA.productId);
     expect((await getDoc(ref)).exists()).toBe(true);
-    await expect(updateDoc(ref, { name: "Renamed" })).resolves.toBeUndefined();
+    await expect(
+      updateDoc(ref, { name: "Renamed", updatedAt: serverTimestamp() }),
+    ).resolves.toBeUndefined();
   });
 
   it("denies another store read, update and delete", async () => {
@@ -1157,6 +1161,280 @@ describe("menu validation rules", () => {
           updatedAt: serverTimestamp(),
         }),
       ).rejects.toThrow();
+    });
+  });
+});
+
+describe("category validation rules", () => {
+  const { NAME } = FIELD_LIMITS;
+  const create = (extra = {}, omitKey) => {
+    const data = {
+      menuId: storeA.menuId,
+      name: `Valid ${Math.random()}`,
+      position: 1,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...extra,
+    };
+    if (omitKey) delete data[omitKey];
+    return addDoc(collection(db, "categories"), data);
+  };
+
+  it("lets the owner create a category with a name at the limit", async () => {
+    await signInAs(storeA);
+    await expect(create({ name: "a".repeat(NAME) })).resolves.toBeDefined();
+  });
+
+  it("denies invalid category creation", async () => {
+    await signInAs(storeA);
+    for (const key of ["menuId", "name", "position", "createdAt", "updatedAt"])
+      await expect(create({}, key)).rejects.toThrow();
+    await expect(create({ extra: "x" })).rejects.toThrow();
+    await expect(create({ name: "" })).rejects.toThrow();
+    await expect(create({ name: "   " })).rejects.toThrow();
+    await expect(create({ name: "a".repeat(NAME + 1) })).rejects.toThrow();
+    await expect(create({ position: 0 })).rejects.toThrow();
+    await expect(create({ position: 1.5 })).rejects.toThrow();
+    await expect(create({ position: "1" })).rejects.toThrow();
+    await expect(create({ createdAt: new Date() })).rejects.toThrow();
+  });
+
+  describe("update", () => {
+    let ref;
+    const touch = (data = {}) =>
+      updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+
+    beforeAll(async () => {
+      await signInAs(storeA);
+      ref = await create();
+    });
+
+    it("validates the name, the position and the keys of an update", async () => {
+      await signInAs(storeA);
+      await expect(touch({ name: "Renamed" })).resolves.toBeUndefined();
+      await expect(touch({ name: "a".repeat(NAME) })).resolves.toBeUndefined();
+      await expect(touch({ position: 1 })).resolves.toBeUndefined();
+      await expect(touch({ name: "" })).rejects.toThrow();
+      await expect(touch({ name: "   " })).rejects.toThrow();
+      await expect(touch({ name: "a".repeat(NAME + 1) })).rejects.toThrow();
+      await expect(touch({ position: 0 })).rejects.toThrow();
+      await expect(touch({ position: 1.5 })).rejects.toThrow();
+      await expect(touch({ position: "1" })).rejects.toThrow();
+      await expect(touch({ extra: "x" })).rejects.toThrow();
+    });
+
+    it("denies removing a required key", async () => {
+      await signInAs(storeA);
+      await expect(touch({ position: deleteField() })).rejects.toThrow();
+    });
+
+    it("denies changing menuId or createdAt", async () => {
+      await signInAs(storeA);
+      await expect(touch({ menuId: storeB.menuId })).rejects.toThrow();
+      await expect(touch({ createdAt: serverTimestamp() })).rejects.toThrow();
+    });
+
+    it("denies an update without updatedAt set to the request time", async () => {
+      await signInAs(storeA);
+      await expect(updateDoc(ref, { name: "No timestamp" })).rejects.toThrow();
+      await expect(touch({ updatedAt: new Date() })).rejects.toThrow();
+    });
+
+    it("keeps legacy categories without position or createdAt updatable", async () => {
+      await signInAs(storeA);
+      const legacyId = await seedDoc("categories", {
+        menuId: storeA.menuId,
+        name: "Legacy",
+      });
+      const legacy = doc(db, "categories", legacyId);
+
+      await expect(
+        updateDoc(legacy, { name: "Fixed", updatedAt: serverTimestamp() }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("product validation rules", () => {
+  const { NAME, DESCRIPTION, LIST_SIZE } = FIELD_LIMITS;
+  const list = (size) => Array.from({ length: size }, (_, i) => `item ${i}`);
+  const create = (extra = {}, omitKey) => {
+    const data = {
+      categoryId: storeA.categoryId,
+      name: `Valid ${Math.random()}`,
+      description: null,
+      ingredients: null,
+      sizes: null,
+      price: 10,
+      availableCookingLevels: null,
+      defaultCookingLevel: null,
+      isAvailable: true,
+      imageUrl: null,
+      position: 1,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...extra,
+    };
+    if (omitKey) delete data[omitKey];
+    return addDoc(collection(db, "products"), data);
+  };
+
+  it("lets the owner create products at the limits", async () => {
+    await signInAs(storeA);
+    await expect(create({ name: "a".repeat(NAME) })).resolves.toBeDefined();
+    await expect(
+      create({ description: "a".repeat(DESCRIPTION) }),
+    ).resolves.toBeDefined();
+    await expect(
+      create({ ingredients: list(LIST_SIZE) }),
+    ).resolves.toBeDefined();
+    await expect(
+      create({
+        price: null,
+        sizes: [{ name: "S", price: 7.5 }],
+        availableCookingLevels: list(LIST_SIZE),
+        defaultCookingLevel: "item 0",
+      }),
+    ).resolves.toBeDefined();
+    await expect(create({ price: 9.5, position: 2 })).resolves.toBeDefined();
+  });
+
+  it("denies a missing or extra key on creation", async () => {
+    await signInAs(storeA);
+    for (const key of [
+      "categoryId",
+      "name",
+      "description",
+      "ingredients",
+      "sizes",
+      "price",
+      "availableCookingLevels",
+      "defaultCookingLevel",
+      "isAvailable",
+      "imageUrl",
+      "position",
+      "createdAt",
+      "updatedAt",
+    ])
+      await expect(create({}, key)).rejects.toThrow();
+    await expect(create({ extra: "x" })).rejects.toThrow();
+  });
+
+  it("denies invalid values on creation", async () => {
+    await signInAs(storeA);
+    await expect(create({ name: "" })).rejects.toThrow();
+    await expect(create({ name: "   " })).rejects.toThrow();
+    await expect(create({ name: "a".repeat(NAME + 1) })).rejects.toThrow();
+    await expect(
+      create({ description: "a".repeat(DESCRIPTION + 1) }),
+    ).rejects.toThrow();
+    await expect(create({ ingredients: list(LIST_SIZE + 1) })).rejects.toThrow();
+    await expect(create({ sizes: list(LIST_SIZE + 1) })).rejects.toThrow();
+    await expect(
+      create({ availableCookingLevels: list(LIST_SIZE + 1) }),
+    ).rejects.toThrow();
+    await expect(create({ ingredients: "tomato" })).rejects.toThrow();
+    await expect(create({ price: -1 })).rejects.toThrow();
+    await expect(create({ price: "10" })).rejects.toThrow();
+    await expect(create({ isAvailable: "yes" })).rejects.toThrow();
+    await expect(create({ imageUrl: 5 })).rejects.toThrow();
+    await expect(
+      create({ defaultCookingLevel: "a".repeat(101) }),
+    ).rejects.toThrow();
+    await expect(create({ position: 0 })).rejects.toThrow();
+    await expect(create({ position: 1.5 })).rejects.toThrow();
+    await expect(create({ position: "1" })).rejects.toThrow();
+    await expect(create({ createdAt: new Date() })).rejects.toThrow();
+  });
+
+  describe("update", () => {
+    let ref;
+    const touch = (data = {}) =>
+      updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+
+    beforeAll(async () => {
+      await signInAs(storeA);
+      ref = await create({
+        description: "Tasty",
+        imageUrl: "https://example.com/a.png",
+      });
+    });
+
+    it("validates the name, the position and the keys of an update", async () => {
+      await signInAs(storeA);
+      await expect(touch({ name: "Renamed" })).resolves.toBeUndefined();
+      await expect(touch({ name: "a".repeat(NAME) })).resolves.toBeUndefined();
+      await expect(touch({ position: 1 })).resolves.toBeUndefined();
+      await expect(touch({ name: "" })).rejects.toThrow();
+      await expect(touch({ name: "   " })).rejects.toThrow();
+      await expect(touch({ name: "a".repeat(NAME + 1) })).rejects.toThrow();
+      await expect(touch({ position: 0 })).rejects.toThrow();
+      await expect(touch({ position: 1.5 })).rejects.toThrow();
+      await expect(touch({ position: "1" })).rejects.toThrow();
+      await expect(touch({ extra: "x" })).rejects.toThrow();
+    });
+
+    it("lets the optional keys be set to null or valid values", async () => {
+      await signInAs(storeA);
+      await expect(
+        touch({ description: null, imageUrl: null }),
+      ).resolves.toBeUndefined();
+      await expect(
+        touch({ sizes: [{ name: "S", price: 5 }], price: null }),
+      ).resolves.toBeUndefined();
+      await expect(
+        touch({ ingredients: list(LIST_SIZE), price: 12.5, sizes: null }),
+      ).resolves.toBeUndefined();
+      await expect(
+        touch({ description: "a".repeat(DESCRIPTION) }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("denies wrong types and values", async () => {
+      await signInAs(storeA);
+      await expect(touch({ price: -1 })).rejects.toThrow();
+      await expect(touch({ price: "10" })).rejects.toThrow();
+      await expect(touch({ isAvailable: "yes" })).rejects.toThrow();
+      await expect(touch({ ingredients: "tomato" })).rejects.toThrow();
+      await expect(touch({ ingredients: list(LIST_SIZE + 1) })).rejects.toThrow();
+      await expect(touch({ sizes: list(LIST_SIZE + 1) })).rejects.toThrow();
+      await expect(
+        touch({ availableCookingLevels: list(LIST_SIZE + 1) }),
+      ).rejects.toThrow();
+      await expect(
+        touch({ description: "a".repeat(DESCRIPTION + 1) }),
+      ).rejects.toThrow();
+    });
+
+    it("denies removing a key", async () => {
+      await signInAs(storeA);
+      await expect(touch({ description: deleteField() })).rejects.toThrow();
+      await expect(touch({ name: deleteField() })).rejects.toThrow();
+    });
+
+    it("denies changing categoryId or createdAt", async () => {
+      await signInAs(storeA);
+      await expect(touch({ categoryId: storeB.categoryId })).rejects.toThrow();
+      await expect(touch({ createdAt: serverTimestamp() })).rejects.toThrow();
+    });
+
+    it("denies an update without updatedAt set to the request time", async () => {
+      await signInAs(storeA);
+      await expect(updateDoc(ref, { name: "No timestamp" })).rejects.toThrow();
+      await expect(touch({ updatedAt: new Date() })).rejects.toThrow();
+    });
+
+    it("keeps legacy products without position or createdAt updatable", async () => {
+      await signInAs(storeA);
+      const legacyId = await seedDoc("products", {
+        categoryId: storeA.categoryId,
+        name: "Legacy",
+      });
+      const legacy = doc(db, "products", legacyId);
+
+      await expect(
+        updateDoc(legacy, { name: "Fixed", updatedAt: serverTimestamp() }),
+      ).resolves.toBeUndefined();
     });
   });
 });

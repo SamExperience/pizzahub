@@ -242,18 +242,121 @@ service cloud.firestore {
         && resource.data.storeId == userStoreId();
     }
 
+    function isDescription(v) {
+      return v == null || (v is string && v.size() <= 500);
+    }
+
+    // Optional list: null, or a list within the size limit. The elements are
+    // not checked because the rules cannot iterate over a list.
+    function isOptList(v) {
+      return v == null || (v is list && v.size() <= 50);
+    }
+
+    function isPosition(v) {
+      return v is int && v >= 1;
+    }
+
+    function isValidCategoryFields(data) {
+      return (!data.keys().hasAny(["menuId"]) || data.menuId is string)
+        && (!data.keys().hasAny(["name"]) || isName(data.name))
+        && (!data.keys().hasAny(["position"]) || isPosition(data.position));
+    }
+
+    function isValidCategoryCreate(data) {
+      return data.keys().hasOnly([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && isValidCategoryFields(data)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Same approach as the Menu update: keys that are present are validated,
+    // required keys cannot be removed, menuId and createdAt never change.
+    function isValidCategoryUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.removedKeys().hasAny([
+          "menuId", "name", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["menuId", "createdAt"])
+        && isValidCategoryFields(data)
+        && data.updatedAt == request.time;
+    }
+
+    // Shape of the product fields that are present (all of them on create).
+    // Nullable fields accept null; price is an int or a float.
+    function isValidProductFields(data) {
+      return (!data.keys().hasAny(["categoryId"]) || data.categoryId is string)
+        && (!data.keys().hasAny(["name"]) || isName(data.name))
+        && isDescription(data.get("description", null))
+        && isOptList(data.get("ingredients", null))
+        && isOptList(data.get("sizes", null))
+        && (data.get("price", null) == null
+          || (data.price is number && data.price >= 0))
+        && isOptList(data.get("availableCookingLevels", null))
+        && isOptName(data.get("defaultCookingLevel", null))
+        && (!data.keys().hasAny(["isAvailable"]) || data.isAvailable is bool)
+        && (data.get("imageUrl", null) == null || data.imageUrl is string)
+        && (!data.keys().hasAny(["position"]) || isPosition(data.position));
+    }
+
+    function isValidProductCreate(data) {
+      return data.keys().hasOnly([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && isValidProductFields(data)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Keys are never removed by the app, so none can be removed here either;
+    // categoryId and createdAt never change.
+    function isValidProductUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.removedKeys().hasAny([
+          "categoryId", "name", "description", "ingredients", "sizes", "price",
+          "availableCookingLevels", "defaultCookingLevel", "isAvailable",
+          "imageUrl", "position", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["categoryId", "createdAt"])
+        && isValidProductFields(data)
+        && data.updatedAt == request.time;
+    }
+
     match /categories/{categoryId} {
       allow read: if request.auth != null
         && menuStoreId(resource.data.menuId) == userStoreId();
 
       allow create: if request.auth != null
         && isAdmin()
-        && menuStoreId(request.resource.data.menuId) == userStoreId();
+        && menuStoreId(request.resource.data.menuId) == userStoreId()
+        && isValidCategoryCreate(request.resource.data);
 
       allow update: if request.auth != null
         && isAdmin()
         && request.resource.data.menuId == resource.data.menuId
-        && menuStoreId(resource.data.menuId) == userStoreId();
+        && menuStoreId(resource.data.menuId) == userStoreId()
+        && isValidCategoryUpdate(request.resource.data);
 
       allow delete: if request.auth != null
         && isAdmin()
@@ -266,12 +369,14 @@ service cloud.firestore {
 
       allow create: if request.auth != null
         && isAdmin()
-        && categoryStoreId(request.resource.data.categoryId) == userStoreId();
+        && categoryStoreId(request.resource.data.categoryId) == userStoreId()
+        && isValidProductCreate(request.resource.data);
 
       allow update: if request.auth != null
         && isAdmin()
         && request.resource.data.categoryId == resource.data.categoryId
-        && categoryStoreId(resource.data.categoryId) == userStoreId();
+        && categoryStoreId(resource.data.categoryId) == userStoreId()
+        && isValidProductUpdate(request.resource.data);
 
       allow delete: if request.auth != null
         && isAdmin()
