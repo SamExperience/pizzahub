@@ -3,6 +3,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -20,6 +21,7 @@ import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { createMenu } from "../src/services/menu.service";
 import { createCategory } from "../src/services/category.service";
 import { createProduct } from "../src/services/product.service";
+import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 
 const TEST_PASSWORD = "Password123!";
 
@@ -77,7 +79,9 @@ describe("menus rules", () => {
     await signInAs(storeA);
     const ref = doc(db, "menus", storeA.menuId);
     expect((await getDoc(ref)).exists()).toBe(true);
-    await expect(updateDoc(ref, { name: "Renamed" })).resolves.toBeUndefined();
+    await expect(
+      updateDoc(ref, { name: "Renamed", updatedAt: serverTimestamp() }),
+    ).resolves.toBeUndefined();
   });
 
   it("denies another store read, update and delete", async () => {
@@ -98,7 +102,9 @@ describe("menus rules", () => {
   it("denies moving the menu to another store", async () => {
     await signInAs(storeA);
     const ref = doc(db, "menus", storeA.menuId);
-    await expect(updateDoc(ref, { storeId: storeB.storeId })).rejects.toThrow();
+    await expect(
+      updateDoc(ref, { storeId: storeB.storeId, updatedAt: serverTimestamp() }),
+    ).rejects.toThrow();
   });
 });
 
@@ -644,6 +650,14 @@ const onboard = (uid, label) =>
     country: "Switzerland",
   });
 
+const validStoreAddress = {
+  street: "Rue du Lyon",
+  streetNumber: "9",
+  postalCode: "1201",
+  city: "Genève",
+  country: "Switzerland",
+};
+
 // Raw onboarding writes in one batch. Overrides tweak the documents; `omit`
 // lists documents to leave out ("company", "store", "user").
 const commitRawWorkspace = ({
@@ -672,7 +686,7 @@ const commitRawWorkspace = ({
   if (!omit.includes("store")) {
     batch.set(storeRef, {
       name: "Raw Store",
-      address: null,
+      address: validStoreAddress,
       companyId: companyRef.id,
       isActive: true,
       imageUrl: null,
@@ -855,7 +869,7 @@ describe("companies, stores and users rules", () => {
       await expect(
         setDoc(doc(collection(db, "stores")), {
           name: "Intruder Store",
-          address: null,
+          address: validStoreAddress,
           companyId: storeA.companyId,
           isActive: true,
           imageUrl: null,
@@ -924,6 +938,226 @@ describe("companies, stores and users rules", () => {
     await expect(
       setDoc(doc(db, "users", storeA.uid), { uid: storeA.uid, role: "admin" }),
     ).rejects.toThrow();
+  });
+});
+
+describe("field validation rules", () => {
+  const { NAME } = FIELD_LIMITS;
+  const atLimit = "a".repeat(NAME);
+  const overLimit = "a".repeat(NAME + 1);
+  let account;
+
+  beforeAll(async () => {
+    account = await registerAccount("limits");
+  });
+
+  const raw = async (overrides) => {
+    await signInAs(account);
+    return commitRawWorkspace({ uid: account.uid, ...overrides });
+  };
+
+  // Commits a valid workspace with one key removed from one entity.
+  const withoutKey = async (entity, key) => {
+    await signInAs(account);
+    const companyRef = doc(collection(db, "companies"));
+    const storeRef = doc(collection(db, "stores"));
+    const docs = {
+      company: {
+        name: "C",
+        logoUrl: null,
+        address: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      store: {
+        companyId: companyRef.id,
+        name: "S",
+        address: validStoreAddress,
+        isActive: true,
+        imageUrl: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      user: {
+        uid: account.uid,
+        companyId: companyRef.id,
+        storeId: storeRef.id,
+        role: "admin",
+        displayName: "U",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+    };
+    delete docs[entity][key];
+    return writeBatch(db)
+      .set(companyRef, docs.company)
+      .set(storeRef, docs.store)
+      .set(doc(db, "users", account.uid), docs.user)
+      .commit();
+  };
+
+  it("applies the name limit to Company and Store", async () => {
+    for (const bad of [overLimit, "", "   "]) {
+      await expect(raw({ company: { name: bad } })).rejects.toThrow();
+      await expect(raw({ store: { name: bad } })).rejects.toThrow();
+    }
+    await expect(raw({ company: { name: 5 } })).rejects.toThrow();
+  });
+
+  it("denies unknown keys on every entity", async () => {
+    await expect(raw({ company: { extra: "x" } })).rejects.toThrow();
+    await expect(raw({ store: { extra: "x" } })).rejects.toThrow();
+    await expect(raw({ user: { extra: "x" } })).rejects.toThrow();
+  });
+
+  it("denies a missing required key on every entity", async () => {
+    const required = {
+      company: ["name", "logoUrl", "address", "createdAt", "updatedAt"],
+      store: [
+        "companyId",
+        "name",
+        "address",
+        "isActive",
+        "imageUrl",
+        "createdAt",
+        "updatedAt",
+      ],
+      user: ["uid", "companyId", "storeId", "role", "createdAt", "updatedAt"],
+    };
+
+    for (const [entity, keys] of Object.entries(required)) {
+      for (const key of keys) {
+        await expect(withoutKey(entity, key)).rejects.toThrow();
+      }
+    }
+  });
+
+  it("validates the Store address", async () => {
+    const address = (extra, omitKey) => {
+      const value = { ...validStoreAddress, ...extra };
+      if (omitKey) delete value[omitKey];
+      return value;
+    };
+    const tooLongNumber = "1".repeat(FIELD_LIMITS.STREET_NUMBER + 1);
+
+    await expect(raw({ store: { address: address({}, "city") } })).rejects.toThrow();
+    await expect(raw({ store: { address: address({ extra: "x" }) } })).rejects.toThrow();
+    await expect(raw({ store: { address: address({ city: "  " }) } })).rejects.toThrow();
+    await expect(
+      raw({ store: { address: address({ street: overLimit }) } }),
+    ).rejects.toThrow();
+    await expect(
+      raw({ store: { address: address({ streetNumber: tooLongNumber }) } }),
+    ).rejects.toThrow();
+    await expect(raw({ store: { address: null } })).rejects.toThrow();
+  });
+
+  it("denies timestamps that are not the request time", async () => {
+    await expect(raw({ company: { createdAt: new Date() } })).rejects.toThrow();
+    await expect(raw({ store: { updatedAt: new Date() } })).rejects.toThrow();
+    await expect(raw({ user: { createdAt: new Date() } })).rejects.toThrow();
+  });
+
+  it("denies a displayName over the limit", async () => {
+    await expect(raw({ user: { displayName: overLimit } })).rejects.toThrow();
+  });
+
+  it("allows values at the limit, null streetNumber and null displayName", async () => {
+    await raw({
+      company: { name: atLimit },
+      store: {
+        name: atLimit,
+        address: { ...validStoreAddress, streetNumber: null },
+      },
+      user: { displayName: null },
+    });
+    const profile = (await getDoc(doc(db, "users", account.uid))).data();
+    expect(profile.displayName).toBeNull();
+  });
+});
+
+describe("menu validation rules", () => {
+  const { NAME } = FIELD_LIMITS;
+  const create = (extra = {}, omitKey) => {
+    const data = {
+      storeId: storeA.storeId,
+      name: "Valid",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...extra,
+    };
+    if (omitKey) delete data[omitKey];
+    return addDoc(collection(db, "menus"), data);
+  };
+
+  it("lets the owner create a menu with a name at the limit", async () => {
+    await signInAs(storeA);
+    await expect(create({ name: "a".repeat(NAME) })).resolves.toBeDefined();
+  });
+
+  it("denies invalid menu creation", async () => {
+    await signInAs(storeA);
+    await expect(create({}, "name")).rejects.toThrow();
+    await expect(create({}, "createdAt")).rejects.toThrow();
+    await expect(create({ name: "" })).rejects.toThrow();
+    await expect(create({ name: "   " })).rejects.toThrow();
+    await expect(create({ name: "a".repeat(NAME + 1) })).rejects.toThrow();
+    await expect(create({ extra: "x" })).rejects.toThrow();
+    await expect(create({ createdAt: new Date() })).rejects.toThrow();
+  });
+
+  describe("update", () => {
+    let ref;
+    const touch = (data = {}) =>
+      updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+
+    beforeAll(async () => {
+      await signInAs(storeA);
+      ref = await create();
+    });
+
+    it("validates the name and the keys of an update", async () => {
+      await signInAs(storeA);
+      await expect(touch({ name: "Renamed" })).resolves.toBeUndefined();
+      await expect(touch({ name: "a".repeat(NAME) })).resolves.toBeUndefined();
+      await expect(touch({ name: "" })).rejects.toThrow();
+      await expect(touch({ name: "   " })).rejects.toThrow();
+      await expect(touch({ name: "a".repeat(NAME + 1) })).rejects.toThrow();
+      await expect(touch({ extra: "x" })).rejects.toThrow();
+    });
+
+    it("denies removing a required key", async () => {
+      await signInAs(storeA);
+      await expect(touch({ name: deleteField() })).rejects.toThrow();
+    });
+
+    it("denies changing storeId or createdAt", async () => {
+      await signInAs(storeA);
+      await expect(touch({ storeId: storeB.storeId })).rejects.toThrow();
+      await expect(touch({ createdAt: serverTimestamp() })).rejects.toThrow();
+    });
+
+    it("denies an update without updatedAt set to the request time", async () => {
+      await signInAs(storeA);
+      await expect(updateDoc(ref, { name: "No timestamp" })).rejects.toThrow();
+      await expect(touch({ updatedAt: new Date() })).rejects.toThrow();
+    });
+
+    it("keeps legacy menus without name or createdAt updatable", async () => {
+      await signInAs(storeA);
+      const legacyId = await seedDoc("menus", { storeId: storeA.storeId });
+      const legacy = doc(db, "menus", legacyId);
+
+      await expect(
+        updateDoc(legacy, { name: "Fixed", updatedAt: serverTimestamp() }),
+      ).resolves.toBeUndefined();
+      await expect(
+        updateDoc(legacy, {
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ).rejects.toThrow();
+    });
   });
 });
 
@@ -1070,7 +1304,10 @@ describe("non-admin profile", () => {
   it("still lets the admin owner of the store write", async () => {
     await signInAs(storeA);
     await expect(
-      updateDoc(doc(db, "menus", storeA.menuId), { name: "Admin" }),
+      updateDoc(doc(db, "menus", storeA.menuId), {
+        name: "Admin",
+        updatedAt: serverTimestamp(),
+      }),
     ).resolves.toBeUndefined();
     await expect(
       updateDoc(order, {

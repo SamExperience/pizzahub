@@ -3,6 +3,116 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Field limits. They mirror FIELD_LIMITS in src/utils/fieldLimits.js and
+    // must be kept in sync with it. A required text is non-blank: the RE2
+    // regex must fully match whitespace-only (or empty) strings to reject them.
+    // The length of single list elements is not checked here.
+    function isName(v) {
+      return v is string && v.size() <= 100 && !v.matches('\\s*');
+    }
+
+    function isAddressLine(v) {
+      return v is string && v.size() <= 100 && !v.matches('\\s*');
+    }
+
+    function isPostalCode(v) {
+      return v is string && v.size() <= 20 && !v.matches('\\s*');
+    }
+
+    // Optional strings: null, or a string within the limit.
+    function isOptName(v) {
+      return v == null || (v is string && v.size() <= 100);
+    }
+
+    function isOptAddressLine(v) {
+      return v == null || (v is string && v.size() <= 100);
+    }
+
+    function isOptStreetNumber(v) {
+      return v == null || (v is string && v.size() <= 20);
+    }
+
+    function isOptPostalCode(v) {
+      return v == null || (v is string && v.size() <= 20);
+    }
+
+    // Company address: optional, every part null or a string within its limit.
+    function isValidCompanyAddress(v) {
+      return v == null
+        || (v is map
+          && v.keys().hasOnly([
+            "street", "streetNumber", "postalCode", "city", "country"
+          ])
+          && isOptAddressLine(v.get("street", null))
+          && isOptStreetNumber(v.get("streetNumber", null))
+          && isOptPostalCode(v.get("postalCode", null))
+          && isOptAddressLine(v.get("city", null))
+          && isOptAddressLine(v.get("country", null)));
+    }
+
+    // Store address: required, street, postalCode, city and country non-blank.
+    function isValidStoreAddress(v) {
+      return v is map
+        && v.keys().hasOnly([
+          "street", "streetNumber", "postalCode", "city", "country"
+        ])
+        && v.keys().hasAll(["street", "postalCode", "city", "country"])
+        && isAddressLine(v.street)
+        && isOptStreetNumber(v.get("streetNumber", null))
+        && isPostalCode(v.postalCode)
+        && isAddressLine(v.city)
+        && isAddressLine(v.country);
+    }
+
+    function isValidCompany(data) {
+      return data.keys().hasOnly([
+          "name", "logoUrl", "address", "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "name", "logoUrl", "address", "createdAt", "updatedAt"
+        ])
+        && isName(data.name)
+        && (data.logoUrl == null || data.logoUrl is string)
+        && isValidCompanyAddress(data.address)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidStore(data) {
+      return data.keys().hasOnly([
+          "companyId", "name", "address", "isActive", "imageUrl",
+          "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "companyId", "name", "address", "isActive", "imageUrl",
+          "createdAt", "updatedAt"
+        ])
+        && data.companyId is string
+        && isName(data.name)
+        && isValidStoreAddress(data.address)
+        && data.isActive is bool
+        && (data.imageUrl == null || data.imageUrl is string)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // displayName is optional (it can be null).
+    function isValidUser(data) {
+      return data.keys().hasOnly([
+          "uid", "companyId", "storeId", "role", "displayName",
+          "createdAt", "updatedAt"
+        ])
+        && data.keys().hasAll([
+          "uid", "companyId", "storeId", "role", "createdAt", "updatedAt"
+        ])
+        && data.uid is string
+        && data.companyId is string
+        && data.storeId is string
+        && isOptName(data.get("displayName", null))
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
     match /companies/{companyId} {
       allow read: if request.auth != null
         && get(
@@ -15,7 +125,8 @@ service cloud.firestore {
         ).data.companyId == companyId
         && getAfter(
           /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == "admin";
+        ).data.role == "admin"
+        && isValidCompany(request.resource.data);
     }
 
     match /stores/{storeId} {
@@ -33,7 +144,8 @@ service cloud.firestore {
         ).data.role == "admin"
         && getAfter(
           /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.companyId == request.resource.data.companyId;
+        ).data.companyId == request.resource.data.companyId
+        && isValidStore(request.resource.data);
     }
 
     match /users/{userId} {
@@ -51,7 +163,8 @@ service cloud.firestore {
         ).data.createdAt == request.time
         && getAfter(
           /databases/$(database)/documents/stores/$(request.resource.data.storeId)
-        ).data.createdAt == request.time;
+        ).data.createdAt == request.time
+        && isValidUser(request.resource.data);
     }
 
     // Profile of the signed-in user (users/{uid}), read once per request.
@@ -85,18 +198,44 @@ service cloud.firestore {
       );
     }
 
+    function isValidMenuCreate(data) {
+      return data.keys().hasOnly(["storeId", "name", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["storeId", "name", "createdAt", "updatedAt"])
+        && data.storeId is string
+        && isName(data.name)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Legacy Menus may miss a key, so nothing is required here: keys that are
+    // present are validated, required keys cannot be removed, and storeId and
+    // createdAt never change.
+    function isValidMenuUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly(["storeId", "name", "createdAt", "updatedAt"])
+        && !changed.removedKeys().hasAny([
+          "storeId", "name", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["storeId", "createdAt"])
+        && (!data.keys().hasAny(["name"]) || isName(data.name))
+        && data.updatedAt == request.time;
+    }
+
     match /menus/{menuId} {
       allow read: if request.auth != null
         && resource.data.storeId == userStoreId();
 
       allow create: if request.auth != null
         && isAdmin()
-        && request.resource.data.storeId == userStoreId();
+        && request.resource.data.storeId == userStoreId()
+        && isValidMenuCreate(request.resource.data);
 
       allow update: if request.auth != null
         && isAdmin()
         && request.resource.data.storeId == resource.data.storeId
-        && resource.data.storeId == userStoreId();
+        && resource.data.storeId == userStoreId()
+        && isValidMenuUpdate(request.resource.data);
 
       allow delete: if request.auth != null
         && isAdmin()
