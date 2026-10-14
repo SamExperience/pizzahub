@@ -35,3 +35,7 @@ docs
 
 # Firebase emulator backup (owner data, never committed)
 emulator-data/
+
+# Cloud Functions local config (emulator params and Stripe test secrets)
+functions/.env.local
+functions/.secret.local
