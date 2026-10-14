@@ -8,6 +8,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -27,7 +28,7 @@ const TEST_PASSWORD = "Password123!";
 const createStoreWithMenu = async (label) => {
   const email = `test-rules-${label}-${Date.now()}@example.com`;
   const { user } = await register(email, TEST_PASSWORD);
-  const { storeId } = await createOnboardingWorkspace({
+  const { storeId, companyId } = await createOnboardingWorkspace({
     uid: user.uid,
     userName: user.displayName,
     companyName: `Rules ${label} Company`,
@@ -48,6 +49,8 @@ const createStoreWithMenu = async (label) => {
   });
   return {
     email,
+    uid: user.uid,
+    companyId,
     storeId,
     menuId: menu.id,
     categoryId: category.id,
@@ -615,6 +618,310 @@ describe("unauthenticated access", () => {
   it("denies deleting the menu", async () => {
     await signout();
     await expect(deleteDoc(doc(db, "menus", storeA.menuId))).rejects.toThrow();
+  });
+});
+
+// Registers a new account (left signed in) without onboarding it.
+const registerAccount = async (label) => {
+  await signout();
+  const email = `test-rules-${label}-${Date.now()}@example.com`;
+  const { user } = await register(email, TEST_PASSWORD);
+  return { uid: user.uid, email };
+};
+
+const onboard = (uid, label) =>
+  createOnboardingWorkspace({
+    uid,
+    userName: "Test User",
+    companyName: `Rules ${label} Company`,
+    storeName: `Rules ${label} Store`,
+    street: "Rue du Lyon",
+    streetNumber: "9",
+    postalCode: "1201",
+    city: "Genève",
+    country: "Switzerland",
+  });
+
+// Raw onboarding writes in one batch. Overrides tweak the documents; `omit`
+// lists documents to leave out ("company", "store", "user").
+const commitRawWorkspace = ({
+  uid,
+  userId = uid,
+  company = {},
+  store = {},
+  user = {},
+  omit = [],
+}) => {
+  const companyRef = doc(collection(db, "companies"));
+  const storeRef = doc(collection(db, "stores"));
+  const userRef = doc(db, "users", userId);
+  const batch = writeBatch(db);
+
+  if (!omit.includes("company")) {
+    batch.set(companyRef, {
+      name: "Raw Company",
+      logoUrl: null,
+      address: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...company,
+    });
+  }
+  if (!omit.includes("store")) {
+    batch.set(storeRef, {
+      name: "Raw Store",
+      address: null,
+      companyId: companyRef.id,
+      isActive: true,
+      imageUrl: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...store,
+    });
+  }
+  if (!omit.includes("user")) {
+    batch.set(userRef, {
+      uid,
+      companyId: companyRef.id,
+      storeId: storeRef.id,
+      role: "admin",
+      displayName: "Raw User",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...user,
+    });
+  }
+  return batch.commit();
+};
+
+describe("companies, stores and users rules", () => {
+  it("lets a fresh account onboard its Company, Store and User", async () => {
+    const user = await registerAccount("fresh");
+    const { companyId, storeId } = await onboard(user.uid, "fresh");
+
+    expect((await getDoc(doc(db, "companies", companyId))).exists()).toBe(true);
+    expect((await getDoc(doc(db, "stores", storeId))).exists()).toBe(true);
+    expect(
+      (await getDoc(doc(db, "users", user.uid))).data(),
+    ).toMatchObject({ companyId, storeId, role: "admin" });
+  });
+
+  it("lets the owner read own documents and denies foreign ones", async () => {
+    await signInAs(storeA);
+    expect((await getDoc(doc(db, "companies", storeA.companyId))).exists()).toBe(true);
+    expect((await getDoc(doc(db, "stores", storeA.storeId))).exists()).toBe(true);
+    expect((await getDoc(doc(db, "users", storeA.uid))).exists()).toBe(true);
+
+    await expect(getDoc(doc(db, "companies", storeB.companyId))).rejects.toThrow();
+    await expect(getDoc(doc(db, "stores", storeB.storeId))).rejects.toThrow();
+    await expect(getDoc(doc(db, "users", storeB.uid))).rejects.toThrow();
+  });
+
+  it("denies changing or deleting the own profile", async () => {
+    await signInAs(storeA);
+    const ref = doc(db, "users", storeA.uid);
+    const change = (data) =>
+      updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+
+    await expect(change({ companyId: storeB.companyId })).rejects.toThrow();
+    await expect(change({ storeId: storeB.storeId })).rejects.toThrow();
+    await expect(change({ role: "owner" })).rejects.toThrow();
+    await expect(change({ displayName: "Renamed" })).rejects.toThrow();
+    await expect(
+      setDoc(ref, {
+        uid: storeA.uid,
+        companyId: storeA.companyId,
+        storeId: storeA.storeId,
+        role: "admin",
+        displayName: "Overwritten",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    ).rejects.toThrow();
+    await expect(deleteDoc(ref)).rejects.toThrow();
+  });
+
+  it("denies updating or deleting a Company and a Store", async () => {
+    const companyRef = doc(db, "companies", storeA.companyId);
+    const storeRef = doc(db, "stores", storeA.storeId);
+    const attempt = async () => {
+      await expect(updateDoc(companyRef, { name: "Hacked" })).rejects.toThrow();
+      await expect(deleteDoc(companyRef)).rejects.toThrow();
+      await expect(updateDoc(storeRef, { name: "Hacked" })).rejects.toThrow();
+      await expect(
+        updateDoc(storeRef, { companyId: storeB.companyId }),
+      ).rejects.toThrow();
+      await expect(deleteDoc(storeRef)).rejects.toThrow();
+    };
+
+    await signInAs(storeA);
+    await attempt();
+    await signInAs(storeB);
+    await attempt();
+    await signout();
+    await attempt();
+  });
+
+  it("denies creating invalid workspaces", async () => {
+    const user = await registerAccount("invalid");
+    const uid = user.uid;
+
+    await expect(
+      commitRawWorkspace({ uid, user: { role: "staff" } }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, user: { uid: "someone-else" } }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, userId: storeA.uid }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, omit: ["store", "user"] }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, omit: ["company", "user"] }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, omit: ["company", "store"] }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, store: { companyId: storeA.companyId } }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, omit: ["store"], user: { storeId: storeA.storeId } }),
+    ).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid, omit: ["company"], user: { companyId: storeA.companyId } }),
+    ).rejects.toThrow();
+
+    // The valid workspace still succeeds afterwards.
+    await commitRawWorkspace({ uid });
+  });
+
+  it("denies a second onboarding by an already onboarded user", async () => {
+    await signInAs(storeA);
+    await expect(
+      commitRawWorkspace({ uid: storeA.uid }),
+    ).rejects.toThrow();
+    await expect(onboard(storeA.uid, "again")).rejects.toThrow();
+    expect((await getDoc(doc(db, "users", storeA.uid))).data().storeId).toBe(
+      storeA.storeId,
+    );
+  });
+
+  describe("second account next to an existing admin", () => {
+    let second;
+
+    beforeAll(async () => {
+      second = await registerAccount("second");
+    });
+
+    const asSecond = async () => {
+      await signout();
+      await login(second.email, TEST_PASSWORD);
+    };
+
+    it("denies joining the existing Company and Store", async () => {
+      await asSecond();
+      await expect(
+        setDoc(doc(db, "users", second.uid), {
+          uid: second.uid,
+          companyId: storeA.companyId,
+          storeId: storeA.storeId,
+          role: "admin",
+          displayName: "Intruder",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("denies joining the existing Company with a new Store", async () => {
+      await asSecond();
+      await expect(
+        commitRawWorkspace({
+          uid: second.uid,
+          omit: ["company"],
+          user: { companyId: storeA.companyId },
+          store: { companyId: storeA.companyId },
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("denies creating a Store under the existing Company", async () => {
+      await asSecond();
+      await expect(
+        setDoc(doc(collection(db, "stores")), {
+          name: "Intruder Store",
+          address: null,
+          companyId: storeA.companyId,
+          isActive: true,
+          imageUrl: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("denies reading or writing the existing workspace data", async () => {
+      await asSecond();
+      const orderId = await seedDoc("orders", { storeId: storeA.storeId });
+      const targets = [
+        doc(db, "companies", storeA.companyId),
+        doc(db, "stores", storeA.storeId),
+        doc(db, "users", storeA.uid),
+        doc(db, "menus", storeA.menuId),
+        doc(db, "categories", storeA.categoryId),
+        doc(db, "products", storeA.productId),
+        doc(db, "orders", orderId),
+      ];
+
+      for (const ref of targets) {
+        await expect(getDoc(ref)).rejects.toThrow();
+        await expect(updateDoc(ref, { name: "Hacked" })).rejects.toThrow();
+        await expect(deleteDoc(ref)).rejects.toThrow();
+      }
+      await expect(
+        addDoc(collection(db, "menus"), { storeId: storeA.storeId, name: "X" }),
+      ).rejects.toThrow();
+    });
+
+    it("lets the second account onboard its own Company and Store", async () => {
+      await asSecond();
+      const { companyId, storeId } = await onboard(second.uid, "second");
+      expect(companyId).not.toBe(storeA.companyId);
+      expect(storeId).not.toBe(storeA.storeId);
+      expect((await getDoc(doc(db, "stores", storeId))).exists()).toBe(true);
+      await expect(
+        getDoc(doc(db, "stores", storeA.storeId)),
+      ).rejects.toThrow();
+    });
+  });
+
+  it("denies unauthenticated reads and creates", async () => {
+    await signout();
+    await expect(getDoc(doc(db, "companies", storeA.companyId))).rejects.toThrow();
+    await expect(getDoc(doc(db, "stores", storeA.storeId))).rejects.toThrow();
+    await expect(getDoc(doc(db, "users", storeA.uid))).rejects.toThrow();
+    await expect(
+      commitRawWorkspace({ uid: "anonymous-uid" }),
+    ).rejects.toThrow();
+    await expect(
+      setDoc(doc(collection(db, "companies")), {
+        name: "X",
+        createdAt: serverTimestamp(),
+      }),
+    ).rejects.toThrow();
+    await expect(
+      setDoc(doc(collection(db, "stores")), {
+        name: "X",
+        companyId: storeA.companyId,
+        createdAt: serverTimestamp(),
+      }),
+    ).rejects.toThrow();
+    await expect(
+      setDoc(doc(db, "users", storeA.uid), { uid: storeA.uid, role: "admin" }),
+    ).rejects.toThrow();
   });
 });
 
