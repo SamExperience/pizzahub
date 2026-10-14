@@ -408,6 +408,35 @@ describe("orders and customers write rules", () => {
     ).rejects.toThrow();
   });
 
+  it("denies a delivery order with a blank phone or address part", async () => {
+    await signInAs(storeA);
+    const delivery = (customerId) =>
+      orderFields(storeA.storeId, customerId, { orderType: "delivery" });
+    const blankAddress = (part) => ({ ...deliveryAddress, [part]: "   " });
+
+    await expect(
+      commitOrder(delivery, customerFields(companyA, { phone: "   " })),
+    ).rejects.toThrow();
+    for (const part of ["street", "streetNumber", "postalCode", "city"]) {
+      await expect(
+        commitOrder(
+          delivery,
+          customerFields(companyA, { address: blankAddress(part) }),
+        ),
+      ).rejects.toThrow();
+    }
+    // A blank optional part (country) does not block the delivery.
+    await commitOrder(
+      delivery,
+      customerFields(companyA, { address: blankAddress("country") }),
+    );
+    // Takeaway orders do not need delivery details.
+    await commitOrder(
+      (customerId) => orderFields(storeA.storeId, customerId),
+      customerFields(companyA, { phone: "   ", address: null }),
+    );
+  });
+
   it("denies invalid orders", async () => {
     await signInAs(storeA);
     const customer = () => customerFields(companyA);

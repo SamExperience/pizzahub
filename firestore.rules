@@ -442,19 +442,20 @@ service cloud.firestore {
       ).data;
     }
 
-    // Delivery needs phone and street, streetNumber, postalCode, city.
+    // Non-blank text: a string that is not empty or whitespace only.
+    function isFilled(v) {
+      return v is string && !v.matches('\\s*');
+    }
+
+    // Delivery needs a non-blank phone, street, streetNumber, postalCode and
+    // city.
     function hasDeliveryDetails(customer) {
-      return customer.phone is string
-        && customer.phone.size() > 0
-        && customer.address is map
-        && customer.address.street is string
-        && customer.address.street.size() > 0
-        && customer.address.streetNumber is string
-        && customer.address.streetNumber.size() > 0
-        && customer.address.postalCode is string
-        && customer.address.postalCode.size() > 0
-        && customer.address.city is string
-        && customer.address.city.size() > 0;
+      return isFilled(customer.get("phone", null))
+        && customer.get("address", null) is map
+        && isFilled(customer.address.get("street", null))
+        && isFilled(customer.address.get("streetNumber", null))
+        && isFilled(customer.address.get("postalCode", null))
+        && isFilled(customer.address.get("city", null));
     }
 
     // Order content editable on creation and on edit: customer, order type,
