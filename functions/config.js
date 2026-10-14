@@ -9,6 +9,7 @@ setGlobalOptions({ region: "europe-west6", maxInstances: 10 });
 
 // Secrets live in Google Secret Manager (local emulator: functions/.secret.local).
 export const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
+export const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 
 // Non-secret params (functions/.env.<projectId> or prompted on deploy).
 export const stripePriceId = defineString("STRIPE_PRICE_ID");
