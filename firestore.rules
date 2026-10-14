@@ -388,15 +388,50 @@ service cloud.firestore {
       return userProfile().companyId;
     }
 
-    // Customer fields a client may write, and common shape checks.
-    function isValidCustomer(data) {
+    // Optional phone: null, or a string within the limit.
+    function isOptPhone(v) {
+      return v == null || (v is string && v.size() <= 30);
+    }
+
+    // Shape of the Customer fields that are present (all of them on create).
+    // Optional fields can be null or absent; the address reuses the optional
+    // Company address check.
+    function isValidCustomerFields(data) {
+      return (!data.keys().hasAny(["companyId"]) || data.companyId is string)
+        && (!data.keys().hasAny(["firstName"]) || isName(data.firstName))
+        && isOptName(data.get("lastName", null))
+        && isOptPhone(data.get("phone", null))
+        && isValidCompanyAddress(data.get("address", null));
+    }
+
+    function isValidCustomerCreate(data) {
       return data.keys().hasOnly([
           "companyId", "firstName", "lastName", "phone", "address",
           "createdAt", "updatedAt"
         ])
-        && data.keys().hasAll(["companyId", "firstName", "createdAt", "updatedAt"])
-        && data.firstName is string
-        && data.firstName.size() > 0
+        && data.keys().hasAll([
+          "companyId", "firstName", "createdAt", "updatedAt"
+        ])
+        && isValidCustomerFields(data)
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // Legacy Customers may miss a key, so nothing is required here: keys that
+    // are present are validated, required keys cannot be removed, and
+    // companyId and createdAt never change.
+    function isValidCustomerUpdate(data) {
+      let changed = data.diff(resource.data);
+
+      return data.keys().hasOnly([
+          "companyId", "firstName", "lastName", "phone", "address",
+          "createdAt", "updatedAt"
+        ])
+        && !changed.removedKeys().hasAny([
+          "companyId", "firstName", "createdAt", "updatedAt"
+        ])
+        && !changed.affectedKeys().hasAny(["companyId", "createdAt"])
+        && isValidCustomerFields(data)
         && data.updatedAt == request.time;
     }
 
@@ -429,7 +464,9 @@ service cloud.firestore {
         && data.orderType in ["takeaway", "delivery"]
         && data.items is list
         && data.items.size() > 0
+        && data.items.size() <= 50
         && data.total is number
+        && data.total >= 0
         && data.scheduledTime is timestamp
         && orderCustomer(data.customerId).companyId == userCompanyId()
         && (data.orderType != "delivery"
@@ -506,15 +543,13 @@ service cloud.firestore {
       allow create: if request.auth != null
         && isAdmin()
         && request.resource.data.companyId == userCompanyId()
-        && isValidCustomer(request.resource.data)
-        && request.resource.data.createdAt == request.time;
+        && isValidCustomerCreate(request.resource.data);
 
       allow update: if request.auth != null
         && isAdmin()
         && resource.data.companyId == userCompanyId()
         && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.createdAt == resource.data.createdAt
-        && isValidCustomer(request.resource.data);
+        && isValidCustomerUpdate(request.resource.data);
     }
   }
 }

@@ -613,6 +613,224 @@ describe("orders and customers write rules", () => {
     await signout();
     await expect(setStatus(ref, "Completed")).rejects.toThrow();
   });
+
+  describe("customer validation", () => {
+    const { NAME, PHONE, POSTAL_CODE } = FIELD_LIMITS;
+    const create = (extra = {}, omitKey) => {
+      const data = customerFields(companyA, extra);
+      if (omitKey) delete data[omitKey];
+      return writeBatch(db).set(doc(collection(db, "customers")), data).commit();
+    };
+
+    it("denies a missing required key or an extra key on creation", async () => {
+      await signInAs(storeA);
+      for (const key of ["companyId", "firstName", "createdAt", "updatedAt"])
+        await expect(create({}, key)).rejects.toThrow();
+      await expect(create({ extra: "x" })).rejects.toThrow();
+    });
+
+    it("validates the values on creation", async () => {
+      await signInAs(storeA);
+      await expect(create({ firstName: "" })).rejects.toThrow();
+      await expect(create({ firstName: "   " })).rejects.toThrow();
+      await expect(create({ firstName: "a".repeat(NAME + 1) })).rejects.toThrow();
+      await expect(create({ lastName: "a".repeat(NAME + 1) })).rejects.toThrow();
+      await expect(create({ phone: "1".repeat(PHONE + 1) })).rejects.toThrow();
+      await expect(
+        create({
+          address: {
+            ...deliveryAddress,
+            postalCode: "1".repeat(POSTAL_CODE + 1),
+          },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        create({ address: { ...deliveryAddress, planet: "Mars" } }),
+      ).rejects.toThrow();
+      await expect(create({ firstName: "a".repeat(NAME) })).resolves.toBeUndefined();
+      await expect(
+        create({ lastName: "a".repeat(NAME), phone: "1".repeat(PHONE) }),
+      ).resolves.toBeUndefined();
+      await expect(
+        create({ lastName: null, phone: null, address: null }),
+      ).resolves.toBeUndefined();
+    });
+
+    describe("update", () => {
+      let ref;
+      const touch = (data = {}) =>
+        updateDoc(ref, { updatedAt: serverTimestamp(), ...data });
+
+      beforeAll(async () => {
+        await signInAs(storeA);
+        ref = doc(db, "customers", await createCustomer());
+      });
+
+      it("validates the changed values", async () => {
+        await signInAs(storeA);
+        await expect(touch({ firstName: "Luigi" })).resolves.toBeUndefined();
+        await expect(touch({ lastName: null, phone: null })).resolves.toBeUndefined();
+        await expect(touch({ address: null })).resolves.toBeUndefined();
+        await expect(touch({ firstName: "   " })).rejects.toThrow();
+        await expect(touch({ firstName: "a".repeat(NAME + 1) })).rejects.toThrow();
+        await expect(touch({ phone: "1".repeat(PHONE + 1) })).rejects.toThrow();
+        await expect(touch({ extra: "x" })).rejects.toThrow();
+      });
+
+      it("denies removing a required key", async () => {
+        await signInAs(storeA);
+        await expect(touch({ firstName: deleteField() })).rejects.toThrow();
+      });
+
+      it("denies changing companyId or createdAt", async () => {
+        await signInAs(storeA);
+        await expect(touch({ companyId: companyB })).rejects.toThrow();
+        await expect(touch({ createdAt: serverTimestamp() })).rejects.toThrow();
+      });
+
+      it("denies an update without updatedAt set to the request time", async () => {
+        await signInAs(storeA);
+        await expect(updateDoc(ref, { firstName: "NoTime" })).rejects.toThrow();
+        await expect(touch({ updatedAt: new Date() })).rejects.toThrow();
+      });
+
+      it("keeps legacy customers without timestamps updatable", async () => {
+        await signInAs(storeA);
+        const legacyId = await seedDoc("customers", {
+          companyId: companyA,
+          firstName: "Legacy",
+        });
+        await expect(
+          updateDoc(doc(db, "customers", legacyId), {
+            firstName: "Fixed",
+            updatedAt: serverTimestamp(),
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+  });
+
+  describe("order validation", () => {
+    const MAX_ITEMS = FIELD_LIMITS.LIST_SIZE;
+    const items = (size) =>
+      Array.from({ length: size }, (_, i) => ({
+        productId: `p${i}`,
+        productName: "Margherita",
+        quantity: 1,
+      }));
+
+    const createWith = async (extra, omitKey) => {
+      const customerId = await createCustomer();
+      const data = orderFields(storeA.storeId, customerId, extra);
+      if (omitKey) delete data[omitKey];
+      const ref = doc(collection(db, "orders"));
+      await writeBatch(db).set(ref, data).commit();
+      return ref;
+    };
+
+    it("validates the items count and the total on creation", async () => {
+      await signInAs(storeA);
+      await expect(createWith({ items: [] })).rejects.toThrow();
+      await expect(createWith({ items: items(1) })).resolves.toBeDefined();
+      await expect(createWith({ items: items(MAX_ITEMS) })).resolves.toBeDefined();
+      await expect(createWith({ items: items(MAX_ITEMS + 1) })).rejects.toThrow();
+      await expect(createWith({ total: -1 })).rejects.toThrow();
+      await expect(createWith({ total: 0 })).resolves.toBeDefined();
+    });
+
+    it("denies a missing required key on creation", async () => {
+      await signInAs(storeA);
+      for (const key of [
+        "storeId",
+        "customerId",
+        "orderType",
+        "scheduledTime",
+        "status",
+        "items",
+        "total",
+        "createdAt",
+        "updatedAt",
+      ])
+        await expect(createWith({}, key)).rejects.toThrow();
+    });
+
+    it("validates the items count and the total on content edit", async () => {
+      const ref = await createOrderA();
+      const { customerId } = (await getDoc(ref)).data();
+
+      await expect(editContent(ref, customerId, { items: [] })).rejects.toThrow();
+      await expect(
+        editContent(ref, customerId, { items: items(MAX_ITEMS + 1) }),
+      ).rejects.toThrow();
+      await expect(editContent(ref, customerId, { total: -1 })).rejects.toThrow();
+      await expect(
+        editContent(ref, customerId, { items: items(1) }),
+      ).resolves.toBeUndefined();
+      await expect(
+        editContent(ref, customerId, { items: items(MAX_ITEMS) }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("denies removing a required content key", async () => {
+      const ref = await createOrderA();
+      const { customerId } = (await getDoc(ref)).data();
+
+      await expect(
+        editContent(ref, customerId, { total: deleteField() }),
+      ).rejects.toThrow();
+      await expect(
+        editContent(ref, customerId, { scheduledTime: deleteField() }),
+      ).rejects.toThrow();
+    });
+
+    describe("legacy order without scheduledTime", () => {
+      let ref;
+      let customerId;
+
+      beforeAll(async () => {
+        await signInAs(storeA);
+        customerId = await createCustomer();
+        const id = await seedDoc("orders", {
+          storeId: storeA.storeId,
+          customerId,
+          orderType: "takeaway",
+          status: "Pending",
+        });
+        ref = doc(db, "orders", id);
+      });
+
+      it("denies a content edit that does not supply every content field", async () => {
+        await signInAs(storeA);
+        await expect(
+          updateDoc(ref, {
+            customerId,
+            orderType: "takeaway",
+            items: items(1),
+            total: 10,
+            updatedAt: serverTimestamp(),
+          }),
+        ).rejects.toThrow();
+        await expect(
+          updateDoc(ref, { total: 10, updatedAt: serverTimestamp() }),
+        ).rejects.toThrow();
+      });
+
+      it("denies changing storeId or createdAt", async () => {
+        await signInAs(storeA);
+        await expect(
+          editContent(ref, customerId, { storeId: storeB.storeId }),
+        ).rejects.toThrow();
+        await expect(
+          editContent(ref, customerId, { createdAt: serverTimestamp() }),
+        ).rejects.toThrow();
+      });
+
+      it("lets a content edit supply every content field", async () => {
+        await signInAs(storeA);
+        await expect(editContent(ref, customerId)).resolves.toBeUndefined();
+      });
+    });
+  });
 });
 
 describe("unauthenticated access", () => {
