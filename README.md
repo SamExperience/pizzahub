@@ -195,6 +195,10 @@ On first use, copy the `whsec_...` signing secret printed by `stripe listen` int
 | `npm run emulator:firebase` | Start only the Firebase emulators with the data in `emulator-data/`. |
 | `npm run stripe:listen` | Forward the Stripe test events handled by the webhook to the Functions emulator. |
 | `npm run emulator:export` | Export the running emulators' data to `emulator-data/`. |
+| `npm run deploy:rules` | Deploy the Firestore rules and indexes and the Storage rules to the default Firebase project. |
+| `npm run deploy:functions` | Deploy the Cloud Functions. |
+| `npm run deploy:backend` | Deploy the rules, indexes and Cloud Functions together. |
+| `npm run deploy:hosting` | Build the client and deploy `dist/` to Firebase Hosting. |
 
 Tests run against the emulators using the configuration in `.env.test`. To start the emulators, run the suite once and stop them, use the same command as CI:
 

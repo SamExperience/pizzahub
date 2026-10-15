@@ -16,6 +16,7 @@
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:backend": "firebase deploy --only firestore:rules,firestore:indexes,storage,functions",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
     "stripe:listen": "stripe listen --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted --forward-to http://127.0.0.1:5001/pizzahub-11284/europe-west6/stripeWebhook"
   },
   "dependencies": {

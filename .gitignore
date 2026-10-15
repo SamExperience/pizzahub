@@ -42,3 +42,6 @@ emulator-data/
 # Cloud Functions local config (emulator params and Stripe test secrets)
 functions/.env.local
 functions/.secret.local
+
+# Firebase CLI deploy cache
+.firebase/
