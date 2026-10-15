@@ -8,7 +8,7 @@ import { formatDate } from "../utils/format";
 import useSubscription from "../utils/useSubscription";
 import { alert, badge, card, muted, primaryButton, sectionTitle } from "../utils/styles";
 
-// Labels of the Stripe statuses (docs/01-data-model.md); unknown ones are shown as received.
+// Labels of the Stripe statuses (spec/01-data-model.md); unknown ones are shown as received.
 const STATUS_LABELS = {
   active: "Active",
   past_due: "Past due",

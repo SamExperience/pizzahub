@@ -18,7 +18,7 @@ function toTimestamp(seconds) {
   return typeof seconds === "number" ? Timestamp.fromMillis(seconds * 1000) : null;
 }
 
-// Maps a Stripe Subscription to the subscriptions/{companyId} fields (docs/01-data-model.md).
+// Maps a Stripe Subscription to the subscriptions/{companyId} fields (spec/01-data-model.md).
 // The billing period lives on the subscription item in current Stripe API versions.
 export function buildSubscriptionData(subscription, eventCreated) {
   const item = subscription.items?.data?.[0];

@@ -3,7 +3,7 @@ import { httpsCallable } from "firebase/functions";
 
 import { db, functions } from "./firebase";
 
-// Only this Stripe status counts as an active subscription (docs/01-data-model.md).
+// Only this Stripe status counts as an active subscription (spec/01-data-model.md).
 export const SUBSCRIPTION_STATUS_ACTIVE = "active";
 
 // A missing document or any status other than "active" is inactive.

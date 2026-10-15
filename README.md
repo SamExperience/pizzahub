@@ -121,6 +121,7 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - [Lucide](https://lucide.dev/) icons (lucide-react)
 - [Vitest](https://vitest.dev/) and Testing Library
 - [Oxlint](https://oxc.rs/)
+- [concurrently](https://github.com/open-cli-tools/concurrently) to run the emulators and the Stripe listener together
 
 ## Getting started
 
@@ -176,13 +177,9 @@ The Emulator Suite UI is enabled and its address is printed when the emulators s
 
 ### Stripe webhooks locally
 
-With the emulators running, forward the Stripe test events to the webhook function with the Stripe CLI (replace `<projectId>` with your Firebase project id):
+`npm run emulator` also starts the Stripe CLI (`npm run stripe:listen`), which forwards the four Stripe events handled by the webhook (`checkout.session.completed`, `customer.subscription.created`, `updated`, `deleted`) to the `stripeWebhook` function on the Functions emulator (`127.0.0.1:5001`, project `pizzahub-11284`). Sign in to the Stripe CLI first (`stripe login`).
 
-```bash
-stripe listen --forward-to http://localhost:5001/<projectId>/europe-west6/stripeWebhook
-```
-
-Copy the `whsec_...` signing secret printed by `stripe listen` into `STRIPE_WEBHOOK_SECRET` in `functions/.secret.local` and restart the emulators. Then subscribe from the Dashboard with a Stripe test card: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0341` is declined (any future expiry date and any CVC). A test subscription can be cancelled with `stripe subscriptions cancel <subscriptionId>`; the status in the Dashboard and the banner update automatically.
+On first use, copy the `whsec_...` signing secret printed by `stripe listen` into `STRIPE_WEBHOOK_SECRET` in `functions/.secret.local` and restart the emulators. Events sent while the listener was not running are not retried locally: resend them with `stripe events resend <eventId>`. Then subscribe from the Dashboard with a Stripe test card: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0341` is declined (any future expiry date and any CVC). A test subscription can be cancelled with `stripe subscriptions cancel <subscriptionId>`; the status in the Dashboard and the banner update automatically.
 
 ## Scripts
 
@@ -194,7 +191,9 @@ Copy the `whsec_...` signing secret printed by `stripe listen` into `STRIPE_WEBH
 | `npm run lint` | Run Oxlint. |
 | `npm test` | Run the Vitest suite (requires the emulators). |
 | `npm run test:functions` | Run the Cloud Functions unit tests (Stripe and Firestore are mocked; no emulator needed). |
-| `npm run emulator` | Start the Firebase emulators with the data in `emulator-data/`. |
+| `npm run emulator` | Start the Firebase emulators with the data in `emulator-data/` and the Stripe webhook listener, in one terminal. |
+| `npm run emulator:firebase` | Start only the Firebase emulators with the data in `emulator-data/`. |
+| `npm run stripe:listen` | Forward the Stripe test events handled by the webhook to the Functions emulator. |
 | `npm run emulator:export` | Export the running emulators' data to `emulator-data/`. |
 
 Tests run against the emulators using the configuration in `.env.test`. To start the emulators, run the suite once and stop them, use the same command as CI:
