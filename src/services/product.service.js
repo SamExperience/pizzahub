@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  getCountFromServer,
   getDocs,
   orderBy,
   query,
@@ -376,6 +377,18 @@ export const getProductsByCategoryId = async (categoryId) => {
     id: doc.id,
     ...doc.data(),
   }));
+};
+
+// Counts on the server, so the Menu sidebar badges never download products.
+export const countProductsByCategoryId = async (categoryId) => {
+  if (!categoryId) throw new Error("Category ID is required");
+
+  const q = query(
+    collection(db, "products"),
+    where("categoryId", "==", categoryId),
+  );
+
+  return (await getCountFromServer(q)).data().count;
 };
 
 export const getProductById = async (productId) => {

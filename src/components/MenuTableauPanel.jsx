@@ -199,7 +199,7 @@ export default function MenuTableauPanel({
                     aria-current={
                       category.id === categoryId ? "true" : undefined
                     }
-                    className="min-h-10 w-full rounded-full border border-neutral-300 px-4 py-2 text-left text-sm font-medium whitespace-nowrap text-neutral-800 hover:bg-neutral-50 focus:outline-none md:min-h-11 md:rounded-lg md:border-transparent md:whitespace-normal focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:border-brand-600 aria-[current=true]:bg-brand-600 aria-[current=true]:text-white"
+                    className="min-h-11 w-full rounded-full border border-neutral-300 px-4 py-2 text-left text-sm font-medium whitespace-nowrap text-neutral-800 hover:bg-neutral-50 focus:outline-none md:rounded-lg md:border-transparent md:whitespace-normal focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:border-brand-600 aria-[current=true]:bg-brand-600 aria-[current=true]:text-white"
                     onClick={() => setSelectedCategoryId(category.id)}
                   >
                     {category.name}

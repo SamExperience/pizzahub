@@ -50,7 +50,7 @@ export default function TableauBoard({
         </div>
         <button
           type="button"
-          className={`${primaryButton} min-h-10 max-md:fixed max-md:right-4 max-md:bottom-6 max-md:z-20 max-md:size-14 max-md:rounded-full max-md:p-0 max-md:shadow-xl`}
+          className={`${primaryButton} max-md:fixed max-md:right-4 max-md:bottom-6 max-md:z-20 max-md:size-14 max-md:rounded-full max-md:p-0 max-md:shadow-xl`}
           onClick={onCreateTicket}
         >
           <Plus className="size-4 max-md:size-7" aria-hidden="true" />

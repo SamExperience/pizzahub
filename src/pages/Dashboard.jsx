@@ -53,7 +53,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       aria-current={isActive ? "page" : undefined}
-                      className={`flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
+                      className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
                         isActive
                           ? "bg-brand-50 text-brand-700"
                           : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"

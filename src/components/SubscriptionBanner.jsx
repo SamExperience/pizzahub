@@ -16,7 +16,7 @@ export default function SubscriptionBanner() {
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:px-6 lg:px-8"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-200 bg-amber-50 px-4 py-0 text-sm text-amber-800 sm:px-6 lg:px-8"
     >
       <span className="flex items-center gap-2">
         <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
@@ -24,7 +24,7 @@ export default function SubscriptionBanner() {
       </span>
       <Link
         to="/dashboard?section=subscription"
-        className="font-medium underline underline-offset-2 hover:text-amber-900"
+        className="inline-flex min-h-11 items-center font-medium underline underline-offset-2 hover:text-amber-900"
       >
         Manage subscription
       </Link>

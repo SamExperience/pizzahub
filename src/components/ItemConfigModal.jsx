@@ -343,7 +343,7 @@ export default function ItemConfigModal({
                   <input
                     id="customization"
                     type="text"
-                    className={`${input} min-h-11`}
+                    className={input}
                     maxLength={FIELD_LIMITS.LIST_ITEM}
                     placeholder="e.g. no onions"
                     value={customizationText}

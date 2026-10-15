@@ -17,7 +17,7 @@ const ADDRESS_INPUTS = [
   { field: "country", label: "Country", required: false, span: "col-span-6 sm:col-span-2", max: FIELD_LIMITS.ADDRESS_LINE },
 ];
 
-const fieldInput = `${input} min-h-11 sm:min-h-10`;
+const fieldInput = input;
 const fieldLabel = `${label} mb-1 block`;
 
 const describeCustomer = ({ lastName, phone, address }) =>
@@ -64,7 +64,7 @@ function CustomerCard({ form, isDelivery, onEdit }) {
       </div>
       <button
         type="button"
-        className={`${button} min-h-10 shrink-0 px-2.5 text-xs`}
+        className={`${button} shrink-0 px-2.5 text-xs`}
         onClick={onEdit}
       >
         <Pencil className="size-3.5" aria-hidden="true" />
@@ -122,7 +122,7 @@ export default function TicketCustomerSection({
         {selectedCustomer && (
           <button
             type="button"
-            className={`${ghostButton} min-h-10 font-medium tracking-normal text-brand-700 normal-case`}
+            className={`${ghostButton} min-h-11 font-medium tracking-normal text-brand-700 normal-case`}
             onClick={onClear}
           >
             New customer

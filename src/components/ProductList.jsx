@@ -33,9 +33,10 @@ import ProductForm from "./ProductForm";
 import { getErrorMessage } from "../utils/errorMessage";
 import { logError } from "../utils/logger";
 
-// Chevron button used to move a row up/down: 40px wide, 32px tall.
+// Chevron button used to move a row up/down: 44px wide, 36px tall, so the
+// two stacked arrows fill the 72px row.
 const moveButton =
-  "inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:text-neutral-300 disabled:hover:bg-transparent";
+  "inline-flex h-9 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:text-neutral-300 disabled:hover:bg-transparent";
 
 const panelButton =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40";
@@ -196,7 +197,7 @@ function ProductRow({
           type="button"
           aria-expanded={expanded}
           aria-controls={panelId}
-          className={`flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5 rounded-lg px-1 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${dim}`}
+          className={`flex min-h-11 min-w-0 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 rounded-lg px-1 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${dim}`}
           onClick={toggleExpanded}
         >
           <span className="flex max-w-full items-center gap-2">
@@ -392,6 +393,7 @@ export default function ProductList({
     setPending(true);
     setActionError(null);
     let succeeded = false;
+    let count;
     try {
       await action();
       succeeded = true;
@@ -401,7 +403,9 @@ export default function ProductList({
     }
 
     try {
-      setProducts(await getProductsByCategoryId(categoryId));
+      const reloaded = await getProductsByCategoryId(categoryId);
+      setProducts(reloaded);
+      count = reloaded.length;
     } catch (err) {
       logError("Error reloading products -> ", err);
       if (succeeded) {
@@ -412,7 +416,8 @@ export default function ProductList({
 
     pendingRef.current = false;
     setPending(false);
-    onChange?.();
+    // The count is undefined when the reload failed.
+    onChange?.(count);
 
     return succeeded;
   };
@@ -486,7 +491,7 @@ export default function ProductList({
         {!loading && !error && !showForm && editingId === null && (
           <button
             type="button"
-            className={`${primaryButton} min-h-10`}
+            className={primaryButton}
             disabled={pending}
             onClick={() => setShowForm(true)}
           >

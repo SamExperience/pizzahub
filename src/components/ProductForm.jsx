@@ -11,11 +11,11 @@ const fieldsetClass =
   "m-0 flex min-w-0 flex-col gap-3 border-0 p-0";
 const sectionClass = "border-t border-neutral-200 pt-4";
 const legendClass = "mb-3 p-0 text-sm font-semibold text-neutral-900";
-const fieldInput = `${input} min-h-10`;
+const fieldInput = input;
 // Square 40px icon button for removing a row.
 const removeButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
-const addButton = `${button} min-h-10 self-start`;
+const addButton = `${button} self-start`;
 
 const isValidPrice = (value) =>
   value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -301,7 +301,7 @@ export default function ProductForm({
       <div className={sectionClass}>
       <fieldset className={fieldsetClass}>
         <legend className={legendClass}>Availability</legend>
-        <label className="flex min-h-10 items-center gap-2 text-sm font-medium text-neutral-700">
+        <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-neutral-700">
           <input
             type="checkbox"
             className="size-4 rounded accent-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1"
@@ -325,7 +325,7 @@ export default function ProductForm({
             />
             <button
               type="button"
-              className={`${button} min-h-10`}
+              className={button}
               onClick={() => setRemoveImage(true)}
             >
               Remove image
@@ -339,7 +339,7 @@ export default function ProductForm({
           type="file"
           accept="image/*"
           aria-label="Product image"
-          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
+          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
           onChange={(event) => setImageFile(event.target.files[0] ?? null)}
         />
       </fieldset>

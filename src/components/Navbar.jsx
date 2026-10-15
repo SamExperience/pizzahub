@@ -11,7 +11,7 @@ const linkBase =
   "inline-flex items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
 
 const linkSize = {
-  horizontal: "min-h-9 py-1.5",
+  horizontal: "min-h-11 py-1.5",
   vertical: "min-h-11 py-2.5 text-base",
 };
 

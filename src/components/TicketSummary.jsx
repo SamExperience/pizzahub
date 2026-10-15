@@ -48,7 +48,7 @@ export default function TicketSummary({
         {onAddProduct && (
           <button
             type="button"
-            className={`${primaryButton} min-h-10 px-3`}
+            className={`${primaryButton} px-3`}
             disabled={linesFull}
             onClick={onAddProduct}
           >

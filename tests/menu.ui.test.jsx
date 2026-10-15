@@ -16,6 +16,7 @@ import {
 } from "../src/services/category.service";
 import { createMenu, getMenuByStoreId } from "../src/services/menu.service";
 import {
+  countProductsByCategoryId,
   createProduct,
   deleteProductById,
   deleteProductImage,
@@ -39,6 +40,7 @@ vi.mock("../src/services/category.service", () => ({
   moveCategory: vi.fn(),
 }));
 vi.mock("../src/services/product.service", () => ({
+  countProductsByCategoryId: vi.fn(),
   createProduct: vi.fn(),
   deleteProductById: vi.fn(),
   deleteProductImage: vi.fn(),
@@ -94,6 +96,10 @@ const installFakeServices = () => {
     products = products.filter((product) => product.categoryId !== id);
   });
 
+  countProductsByCategoryId.mockImplementation(
+    async (categoryId) =>
+      products.filter((product) => product.categoryId === categoryId).length,
+  );
   getProductsByCategoryId.mockImplementation(async (categoryId) =>
     products
       .filter((product) => product.categoryId === categoryId)
@@ -187,7 +193,7 @@ describe("Menu management through the UI", () => {
     const names = () =>
       screen
         .getAllByRole("button", { name: /^Select / })
-        .map((button) => button.textContent);
+        .map((button) => button.getAttribute("aria-label").slice(7));
     expect(names()).toEqual(["Pizze", "Bibite", "Dolci"]);
 
     await userEvent.click(screen.getByRole("button", { name: "Move Dolci up" }));
@@ -311,7 +317,7 @@ describe("Menu management through the UI", () => {
       expect(productNames()).toEqual(["Capricciosa", "Diavola piccante"]),
     );
     expect(refreshMenuReady).toHaveBeenCalled();
-  });
+  }, 15000); // Long flow: the default 5s timeout fails under a full parallel run.
 
   it("uploads and removes a product image", async () => {
     render(<Menu />);
@@ -374,6 +380,24 @@ describe("Menu management through the UI", () => {
     expect(products).toHaveLength(0);
     // The remaining category becomes the selected one.
     expect(await screen.findByText("No products in this category yet.")).toBeTruthy();
+  });
+
+  it("keeps the category badge in sync with the product count", async () => {
+    render(<Menu />);
+    await screen.findByText("No categories yet.");
+    await addCategory("Pizze");
+
+    const badge = () =>
+      screen.getByRole("button", { name: "Select Pizze" }).querySelector("[title]");
+    expect(badge().title).toBe("0 products");
+
+    await addProduct("Margherita", "7");
+    await addProduct("Diavola", "9");
+    await vi.waitFor(() => expect(badge().title).toBe("2 products"));
+
+    await userEvent.click(screen.getByLabelText("Delete Diavola"));
+    await clickDialog("Delete product");
+    await vi.waitFor(() => expect(badge().title).toBe("1 product"));
   });
 
   it("shows service errors and keeps the data consistent", async () => {

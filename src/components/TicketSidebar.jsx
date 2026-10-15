@@ -416,7 +416,7 @@ export default function TicketSidebar({
                     {ORDER_TYPE_OPTIONS.map(({ value, label, Icon }) => (
                       <label
                         key={value}
-                        className={`flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
+                        className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-400 ${
                           orderType === value
                             ? "bg-white text-brand-700 shadow-sm ring-1 ring-brand-200"
                             : "text-neutral-600 hover:bg-white/60"

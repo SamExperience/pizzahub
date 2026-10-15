@@ -132,7 +132,7 @@ function ActionsMenu({ disabled, onEdit, onCancel }) {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        className={`${button} size-10 min-h-10 px-0 ${open ? "border-brand-300 bg-brand-50 text-brand-700" : ""}`}
+        className={`${button} size-11 px-0 ${open ? "border-brand-300 bg-brand-50 text-brand-700" : ""}`}
         aria-label="More actions"
         title="More actions"
         aria-haspopup="menu"
@@ -225,7 +225,6 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, on
   const isDelivery = order.orderType === ORDER_TYPE.DELIVERY;
   const itemCount = countItems(order.items);
   const street = isDelivery ? formatStreet(customer?.address) : "";
-  const actionSize = "min-h-10 max-md:min-h-11";
   const backLabel = BACK_LABEL[previousStatus];
   const forwardLabel = FORWARD_LABEL[nextStatus];
   const hasStatusMoves = onChangeStatus && (previousStatus || nextStatus);
@@ -290,7 +289,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, on
         {hasStatusMoves && previousStatus && (
           <button
             type="button"
-            className={`${button} ${actionSize} ${backLabel ? "" : "size-10 px-0 max-md:size-11"}`}
+            className={`${button} ${backLabel ? "" : "size-11 px-0"}`}
             aria-label={backLabel ? undefined : `Move to ${previousStatus}`}
             title={`Move to ${previousStatus}`}
             disabled={saving}
@@ -310,7 +309,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, on
         {hasStatusMoves && nextStatus && (
           <button
             type="button"
-            className={`${primaryButton} ${actionSize} max-md:px-4`}
+            className={`${primaryButton} max-md:px-4`}
             title={`Move to ${nextStatus}`}
             disabled={saving}
             onClick={() => run(() => onChangeStatus(order, nextStatus))}
@@ -340,7 +339,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, on
         )}
         <button
           type="button"
-          className={`${iconButton} size-10 shrink-0 max-md:size-11`}
+          className={`${iconButton} shrink-0`}
           aria-label={expanded ? "Hide details" : "Show details"}
           title={expanded ? "Hide details" : "Show details"}
           aria-expanded={expanded}

@@ -23,14 +23,14 @@ export default function CategoryForm({ onSubmit, busy = false }) {
         type="text"
         aria-label="New category name"
         placeholder="New category"
-        className={`${input} min-h-10`}
+        className={input}
         maxLength={FIELD_LIMITS.NAME}
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
       <button
         type="submit"
-        className={`${primaryButton} min-h-10 w-full`}
+        className={`${primaryButton} w-full`}
         disabled={busy || !name.trim()}
       >
         <Plus className="size-4" aria-hidden="true" />
