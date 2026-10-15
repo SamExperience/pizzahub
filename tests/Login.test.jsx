@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   register: vi.fn(),
   loginWithGoogle: vi.fn(),
+  resetPassword: vi.fn(),
 }));
 
 vi.mock("../src/services/auth.service", () => mocks);
@@ -132,5 +133,71 @@ describe("Login", () => {
 
     await screen.findByRole("alert");
     expect(google.disabled).toBe(false);
+  });
+
+  it("sends a password reset email for the typed email", async () => {
+    mocks.resetPassword.mockResolvedValue(undefined);
+    render(<Login />);
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "a@b.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "If an account exists for this email, we sent a password reset link.",
+    );
+    expect(mocks.resetPassword).toHaveBeenCalledWith("a@b.com");
+    expect(mocks.login).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows an inline error when the password reset fails", async () => {
+    mocks.resetPassword.mockRejectedValue({
+      code: "auth/missing-email",
+      message: "missing",
+    });
+    render(<Login />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Enter your email address.",
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("hides the password reset link in sign-up mode", () => {
+    render(<Login />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign up" }));
+
+    expect(
+      screen.queryByRole("button", { name: "Forgot password?" }),
+    ).toBeNull();
+  });
+
+  it("disables the buttons while a password reset request is running", async () => {
+    let resolveReset;
+    mocks.resetPassword.mockReturnValue(
+      new Promise((resolve) => {
+        resolveReset = resolve;
+      }),
+    );
+    render(<Login />);
+
+    const reset = screen.getByRole("button", { name: "Forgot password?" });
+    fireEvent.click(reset);
+
+    expect(reset.disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Log in" }).disabled).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Login with Google" }).disabled,
+    ).toBe(true);
+
+    resolveReset();
+    await screen.findByRole("status");
+    expect(reset.disabled).toBe(false);
+    expect(mocks.resetPassword).toHaveBeenCalledTimes(1);
   });
 });

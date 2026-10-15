@@ -4,6 +4,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 
 import { auth } from "./firebase";
@@ -21,4 +22,14 @@ export async function loginWithGoogle() {
 }
 export async function signout() {
   return await signOut(auth);
+}
+// An unknown email resolves like a known one, so the caller cannot reveal
+// which accounts exist (the emulator and projects without email enumeration
+// protection report auth/user-not-found).
+export async function resetPassword(email) {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") throw error;
+  }
 }

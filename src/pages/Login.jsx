@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, Pizza } from "lucide-react";
-import { register, login } from "../services/auth.service";
+import { register, login, resetPassword } from "../services/auth.service";
 import { loginWithGoogle } from "../services/auth.service";
 import { getAuthErrorMessage } from "../utils/authErrors";
 import {
@@ -20,13 +20,16 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState(null);
+  const [info, setInfo] = useState(null);
   // One auth request at a time: both buttons stay disabled until it answers.
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (submitting) return;
     setError(null);
+    setInfo(null);
     setSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
@@ -50,6 +53,7 @@ export default function Login() {
   async function handleLoginWithGoogle() {
     if (submitting) return;
     setError(null);
+    setInfo(null);
     setSubmitting(true);
 
     try {
@@ -62,9 +66,32 @@ export default function Login() {
     }
   }
 
+  async function handleResetPassword() {
+    if (submitting) return;
+    setError(null);
+    setInfo(null);
+    setSubmitting(true);
+
+    const email = new FormData(formRef.current).get("email");
+
+    try {
+      await resetPassword(email);
+      // Same message whether or not the account exists (no enumeration).
+      setInfo(
+        "If an account exists for this email, we sent a password reset link.",
+      );
+    } catch (error) {
+      logError("Password reset error -> ", error);
+      setError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function toggleMode() {
     setIsSignup((value) => !value);
     setError(null);
+    setInfo(null);
   }
 
   return (
@@ -88,7 +115,11 @@ export default function Login() {
           {isSignup ? "Sign up" : "Log in"}
         </h1>
 
-        <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
+        <form
+          ref={formRef}
+          className="mt-4 flex flex-col gap-4"
+          onSubmit={handleSubmit}
+        >
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className={label}>
               Email
@@ -116,6 +147,16 @@ export default function Login() {
               autoComplete={isSignup ? "new-password" : "current-password"}
               required
             />
+            {!isSignup && (
+              <button
+                type="button"
+                className="min-h-11 self-end text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:opacity-50"
+                onClick={handleResetPassword}
+                disabled={submitting}
+              >
+                Forgot password?
+              </button>
+            )}
           </div>
 
           {isSignup && (
@@ -141,6 +182,15 @@ export default function Login() {
           {error && (
             <div role="alert" className={alert}>
               {error}
+            </div>
+          )}
+
+          {info && (
+            <div
+              role="status"
+              className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+            >
+              {info}
             </div>
           )}
 

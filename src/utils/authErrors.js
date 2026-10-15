@@ -8,6 +8,7 @@ const MESSAGES = {
   "auth/email-already-in-use": "An account with this email already exists.",
   "auth/weak-password": "Password must be at least 6 characters.",
   "auth/invalid-email": "Enter a valid email address.",
+  "auth/missing-email": "Enter your email address.",
   "auth/too-many-requests": "Too many attempts. Please try again later.",
   "auth/network-request-failed":
     "Network error. Check your connection and try again.",
