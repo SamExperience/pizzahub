@@ -10,12 +10,12 @@ const STATUS_LABEL = {
   [ITEM_PRODUCT_STATUS.DELETED]: "No longer on the menu",
 };
 
-// Stepper button inside the quantity pill: 40px touch target, smaller in
-// wide containers.
+// Stepper button inside the quantity pill: 44px touch target at every width
+// (wide containers are tablets too).
 const stepButton =
-  "inline-flex size-10 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-30 @sm:size-8";
+  "inline-flex size-11 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-30";
 
-const rowIconButton = `${iconButton} size-10 @sm:size-9`;
+const rowIconButton = `${iconButton} size-11`;
 
 // Ticket summary: header with the item count and "Add product", then one
 // compact row per Item with quantity controls, reconfiguration and removal.

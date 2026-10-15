@@ -4,7 +4,14 @@ import { getCategoriesByMenuId } from "../services/category.service";
 import { getMenuByStoreId } from "../services/menu.service";
 import { getProductsByCategoryId } from "../services/product.service";
 import { formatPrice } from "../utils/format";
-import { alert, button, emptyBox, iconButton, sectionTitle } from "../utils/styles";
+import {
+  alert,
+  button,
+  emptyBox,
+  iconButton,
+  primaryButton,
+  sectionTitle,
+} from "../utils/styles";
 import LoadingState from "./LoadingState";
 import { logError } from "../utils/logger";
 
@@ -55,8 +62,16 @@ function ProductCard({ product, onSelect }) {
 }
 
 // Left overlay of the ticket creation: quick Menu browsing for the cashier.
-// Unavailable products are shown but cannot be selected.
-export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) {
+// Unavailable products are shown but cannot be selected. Below md the panel
+// covers the ticket, so a "Done" footer recalls itemCount and total (the
+// ticket's current content) and closes the panel.
+export default function MenuTableauPanel({
+  storeId,
+  onSelectProduct,
+  onClose,
+  itemCount = 0,
+  total = 0,
+}) {
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -144,7 +159,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         <h2 className={`${sectionTitle} m-0`}>Add product</h2>
         <button
           type="button"
-          className={iconButton}
+          className={`${iconButton} size-11`}
           aria-label="Close menu"
           title="Close menu"
           onClick={onClose}
@@ -215,7 +230,9 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
               <p className={emptyBox}>No products in this category yet.</p>
             )}
             {!productsLoading && !productsError && products.length > 0 && (
-              <ul className="m-0 grid list-none grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 p-0">
+              // Columns follow the space left by the ticket sidebar, so cards
+              // never get too narrow to read or tap.
+              <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 p-0">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -228,6 +245,16 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
           </div>
         </div>
       )}
+
+      <footer className="border-t border-neutral-200 bg-white px-4 py-3 md:hidden">
+        <button
+          type="button"
+          className={`${primaryButton} min-h-12 w-full text-base`}
+          onClick={onClose}
+        >
+          Done · {itemCount} {itemCount === 1 ? "item" : "items"} · {formatPrice(total)}
+        </button>
+      </footer>
     </section>
   );
 }

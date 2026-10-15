@@ -43,6 +43,7 @@ const FORWARD_LABEL = {
 };
 
 const BACK_LABEL = {
+  [ORDER_STATUS.PENDING]: "Back",
   [ORDER_STATUS.IN_PROGRESS]: "Reopen",
 };
 
@@ -229,7 +230,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
 
   return (
     <article
-      className={`flex flex-col gap-2.5 rounded-xl border border-l-4 bg-white p-3 shadow-sm transition-shadow ${
+      className={`@container flex flex-col gap-2.5 rounded-xl border border-l-4 bg-white p-3 shadow-sm transition-shadow ${
         expanded ? "border-brand-200 shadow-md" : "border-neutral-200"
       } ${styles?.border ?? "border-l-neutral-300"}`}
     >
@@ -294,7 +295,14 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
             onClick={() => run(() => onChangeStatus(order, previousStatus))}
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
-            {backLabel}
+            {/* Next to a forward move a narrow card (three columns on a
+                tablet) has no room for the label: it stays for screen
+                readers only. */}
+            {backLabel && (
+              <span className={nextStatus ? "@max-[18rem]:sr-only" : undefined}>
+                {backLabel}
+              </span>
+            )}
           </button>
         )}
         {hasStatusMoves && nextStatus && (
@@ -319,7 +327,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
         )}
         <button
           type="button"
-          className={`${iconButton} size-10 max-md:size-11`}
+          className={`${iconButton} size-10 shrink-0 max-md:size-11`}
           aria-label={expanded ? "Hide details" : "Show details"}
           title={expanded ? "Hide details" : "Show details"}
           aria-expanded={expanded}

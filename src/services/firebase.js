@@ -22,7 +22,9 @@ export const storage = getStorage(app);
 export const functions = getFunctions(app, "europe-west6");
 
 if (import.meta.env.DEV || import.meta.env.MODE === "test") {
-  connectAuthEmulator(auth, "http://localhost:9099");
+  // The emulator banner would cover the bottom of the screen (ticket footer,
+  // floating Create Ticket button).
+  connectAuthEmulator(auth, "http://localhost:9099", { disableWarnings: true });
   connectFirestoreEmulator(db, "localhost", 8080);
   connectStorageEmulator(storage, "127.0.0.1", 9199);
   connectFunctionsEmulator(functions, "localhost", 5001);

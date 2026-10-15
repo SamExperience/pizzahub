@@ -121,16 +121,24 @@ export default function ItemConfigModal({
   const removeCustomization = (index) =>
     setCustomizations((list) => list.filter((_, i) => i !== index));
 
+  // Text typed but not added yet still belongs to the Item: under pressure
+  // the "Add" step is easy to skip.
+  const pendingCustomization = customizationText.trim();
+  const itemCustomizations =
+    pendingCustomization && !customizationsFull
+      ? [...customizations, pendingCustomization]
+      : customizations;
+
   const buildItem = () => {
     if (restricted)
       return editRestrictedItem(
         initialItem,
-        { cookingLevel, customizations, quantity },
+        { cookingLevel, customizations: itemCustomizations, quantity },
         maxQuantity,
         product,
       );
 
-    const options = { size, cookingLevel, customizations, quantity };
+    const options = { size, cookingLevel, customizations: itemCustomizations, quantity };
 
     return initialItem
       ? reconfigureItem(product, initialItem, options)
@@ -180,6 +188,13 @@ export default function ItemConfigModal({
       <section
         role="dialog"
         aria-label={`Configure ${name}`}
+        // Pressing a button keeps the focus where it is: a blur would add the
+        // typed customization as a chip, move the buttons below it and make
+        // the press miss its target. The pending text is part of the Item
+        // anyway; tapping an empty area still adds it.
+        onMouseDown={(event) => {
+          if (event.target.closest("button")) event.preventDefault();
+        }}
         className="relative flex max-h-[90svh] w-full flex-col overflow-hidden rounded-t-2xl bg-white text-left shadow-xl sm:max-h-full sm:max-w-lg sm:rounded-xl"
       >
         <header className="flex items-start justify-between gap-2 border-b border-neutral-200 px-4 py-3">
@@ -196,7 +211,7 @@ export default function ItemConfigModal({
               {sizes.length > 0 && !choosingSize && (
                 <button
                   type="button"
-                  className={iconButton}
+                  className={`${iconButton} size-11`}
                   aria-label="Back to sizes"
                   title="Back to sizes"
                   onClick={() => setSize(null)}
@@ -211,7 +226,7 @@ export default function ItemConfigModal({
           )}
           <button
             type="button"
-            className={`${iconButton} shrink-0`}
+            className={`${iconButton} size-11 shrink-0`}
             aria-label="Close"
             title="Close"
             onClick={onClose}
@@ -333,6 +348,9 @@ export default function ItemConfigModal({
                     placeholder="e.g. no onions"
                     value={customizationText}
                     onChange={(event) => setCustomizationText(event.target.value)}
+                    // Tapping elsewhere adds the text, as on touch screens
+                    // there is no Enter key to rely on.
+                    onBlur={addCustomization}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
@@ -359,12 +377,12 @@ export default function ItemConfigModal({
                     {customizations.map((text, index) => (
                       <li
                         key={`${text}-${index}`}
-                        className="flex items-center gap-1 rounded-full bg-brand-100 py-1 pr-1 pl-3 text-sm text-brand-800"
+                        className="flex items-center gap-1 rounded-full bg-brand-100 pr-0.5 pl-3 text-sm text-brand-800"
                       >
                         {text}
                         <button
                           type="button"
-                          className="inline-flex size-8 items-center justify-center rounded-full text-brand-700 hover:bg-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                          className="inline-flex size-11 items-center justify-center rounded-full text-brand-700 hover:bg-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           aria-label={`Remove ${text}`}
                           title={`Remove ${text}`}
                           onClick={() => removeCustomization(index)}

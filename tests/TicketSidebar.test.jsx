@@ -288,7 +288,7 @@ describe("TicketSidebar", () => {
     expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(4));
   });
 
-  it("closes from the close button, Cancel, Escape and the backdrop", async () => {
+  it("closes at once from the close button, Cancel, Escape and the backdrop when nothing was entered", async () => {
     const onClose = vi.fn();
     render(<TicketSidebar onClose={onClose} />);
 
@@ -298,6 +298,56 @@ describe("TicketSidebar", () => {
     await userEvent.click(screen.getByTestId("ticket-backdrop"));
 
     expect(onClose).toHaveBeenCalledTimes(4);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("asks before discarding entered data from every close action", async () => {
+    const onClose = vi.fn();
+    render(<TicketSidebar companyId="co1" onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Luca");
+
+    for (const close of [
+      () => userEvent.click(screen.getByTestId("ticket-backdrop")),
+      () => userEvent.click(screen.getByRole("button", { name: "Close" })),
+      () => userEvent.click(screen.getByRole("button", { name: "Cancel" })),
+      () => userEvent.keyboard("{Escape}"),
+    ]) {
+      await close();
+      expect(screen.getByRole("alertdialog", { name: "Discard this ticket?" })).toBeTruthy();
+      await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    }
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/First name/).value).toBe("Luca");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before discarding added items", async () => {
+    const onClose = vi.fn();
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+
+    await addWater();
+    await userEvent.click(screen.getByTestId("ticket-backdrop"));
+
+    expect(screen.getByRole("alertdialog", { name: "Discard this ticket?" })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows the ticket count and total in the menu panel's Done button", async () => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: `Done · 1 item · ${formatPrice(2)}` }),
+    );
+
+    expect(screen.queryByRole("dialog", { name: "Add product" })).toBeNull();
   });
 
   it("shows inline errors and does not save an invalid ticket", async () => {
@@ -574,6 +624,21 @@ describe("TicketSidebar edit mode", () => {
     cleanup();
     vi.useRealTimers();
     vi.clearAllMocks();
+  });
+
+  it("closes an untouched edit at once and asks after a change", async () => {
+    const onClose = vi.fn();
+    renderEdit({ onClose });
+
+    await screen.findByText("Mario Rossi");
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Decrease quantity of Water" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeTruthy();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("prefills the sidebar from the Order and its Customer", async () => {

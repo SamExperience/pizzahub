@@ -189,15 +189,15 @@ describe("TicketCard status arrows", () => {
     renderCard("Pending");
 
     expect(screen.getByRole("button", { name: "Start" }).title).toBe("Move to In progress");
-    expect(screen.queryByRole("button", { name: /Move to Pending/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Back|Move to Pending/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Reopen" })).toBeNull();
     await screen.findByText("Mario Rossi");
   });
 
-  it("shows the back arrow and Complete for In progress", async () => {
+  it("shows Back and Complete for In progress", async () => {
     renderCard("In progress");
 
-    expect(screen.getByRole("button", { name: "Move to Pending" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back" }).title).toBe("Move to Pending");
     expect(screen.getByRole("button", { name: "Complete" }).title).toBe("Move to Completed");
     await screen.findByText("Mario Rossi");
   });
@@ -233,14 +233,14 @@ describe("TicketCard status arrows", () => {
     let resolve;
     renderCard("In progress", vi.fn(() => new Promise((r) => (resolve = r))));
 
-    fireEvent.click(screen.getByRole("button", { name: "Move to Pending" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(screen.getByRole("button", { name: "Move to Pending" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Complete" }).disabled).toBe(true);
 
     resolve();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Move to Pending" }).disabled).toBe(false),
+      expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false),
     );
   });
 

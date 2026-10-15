@@ -23,6 +23,7 @@ import {
 } from "../utils/styles";
 import { dateToTime, getDefaultScheduledTime, timeToDate } from "../utils/ticketTime";
 import { validateTicketForm } from "../utils/ticketValidation";
+import ConfirmDialog from "./ConfirmDialog";
 import LoadingState from "./LoadingState";
 import FieldError from "./FieldError";
 import ItemConfigModal from "./ItemConfigModal";
@@ -50,6 +51,11 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   const originalTime = isEdit ? dateToTime(order.scheduledTime) : null;
   const [orderType, setOrderType] = useState(order?.orderType ?? ORDER_TYPE.TAKEAWAY);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Set by the cashier's own edits (not by loading the Order's Customer):
+  // closing then asks before discarding them, as a stray tap on the
+  // backdrop is easy on touch screens.
+  const [changed, setChanged] = useState(false);
+  const [confirmingClose, setConfirmingClose] = useState(false);
   // Configuration step: { product, index, restricted, maxQuantity } or null.
   // index is null when adding a new Item; restricted is set for an Item whose
   // Product is no longer sellable (product is null when it was deleted).
@@ -94,6 +100,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       );
       if (index === null) setSavedQuantities((list) => [...list, null]);
       setConfig(null);
+      setChanged(true);
     },
     [config],
   );
@@ -101,11 +108,13 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
     setItems((list) =>
       list.map((item, i) => (i === index ? updateItemQuantity(item, quantity) : item)),
     );
+    setChanged(true);
   }, []);
   const removeItem = useCallback((index) => {
     setItems((list) => list.filter((_, i) => i !== index));
     setSavedQuantities((list) => list.filter((_, i) => i !== index));
     setItemMessage(null);
+    setChanged(true);
   }, []);
   // Maximum quantity per Item: the saved quantity when its Product is not
   // sellable, otherwise no limit.
@@ -227,12 +236,26 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   const selectCustomer = useCallback((customer) => {
     setSelectedCustomer(customer);
     setCustomerForm(customerToForm(customer));
+    setChanged(true);
   }, []);
 
   const clearCustomer = useCallback(() => {
     setSelectedCustomer(null);
     setCustomerForm(EMPTY_CUSTOMER_FORM);
+    setChanged(true);
   }, []);
+
+  const changeCustomerForm = useCallback((form) => {
+    setCustomerForm(form);
+    setChanged(true);
+  }, []);
+
+  // Closes at once when nothing was entered, otherwise asks first.
+  const requestClose = useCallback(() => {
+    if (saving) return;
+    if (changed) setConfirmingClose(true);
+    else onClose();
+  }, [saving, changed, onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,22 +342,23 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      // While the menu panel or the configuration step is open, Escape
-      // closes only that layer.
-      if (event.key === "Escape" && !menuOpen && !config && !saving) onClose();
+      // While the menu panel, the configuration step or the discard
+      // confirmation is open, Escape closes only that layer.
+      if (event.key === "Escape" && !menuOpen && !config && !confirmingClose)
+        requestClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, menuOpen, config, saving]);
+  }, [requestClose, menuOpen, config, confirmingClose]);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div
         className="absolute inset-0 bg-black/40"
         data-testid="ticket-backdrop"
-        onClick={saving ? undefined : onClose}
+        onClick={requestClose}
       />
       <aside
         role="dialog"
@@ -347,11 +371,11 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           </h2>
           <button
             type="button"
-            className={iconButton}
+            className={`${iconButton} size-11`}
             aria-label="Close"
             title="Close"
             disabled={saving}
-            onClick={onClose}
+            onClick={requestClose}
           >
             <X className="size-5" aria-hidden="true" />
           </button>
@@ -380,7 +404,10 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
                           name="orderType"
                           value={value}
                           checked={orderType === value}
-                          onChange={() => setOrderType(value)}
+                          onChange={() => {
+                            setOrderType(value);
+                            setChanged(true);
+                          }}
                           className="sr-only"
                         />
                         <Icon className="size-4 shrink-0 max-sm:hidden" aria-hidden="true" />
@@ -404,7 +431,10 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
                     value={scheduledTime}
                     aria-invalid={Boolean(errors.scheduledTime)}
                     aria-describedby={errors.scheduledTime ? "scheduledTime-error" : undefined}
-                    onChange={(event) => setScheduledTime(event.target.value)}
+                    onChange={(event) => {
+                      setScheduledTime(event.target.value);
+                      setChanged(true);
+                    }}
                   />
                 </div>
               </div>
@@ -432,7 +462,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
               error={customersError}
               onRetry={retryCustomers}
               form={customerForm}
-              onFormChange={setCustomerForm}
+              onFormChange={changeCustomerForm}
               selectedCustomer={selectedCustomer}
               onSelect={selectCustomer}
               onClear={clearCustomer}
@@ -476,7 +506,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
               type="button"
               className={`${button} min-h-11 px-4`}
               disabled={saving}
-              onClick={onClose}
+              onClick={requestClose}
             >
               Cancel
             </button>
@@ -496,6 +526,8 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           storeId={storeId}
           onSelectProduct={selectProduct}
           onClose={closeMenuPanel}
+          itemCount={itemCount}
+          total={calculateOrderTotal(items)}
         />
       )}
       {config && (
@@ -508,6 +540,16 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           onClose={closeConfig}
         />
       )}
+      <ConfirmDialog
+        open={confirmingClose}
+        title={isEdit ? "Discard your changes?" : "Discard this ticket?"}
+        message="What you entered will be lost."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={onClose}
+        onCancel={() => setConfirmingClose(false)}
+      />
     </div>
   );
 }
