@@ -13,7 +13,7 @@ import { login, register, signout } from "../src/services/auth.service";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 
 const TEST_PASSWORD = "Password123!";
-const IMAGE = { contentType: "image/png" };
+const IMAGE = { contentType: "image/webp" };
 
 const createStore = async (label) => {
   const email = `test-storage-${label}-${Date.now()}@example.com`;
@@ -127,22 +127,40 @@ describe("product image storage rules", () => {
     ).rejects.toThrow();
   });
 
-  it("denies non-image files", async () => {
+  it("accepts JPEG images", async () => {
     await signInAs(storeA);
-    const textRef = ref(storage, `products/${storeA.storeId}/note.txt`);
+    const jpegRef = ref(storage, `products/${storeA.storeId}/photo.jpg`);
 
-    await expect(
-      uploadString(textRef, "text", "raw", { contentType: "text/plain" }),
-    ).rejects.toThrow();
+    await uploadString(jpegRef, "image", "raw", { contentType: "image/jpeg" });
+    await expect(getDownloadURL(jpegRef)).resolves.toContain("photo.jpg");
+    await deleteObject(jpegRef);
   });
 
-  it("denies images larger than 5 MB", async () => {
+  it("denies non-image files and image types other than WebP and JPEG", async () => {
     await signInAs(storeA);
-    const bigRef = ref(storage, `products/${storeA.storeId}/big.png`);
+
+    for (const contentType of ["text/plain", "image/png", "image/gif", "image/svg+xml"]) {
+      await expect(
+        uploadString(
+          ref(storage, `products/${storeA.storeId}/denied`),
+          "data",
+          "raw",
+          { contentType },
+        ),
+      ).rejects.toThrow();
+    }
+  });
+
+  it("denies images of 150 KB or more", async () => {
+    await signInAs(storeA);
+    const bigRef = ref(storage, `products/${storeA.storeId}/big.webp`);
+    const smallRef = ref(storage, `products/${storeA.storeId}/small.webp`);
 
     await expect(
-      uploadString(bigRef, "a".repeat(5 * 1024 * 1024 + 1), "raw", IMAGE),
+      uploadString(bigRef, "a".repeat(150 * 1024), "raw", IMAGE),
     ).rejects.toThrow();
+    await uploadString(smallRef, "a".repeat(150 * 1024 - 1), "raw", IMAGE);
+    await deleteObject(smallRef);
   });
 });
 

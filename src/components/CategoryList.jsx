@@ -1,16 +1,24 @@
 import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { button, emptyBox, input, primaryButton } from "../utils/styles";
 import ConfirmDialog from "./ConfirmDialog";
 
-// Icon action that reads on both the mobile chip (brand-600) and the desktop row.
+// 44px icon action (touch target) that reads on both the mobile chip
+// (brand-600) and the desktop card.
 const actionButton =
-  "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-40 md:size-9 md:rounded-lg md:text-neutral-500 md:hover:bg-brand-100 md:hover:text-brand-800 md:focus-visible:ring-brand-500/40";
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-40 md:rounded-lg md:text-neutral-500 md:hover:bg-brand-100 md:hover:text-brand-800 md:focus-visible:ring-brand-500/40";
 
-// `onRename` resolves to true when the category was saved.
+// Large counts are capped so the badge keeps a fixed footprint.
+const formatCount = (count) => (count > 99 ? "99+" : String(count));
+const countLabel = (count) => `${count} ${count === 1 ? "product" : "products"}`;
+
+// `onRename` resolves to true when the category was saved; busy disables the
+// actions while a category change runs.
 function CategoryRow({
   category,
+  productCount,
+  busy,
   isFirst,
   isLast,
   isSelected,
@@ -21,6 +29,7 @@ function CategoryRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(category.name);
+  const countId = useId();
 
   const startEditing = () => {
     setName(category.name);
@@ -52,7 +61,7 @@ function CategoryRow({
             <button
               type="submit"
               className={primaryButton}
-              disabled={!name.trim()}
+              disabled={busy || !name.trim()}
             >
               Save
             </button>
@@ -70,25 +79,42 @@ function CategoryRow({
   }
 
   // Actions are shown for the selected category only: pick one to manage it.
+  // The name wraps on two lines at most and the count badge never shrinks, so
+  // long names or large counts cannot push the badge or the actions out.
   return (
     <li
-      className={`flex shrink-0 items-center rounded-full border md:flex-wrap md:rounded-lg md:border-0 ${
+      className={`flex shrink-0 items-center rounded-full border md:flex-col md:items-stretch md:rounded-xl ${
         isSelected
-          ? "border-brand-600 bg-brand-600 text-white md:bg-brand-50 md:text-brand-700"
-          : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 md:border-transparent md:bg-transparent"
+          ? "border-brand-600 bg-brand-600 text-white md:border-brand-300 md:bg-brand-50 md:text-brand-800 md:shadow-sm"
+          : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 md:hover:border-brand-200"
       }`}
     >
       <button
         type="button"
         aria-label={`Select ${category.name}`}
+        aria-describedby={countId}
         aria-current={isSelected ? "true" : undefined}
-        className="min-h-10 max-w-48 truncate rounded-full px-4 text-left text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 md:max-w-none md:flex-1 md:basis-full md:rounded-lg md:px-3"
+        className="flex min-h-11 min-w-0 items-center gap-2 rounded-full pl-4 pr-2 text-left text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 md:gap-3 md:rounded-xl md:px-3 md:py-2"
         onClick={() => onSelect(category.id)}
       >
-        {category.name}
+        <span className="max-w-40 truncate md:line-clamp-2 md:max-w-none md:flex-1 md:whitespace-normal md:break-words">
+          {category.name}
+        </span>
+        <span
+          id={countId}
+          title={countLabel(productCount)}
+          className={`inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums ${
+            isSelected
+              ? "bg-white text-brand-700 md:bg-brand-600 md:text-white"
+              : "bg-neutral-100 text-neutral-600"
+          }`}
+        >
+          <span aria-hidden="true">{formatCount(productCount)}</span>
+          <span className="sr-only">{countLabel(productCount)}</span>
+        </span>
       </button>
       <div
-        className={`items-center pr-1 md:basis-full md:px-1 md:pb-1 ${
+        className={`items-center pr-1 md:border-t md:border-brand-200 md:p-1 ${
           isSelected ? "flex" : "hidden"
         }`}
       >
@@ -97,20 +123,20 @@ function CategoryRow({
           aria-label={`Move ${category.name} up`}
           title={`Move ${category.name} up`}
           className={actionButton}
-          disabled={isFirst}
+          disabled={busy || isFirst}
           onClick={() => onMove(category.id, "up")}
         >
-          <ChevronUp className="size-4" aria-hidden="true" />
+          <ChevronUp className="size-5" aria-hidden="true" />
         </button>
         <button
           type="button"
           aria-label={`Move ${category.name} down`}
           title={`Move ${category.name} down`}
           className={actionButton}
-          disabled={isLast}
+          disabled={busy || isLast}
           onClick={() => onMove(category.id, "down")}
         >
-          <ChevronDown className="size-4" aria-hidden="true" />
+          <ChevronDown className="size-5" aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -119,24 +145,47 @@ function CategoryRow({
           className={actionButton}
           onClick={startEditing}
         >
-          <Pencil className="size-4" aria-hidden="true" />
+          <Pencil className="size-5" aria-hidden="true" />
         </button>
+        {/* Delete sits apart, on the far right of the card, to avoid mistaps. */}
         <button
           type="button"
           aria-label={`Delete ${category.name}`}
           title={`Delete ${category.name}`}
-          className={`${actionButton} md:hover:bg-red-50 md:hover:text-red-600`}
+          className={`${actionButton} ml-2 md:ml-auto md:hover:bg-red-50 md:hover:text-red-600`}
+          disabled={busy}
           onClick={() => onRequestDelete(category)}
         >
-          <Trash2 className="size-4" aria-hidden="true" />
+          <Trash2 className="size-5" aria-hidden="true" />
         </button>
       </div>
     </li>
   );
 }
 
+/**
+ * Category cards of the Menu sidebar (a top selector on mobile) with product
+ * count badges and, on the selected card, rename, move and delete actions.
+ * Actions appear only on the selected card to keep the list compact and the
+ * touch targets 44px.
+ * @param {object} props
+ * @param {object[]} props.categories - Ordered by position.
+ * @param {Object<string, number>} [props.productCounts] - By category id.
+ * @param {boolean} [props.busy] - Disables actions while a change runs.
+ * @param {?string} props.selectedId
+ * @param {function(string): void} props.onSelect
+ * @param {function(string, string): Promise<boolean>} props.onRename - (id, name); true when saved.
+ * @param {function(string): void} props.onDelete - Category id, after confirmation.
+ * @param {function(string, string): void} props.onMove - (id, "up" or "down").
+ * @returns {JSX.Element}
+ * @example
+ * <CategoryList categories={categories} selectedId={id} onSelect={setId}
+ *   onRename={rename} onDelete={remove} onMove={move} />
+ */
 export default function CategoryList({
   categories,
+  productCounts = {},
+  busy = false,
   selectedId,
   onSelect,
   onRename,
@@ -157,11 +206,13 @@ export default function CategoryList({
   // One list: a scrollable chip bar below md, a column from md.
   return (
     <>
-    <ol className="flex flex-row gap-2 overflow-x-auto pb-1 md:flex-col md:gap-1 md:overflow-visible md:pb-0">
+    <ol className="flex flex-row gap-2 overflow-x-auto pb-1 md:flex-col md:gap-2 md:overflow-visible md:pb-0">
       {categories.map((category, index) => (
         <CategoryRow
           key={category.id}
           category={category}
+          productCount={productCounts[category.id] ?? 0}
+          busy={busy}
           isFirst={index === 0}
           isLast={index === categories.length - 1}
           isSelected={category.id === selectedId}

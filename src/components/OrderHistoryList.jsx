@@ -146,8 +146,17 @@ function OrderRow({ order, customers, expanded, onToggle }) {
   );
 }
 
-// Order history rows, newest first (list order). Customers is a Map by id, or
-// null while loading. One row at a time expands its read-only detail.
+/**
+ * Order history rows, newest first (list order). Customers is a Map by id, or
+ * null while loading. One row at a time expands its read-only detail, which
+ * shows the Item snapshots, not the current Menu.
+ * @param {object} props
+ * @param {object[]} props.orders
+ * @param {?Map<string, object>} props.customers
+ * @returns {JSX.Element}
+ * @example
+ * <OrderHistoryList orders={orders} customers={customersById} />
+ */
 export default function OrderHistoryList({ orders, customers }) {
   const [expandedId, setExpandedId] = useState(null);
 

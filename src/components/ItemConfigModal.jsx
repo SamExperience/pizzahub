@@ -53,15 +53,29 @@ function LockedValue({ heading, value }) {
   );
 }
 
-// Item configuration step of the ticket creation. Adding: step 1 (only when
-// the product has sizes) picks the size; step 2 picks cooking level,
-// customizations and quantity, then adds the Item snapshot to the ticket.
-// With initialItem it reconfigures that Item on one page: the saved Item is
-// recalled in the header, sizes are a selector, options still offered by the
-// current product are prefilled and the saved price is kept unless the size
-// changes. restricted (Product no longer sellable, product may be null)
-// shows size and cooking level locked and allows only customizations and a
-// quantity up to maxQuantity.
+/**
+ * Item configuration step of the ticket creation. Adding: step 1 (only when
+ * the product has sizes) picks the size; step 2 picks cooking level,
+ * customizations and quantity, then adds the Item snapshot to the ticket.
+ * With initialItem it reconfigures that Item on one page: the saved Item is
+ * recalled in the header, sizes are a selector, options still offered by the
+ * current product are prefilled and the saved price is kept unless the size
+ * changes. restricted (Product no longer sellable, product may be null)
+ * shows the size locked and allows only customizations and a quantity up to
+ * maxQuantity; the cooking level stays selectable while the unavailable
+ * Product is still in the Menu (it has no price impact), otherwise it is
+ * locked too.
+ * @param {object} props
+ * @param {?object} props.product
+ * @param {?object} [props.initialItem] - Item being edited.
+ * @param {boolean} [props.restricted]
+ * @param {?number} [props.maxQuantity]
+ * @param {function(object): void} props.onAdd - Receives the Item snapshot.
+ * @param {function(): void} props.onClose
+ * @returns {JSX.Element}
+ * @example
+ * <ItemConfigModal product={product} onAdd={addItem} onClose={close} />
+ */
 export default function ItemConfigModal({
   product,
   initialItem = null,
@@ -73,10 +87,9 @@ export default function ItemConfigModal({
   const isEdit = Boolean(initialItem);
   const name = restricted ? initialItem.productName : product.name;
   const sizes = !restricted && Array.isArray(product.sizes) ? product.sizes : [];
-  const cookingLevels =
-    !restricted && Array.isArray(product.availableCookingLevels)
-      ? product.availableCookingLevels
-      : [];
+  const cookingLevels = Array.isArray(product?.availableCookingLevels)
+    ? product.availableCookingLevels
+    : [];
 
   const [size, setSize] = useState(() =>
     sizes.some((item) => item.name === initialItem?.size) ? initialItem.size : null,
@@ -120,11 +133,24 @@ export default function ItemConfigModal({
   const removeCustomization = (index) =>
     setCustomizations((list) => list.filter((_, i) => i !== index));
 
+  // Text typed but not added yet still belongs to the Item: under pressure
+  // the "Add" step is easy to skip.
+  const pendingCustomization = customizationText.trim();
+  const itemCustomizations =
+    pendingCustomization && !customizationsFull
+      ? [...customizations, pendingCustomization]
+      : customizations;
+
   const buildItem = () => {
     if (restricted)
-      return editRestrictedItem(initialItem, { customizations, quantity }, maxQuantity);
+      return editRestrictedItem(
+        initialItem,
+        { cookingLevel, customizations: itemCustomizations, quantity },
+        maxQuantity,
+        product,
+      );
 
-    const options = { size, cookingLevel, customizations, quantity };
+    const options = { size, cookingLevel, customizations: itemCustomizations, quantity };
 
     return initialItem
       ? reconfigureItem(product, initialItem, options)
@@ -174,6 +200,13 @@ export default function ItemConfigModal({
       <section
         role="dialog"
         aria-label={`Configure ${name}`}
+        // Pressing a button keeps the focus where it is: a blur would add the
+        // typed customization as a chip, move the buttons below it and make
+        // the press miss its target. The pending text is part of the Item
+        // anyway; tapping an empty area still adds it.
+        onMouseDown={(event) => {
+          if (event.target.closest("button")) event.preventDefault();
+        }}
         className="relative flex max-h-[90svh] w-full flex-col overflow-hidden rounded-t-2xl bg-white text-left shadow-xl sm:max-h-full sm:max-w-lg sm:rounded-xl"
       >
         <header className="flex items-start justify-between gap-2 border-b border-neutral-200 px-4 py-3">
@@ -190,7 +223,7 @@ export default function ItemConfigModal({
               {sizes.length > 0 && !choosingSize && (
                 <button
                   type="button"
-                  className={iconButton}
+                  className={`${iconButton} size-11`}
                   aria-label="Back to sizes"
                   title="Back to sizes"
                   onClick={() => setSize(null)}
@@ -205,7 +238,7 @@ export default function ItemConfigModal({
           )}
           <button
             type="button"
-            className={`${iconButton} shrink-0`}
+            className={`${iconButton} size-11 shrink-0`}
             aria-label="Close"
             title="Close"
             onClick={onClose}
@@ -244,15 +277,16 @@ export default function ItemConfigModal({
                     className="m-0 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
                   >
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    This product is no longer sellable: size, cooking level and price
+                    This product is no longer sellable:{" "}
+                    {cookingLevels.length > 0 ? "size and price" : "size, cooking level and price"}{" "}
                     are locked; the quantity can only be lowered.
                   </p>
-                  {(initialItem.size || initialItem.cookingLevel) && (
+                  {(initialItem.size || (initialItem.cookingLevel && !cookingLevels.length)) && (
                     <div className="grid grid-cols-2 gap-3">
                       {initialItem.size && (
                         <LockedValue heading="Size" value={initialItem.size} />
                       )}
-                      {initialItem.cookingLevel && (
+                      {initialItem.cookingLevel && cookingLevels.length === 0 && (
                         <LockedValue heading="Cooking level" value={initialItem.cookingLevel} />
                       )}
                     </div>
@@ -321,11 +355,14 @@ export default function ItemConfigModal({
                   <input
                     id="customization"
                     type="text"
-                    className={`${input} min-h-11`}
+                    className={input}
                     maxLength={FIELD_LIMITS.LIST_ITEM}
                     placeholder="e.g. no onions"
                     value={customizationText}
                     onChange={(event) => setCustomizationText(event.target.value)}
+                    // Tapping elsewhere adds the text, as on touch screens
+                    // there is no Enter key to rely on.
+                    onBlur={addCustomization}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
@@ -352,12 +389,12 @@ export default function ItemConfigModal({
                     {customizations.map((text, index) => (
                       <li
                         key={`${text}-${index}`}
-                        className="flex items-center gap-1 rounded-full bg-brand-100 py-1 pr-1 pl-3 text-sm text-brand-800"
+                        className="flex items-center gap-1 rounded-full bg-brand-100 pr-0.5 pl-3 text-sm text-brand-800"
                       >
                         {text}
                         <button
                           type="button"
-                          className="inline-flex size-8 items-center justify-center rounded-full text-brand-700 hover:bg-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                          className="inline-flex size-11 items-center justify-center rounded-full text-brand-700 hover:bg-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           aria-label={`Remove ${text}`}
                           title={`Remove ${text}`}
                           onClick={() => removeCustomization(index)}

@@ -1,5 +1,12 @@
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+/**
+ * Firebase web app configuration read from the VITE_FIREBASE_* environment
+ * variables, so the same build code targets any Firebase project. These
+ * values are public identifiers, not secrets (access is enforced by the
+ * security rules).
+ * @type {FirebaseOptions}
+ * @example
+ * initializeApp(firebaseConfig);
+ */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

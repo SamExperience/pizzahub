@@ -1,13 +1,20 @@
-// Single source of the maximum lengths of user-entered fields.
-//
-// NAME: company, store, menu, category, product, customer first/last name and
-//   user displayName.
-// ADDRESS_LINE: street, city and country.
-// LIST_ITEM: ingredient, size name, cooking level and customization.
-// LIST_SIZE: maximum number of elements of a list and of Order items.
-//
-// The same numbers are repeated in firestore.rules, which must be kept in sync.
-// The rules do not check the length of single list elements.
+/**
+ * Single source of the maximum lengths of user-entered fields, shared by the
+ * UI (maxLength) and the services, so users hit the limit in the form
+ * instead of getting a permission error from the rules.
+ *
+ * - NAME: company, store, menu, category, product, customer first/last name
+ *   and user displayName.
+ * - ADDRESS_LINE: street, city and country.
+ * - LIST_ITEM: ingredient, size name, cooking level and customization.
+ * - LIST_SIZE: maximum number of elements of a list and of Order items.
+ *
+ * The same numbers are repeated in firestore.rules, which must be kept in
+ * sync. The rules do not check the length of single list elements.
+ * @type {Object<string, number>}
+ * @example
+ * <input maxLength={FIELD_LIMITS.NAME} />
+ */
 export const FIELD_LIMITS = {
   NAME: 100,
   ADDRESS_LINE: 100,

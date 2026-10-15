@@ -1,6 +1,12 @@
 // @vitest-environment node
 // Storage emulator uploads fail under jsdom XHR; the node environment uses fetch.
-import { deleteObject, getDownloadURL, ref, uploadString } from "firebase/storage";
+import {
+  deleteObject,
+  getDownloadURL,
+  getMetadata,
+  ref,
+  uploadString,
+} from "firebase/storage";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { storage } from "../src/services/firebase";
 import { register } from "../src/services/auth.service";
@@ -630,7 +636,7 @@ describe("deleteProductById", () => {
 
   it("deletes the product image from Storage", async () => {
     const imageRef = ref(storage, `products/${storeId}/test-${Date.now()}.png`);
-    await uploadString(imageRef, "image", "raw", { contentType: "image/png" });
+    await uploadString(imageRef, "image", "raw", { contentType: "image/webp" });
     const imageUrl = await getDownloadURL(imageRef);
     const product = await makeProduct(deleteCategory.id, 1, { imageUrl });
 
@@ -644,7 +650,7 @@ describe("deleteProductById", () => {
       storage,
       `products/${storeId}/missing-${Date.now()}.png`,
     );
-    await uploadString(imageRef, "image", "raw", { contentType: "image/png" });
+    await uploadString(imageRef, "image", "raw", { contentType: "image/webp" });
     const imageUrl = await getDownloadURL(imageRef);
     const product = await makeProduct(deleteCategory.id, 1, { imageUrl });
     await deleteObject(imageRef);
@@ -727,17 +733,29 @@ describe("moveProductById", () => {
 });
 
 describe("uploadProductImage", () => {
-  it("uploads under the store folder and returns the download URL", async () => {
-    const file = new Blob(["png"], { type: "image/png" });
+  it("uploads under the store folder with Cache-Control and returns the download URL", async () => {
+    const file = new Blob(["webp"], { type: "image/webp" });
 
     const url = await uploadProductImage(storeId, "img-product", file);
 
     expect(url).toContain(encodeURIComponent(`products/${storeId}/img-product`));
+    const metadata = await getMetadata(ref(storage, url));
+    expect(metadata.contentType).toBe("image/webp");
+    expect(metadata.cacheControl).toBe("public, max-age=86400");
     await deleteObject(ref(storage, url));
   });
 
-  it("rejects missing arguments, non-image files and files of 5 MB or more", async () => {
-    const image = new Blob(["png"], { type: "image/png" });
+  it("accepts JPEG images", async () => {
+    const file = new Blob(["jpeg"], { type: "image/jpeg" });
+
+    const url = await uploadProductImage(storeId, "jpeg-product", file);
+
+    expect(url).toContain("jpeg-product");
+    await deleteObject(ref(storage, url));
+  });
+
+  it("rejects missing arguments, other file types and files of 150 KB or more", async () => {
+    const image = new Blob(["webp"], { type: "image/webp" });
 
     await expect(uploadProductImage("", "p1", image)).rejects.toThrow(
       "Store ID is required",
@@ -750,14 +768,17 @@ describe("uploadProductImage", () => {
     );
     await expect(
       uploadProductImage(storeId, "p1", new Blob(["x"], { type: "text/plain" })),
-    ).rejects.toThrow("Product image must be an image file");
+    ).rejects.toThrow("Product image must be a WebP or JPEG file");
+    await expect(
+      uploadProductImage(storeId, "p1", new Blob(["x"], { type: "image/png" })),
+    ).rejects.toThrow("Product image must be a WebP or JPEG file");
     await expect(
       uploadProductImage(
         storeId,
         "p1",
-        new Blob([new Uint8Array(5 * 1024 * 1024)], { type: "image/png" }),
+        new Blob([new Uint8Array(150 * 1024)], { type: "image/webp" }),
       ),
-    ).rejects.toThrow("Product image must be smaller than 5 MB");
+    ).rejects.toThrow("Product image must be smaller than 150 KB");
   });
 });
 

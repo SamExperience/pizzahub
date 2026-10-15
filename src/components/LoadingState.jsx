@@ -1,7 +1,17 @@
 import { Loader2 } from "lucide-react";
 import { muted } from "../utils/styles";
 
-// Muted spinner line; fullPage centers it on the whole viewport.
+/**
+ * Muted spinner line shared by every loading state; fullPage centers it on
+ * the whole viewport (route guards).
+ * @param {object} props
+ * @param {string} [props.text]
+ * @param {boolean} [props.fullPage]
+ * @param {string} [props.className]
+ * @returns {JSX.Element}
+ * @example
+ * <LoadingState text="Loading orders ..." />
+ */
 export default function LoadingState({
   text = "Loading ...",
   fullPage = false,

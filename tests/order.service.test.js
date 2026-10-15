@@ -221,6 +221,41 @@ describe("editRestrictedItem", () => {
       "Item quantity must be a positive integer",
     );
   });
+
+  it("changes the cooking level of an unavailable Product still in the Menu", () => {
+    const product = {
+      id: "p1",
+      isAvailable: false,
+      availableCookingLevels: ["Rare", "Well done"],
+    };
+
+    expect(
+      editRestrictedItem(
+        saved,
+        { cookingLevel: "Well done", customizations: [], quantity: 3 },
+        3,
+        product,
+      ),
+    ).toEqual({ ...saved, cookingLevel: "Well done", customizations: [] });
+    expect(() =>
+      editRestrictedItem(
+        saved,
+        { cookingLevel: "Burnt", customizations: [], quantity: 3 },
+        3,
+        product,
+      ),
+    ).toThrow("Item cooking level is invalid");
+  });
+
+  it("keeps the saved cooking level when the Product is deleted or has no levels", () => {
+    const options = { cookingLevel: "Well done", customizations: [], quantity: 3 };
+
+    expect(editRestrictedItem(saved, options, 3).cookingLevel).toBe("Rare");
+    expect(
+      editRestrictedItem(saved, options, 3, { id: "p1", availableCookingLevels: [] })
+        .cookingLevel,
+    ).toBe("Rare");
+  });
 });
 
 describe("updateItemQuantity", () => {

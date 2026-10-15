@@ -4,6 +4,7 @@ import { useAuth } from "../src/contexts/AuthContext";
 import Login from "../src/pages/Login";
 import PublicRoute from "../src/components/PublicRoute";
 import LoadingState from "../src/components/LoadingState";
+import ErrorState from "../src/components/ErrorState";
 
 vi.mock("../src/contexts/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -47,6 +48,22 @@ describe("PublicRoute", () => {
 
     expect(result.type).toBe(Navigate);
     expect(result.props.to).toBe("/onboarding");
+  });
+
+  it("shows an error instead of onboarding when the profile cannot be read", () => {
+    const retryProfile = vi.fn();
+    useAuth.mockReturnValue({
+      authUser: { uid: "user-1" },
+      userProfile: null,
+      loadingLogin: false,
+      profileError: new Error("offline"),
+      retryProfile,
+    });
+
+    const result = PublicRoute();
+
+    expect(result.type).toBe(ErrorState);
+    expect(result.props.onRetry).toBe(retryProfile);
   });
 
   it("redirects existing users to stores", () => {

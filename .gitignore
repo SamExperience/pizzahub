@@ -31,7 +31,10 @@ dist-ssr
 skills-lock.json
 
 ROADMAP.txt
-docs
+# Owner's private product specification
+spec/
+# Generated JSDoc output (npm run docs)
+docs/
 
 # Firebase emulator backup (owner data, never committed)
 emulator-data/
@@ -39,3 +42,6 @@ emulator-data/
 # Cloud Functions local config (emulator params and Stripe test secrets)
 functions/.env.local
 functions/.secret.local
+
+# Firebase CLI deploy cache
+.firebase/

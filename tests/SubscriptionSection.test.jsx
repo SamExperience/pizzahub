@@ -50,7 +50,7 @@ describe("SubscriptionSection", () => {
     });
     mocks.startCheckout.mockReset();
     mocks.unsubscribe.mockReset();
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -125,8 +125,26 @@ describe("SubscriptionSection", () => {
     renderSection();
     act(() => listener.onError(new Error("denied")));
 
-    expect(screen.getByRole("alert").textContent).toBe("Unable to load the subscription.");
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Unable to load the subscription.",
+    );
     expect(screen.queryByRole("button", { name: "Subscribe" })).toBeNull();
+  });
+
+  it("listens again on Try again after an error", async () => {
+    renderSection();
+    act(() => listener.onError(new Error("denied")));
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(mocks.subscribe).toHaveBeenCalledTimes(2);
+    expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status").textContent).toContain("Loading");
+
+    emit(null);
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Subscribe" })).toBeTruthy();
   });
 
   it("starts the checkout and disables the button while redirecting", async () => {
@@ -172,6 +190,15 @@ describe("SubscriptionSection", () => {
     emit({ status: "incomplete", currentPeriodEnd: null, cancelAtPeriodEnd: false });
 
     expect(screen.getByText(/Payment is being processed/)).toBeTruthy();
+  });
+
+  it("treats a document without status (Customer only) as no subscription yet", () => {
+    renderSection("/dashboard?checkout=success");
+    emit({ stripeCustomerId: "cus_1" });
+
+    expect(screen.getByText(/Payment is being processed/)).toBeTruthy();
+    expect(screen.getByText("No subscription")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Subscribe" })).toBeTruthy();
   });
 
   it("hides the processing message once the subscription has a final status", () => {

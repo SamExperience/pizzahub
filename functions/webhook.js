@@ -1,4 +1,4 @@
-import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onRequest } from "firebase-functions/v2/https";
 
@@ -7,34 +7,13 @@ import {
   stripeSecretKey,
   stripeWebhookSecret,
 } from "./config.js";
+import { applySubscription, buildSubscriptionData } from "./subscription.js";
 
 const SUBSCRIPTION_EVENTS = [
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
 ];
-
-function toTimestamp(seconds) {
-  return typeof seconds === "number" ? Timestamp.fromMillis(seconds * 1000) : null;
-}
-
-// Maps a Stripe Subscription to the subscriptions/{companyId} fields (docs/01-data-model.md).
-// The billing period lives on the subscription item in current Stripe API versions.
-export function buildSubscriptionData(subscription, eventCreated) {
-  const item = subscription.items?.data?.[0];
-  const customer = subscription.customer;
-
-  return {
-    status: subscription.status,
-    stripeCustomerId: typeof customer === "string" ? customer : customer?.id,
-    stripeSubscriptionId: subscription.id,
-    priceId: item?.price?.id ?? null,
-    currentPeriodEnd: toTimestamp(item?.current_period_end),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
-    lastEventAt: toTimestamp(eventCreated),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-}
 
 // Returns { companyId, subscription } for the handled event types, or null to ignore the event.
 async function resolveSubscription(event, stripe) {
@@ -64,23 +43,21 @@ async function resolveSubscription(event, stripe) {
   return null;
 }
 
-// Writes the subscription unless a newer event was already applied (Stripe does not guarantee order).
-async function applySubscription(db, companyId, data) {
-  const ref = db.collection("subscriptions").doc(companyId);
-
-  return db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(ref);
-    const lastEventAt = snapshot.exists ? snapshot.data().lastEventAt : null;
-
-    if (lastEventAt && data.lastEventAt.toMillis() < lastEventAt.toMillis()) {
-      return false;
-    }
-
-    transaction.set(ref, data, { merge: true });
-    return true;
-  });
-}
-
+/**
+ * Logic of the Stripe webhook, separated from onRequest for testing. The
+ * signature is verified on the raw body (400 when invalid), so nobody can
+ * fake a payment; unknown event types get 200 so Stripe stops retrying
+ * them, while processing errors get 500 so Stripe retries later.
+ * @param {object} req - Request with rawBody and the stripe-signature header.
+ * @param {object} res - Express-style response.
+ * @param {object} deps
+ * @param {Firestore} deps.db
+ * @param {function(): object} deps.getStripe
+ * @param {string} deps.webhookSecret
+ * @returns {Promise<void>}
+ * @example
+ * await stripeWebhookHandler(req, res, { db, getStripe, webhookSecret: "whsec_..." });
+ */
 export async function stripeWebhookHandler(req, res, deps) {
   if (req.method !== "POST") {
     res.status(405).send("Method not allowed");
@@ -143,6 +120,13 @@ export async function stripeWebhookHandler(req, res, deps) {
   }
 }
 
+/**
+ * HTTPS endpoint registered in Stripe as the webhook. It is the main writer
+ * of subscriptions/{companyId} (the client can only read it).
+ * @type {HttpsFunction}
+ * @example
+ * // stripe listen --forward-to http://127.0.0.1:5001/<project>/europe-west6/stripeWebhook
+ */
 export const stripeWebhook = onRequest(
   { secrets: [stripeSecretKey, stripeWebhookSecret] },
   (req, res) =>

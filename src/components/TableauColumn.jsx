@@ -1,9 +1,26 @@
 import { emptyBox, statusStyles } from "../utils/styles";
 import TicketCard from "./TicketCard";
 
-// One status column of the Tableau: header with ticket count, then the tickets.
-// From lg the column takes the board height and only the ticket list scrolls.
-// panelId/tabId/className let the board expose it as a mobile tab panel.
+/**
+ * One status column of the Tableau: header with ticket count, then the
+ * tickets. From lg the column takes the board height and only the ticket
+ * list scrolls. panelId/tabId/className let the board expose it as a mobile
+ * tab panel.
+ * @param {object} props
+ * @param {string} props.title - Status shown in the header.
+ * @param {object[]} props.orders - Already sorted.
+ * @param {string} [props.panelId]
+ * @param {string} [props.tabId]
+ * @param {string} [props.className]
+ * @param {function(object, string): Promise<void>} props.onChangeStatus
+ * @param {function(object): void} props.onEdit
+ * @param {function(object): Promise<void>} props.onCancel
+ * @param {function(object, ?object): void} props.onPrint - (order, customer).
+ * @returns {JSX.Element}
+ * @example
+ * <TableauColumn title="Pending" orders={pending} onChangeStatus={move}
+ *   onEdit={edit} onCancel={cancel} onPrint={print} />
+ */
 export default function TableauColumn({
   title,
   orders,
@@ -13,6 +30,7 @@ export default function TableauColumn({
   onChangeStatus,
   onEdit,
   onCancel,
+  onPrint,
 }) {
   const styles = statusStyles[title];
 
@@ -53,6 +71,7 @@ export default function TableauColumn({
                 onChangeStatus={onChangeStatus}
                 onEdit={onEdit}
                 onCancel={onCancel}
+                onPrint={onPrint}
               />
             </li>
           ))}

@@ -13,6 +13,14 @@ import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { requireText } from "../utils/textValidation";
 import { db } from "./firebase";
 
+/**
+ * Reads the Store's Menu. Each Store has at most one Menu, so the first
+ * match is returned; null means the Menu was never created.
+ * @param {string} storeId
+ * @returns {Promise<?object>} The Menu with its id, or null.
+ * @example
+ * const menu = await getMenuByStoreId("store1");
+ */
 export const getMenuByStoreId = async (storeId) => {
   const menuRef = collection(db, "menus");
 
@@ -21,19 +29,22 @@ export const getMenuByStoreId = async (storeId) => {
   const menusSnap = await getDocs(q);
 
   if (!menusSnap.empty) {
-    console.log(
-      ">>> Menu exists! Here is the first result:",
-      menusSnap.docs[0].data(),
-    );
-
     return { id: menusSnap.docs[0].id, ...menusSnap.docs[0].data() };
   } else {
-    console.log(">>> Menu does not exist.");
-
     return null;
   }
 };
 
+/**
+ * Creates the Store's Menu. The name is validated with the same limits the
+ * Firestore rules enforce, so the user gets a clear error instead of a
+ * permission denied.
+ * @param {string} storeId
+ * @param {string} nameMenu
+ * @returns {Promise<object>} The created Menu data with its id.
+ * @example
+ * const menu = await createMenu("store1", "Pizzeria Bella Napoli");
+ */
 export const createMenu = async (storeId, nameMenu) => {
   if (!storeId) throw new Error("Store ID is required");
 
@@ -47,7 +58,6 @@ export const createMenu = async (storeId, nameMenu) => {
     updatedAt: serverTimestamp(),
   };
   const menuSnap = await addDoc(menuRef, data);
-  console.log(">>>Menu created");
 
   return {
     id: menuSnap.id,
@@ -55,7 +65,15 @@ export const createMenu = async (storeId, nameMenu) => {
   };
 };
 
-// A Menu is ready when at least one Category holds at least one Product.
+/**
+ * Tells whether the Store can take orders: a Menu is ready when at least one
+ * Category holds at least one Product. Until then the menu guard keeps the
+ * user on /menu. Reads one Product per Category at most.
+ * @param {string} storeId
+ * @returns {Promise<boolean>}
+ * @example
+ * if (!(await isMenuReady("store1"))) navigate("/menu");
+ */
 export const isMenuReady = async (storeId) => {
   const menu = await getMenuByStoreId(storeId);
   if (!menu) return false;

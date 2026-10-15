@@ -3,8 +3,16 @@ import StoreCard from "../components/StoreCard";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import LoadingState from "../components/LoadingState";
-import { alert, button, muted, pageTitle } from "../utils/styles";
+import { alert, button, emptyBox, muted, pageTitle } from "../utils/styles";
 
+/**
+ * Store selection page: shows the accessible Store and makes it active, then
+ * goes to the Tableau or, when the Menu is not ready, to the Menu. Kept as
+ * a step even with one Store per Company, ready for more Stores later.
+ * @returns {JSX.Element}
+ * @example
+ * { path: "/stores", element: <StoreSelection /> }
+ */
 export default function StoreSelection() {
   const navigate = useNavigate();
 
@@ -47,6 +55,10 @@ export default function StoreSelection() {
       )}
 
       {loadingStore && <LoadingState />}
+
+      {!loadingStore && !errorStore && !accessibleStore && (
+        <p className={emptyBox}>No store found for your account.</p>
+      )}
 
       {accessibleStore && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

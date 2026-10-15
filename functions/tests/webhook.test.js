@@ -255,6 +255,51 @@ describe("stripeWebhookHandler", () => {
     expect(writes[0].data.status).toBe("active");
   });
 
+  it("ignores events of another subscription while the stored one is active", async () => {
+    const documents = {
+      "subscriptions/company-1": { status: "active", stripeSubscriptionId: "sub_1" },
+    };
+
+    const { res, writes } = await run(
+      signedRequest(
+        event("customer.subscription.deleted", subscriptionObject({ id: "sub_2", status: "canceled" })),
+      ),
+      { documents },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ received: true, ignored: true });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("applies events of another subscription when the stored one is not active", async () => {
+    const documents = {
+      "subscriptions/company-1": { status: "canceled", stripeSubscriptionId: "sub_1" },
+    };
+
+    const { writes } = await run(
+      signedRequest(event("customer.subscription.updated", subscriptionObject({ id: "sub_2" }))),
+      { documents },
+    );
+
+    expect(writes[0].data).toMatchObject({ status: "active", stripeSubscriptionId: "sub_2" });
+  });
+
+  it("applies events of the stored active subscription", async () => {
+    const documents = {
+      "subscriptions/company-1": { status: "active", stripeSubscriptionId: "sub_1" },
+    };
+
+    const { writes } = await run(
+      signedRequest(
+        event("customer.subscription.updated", subscriptionObject({ cancel_at_period_end: true })),
+      ),
+      { documents },
+    );
+
+    expect(writes[0].data.cancelAtPeriodEnd).toBe(true);
+  });
+
   it("ignores subscription events without a companyId", async () => {
     const subscription = subscriptionObject({ metadata: {} });
 

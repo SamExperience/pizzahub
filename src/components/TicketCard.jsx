@@ -8,6 +8,7 @@ import {
   MapPin,
   Pencil,
   Phone,
+  Printer,
   ShoppingBag,
 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
@@ -33,6 +34,7 @@ import {
   primaryButton,
   statusStyles,
 } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 // Visible labels of the status moves, keyed by target status; moves without
 // a label are icon-only ("Move to <status>").
@@ -42,6 +44,7 @@ const FORWARD_LABEL = {
 };
 
 const BACK_LABEL = {
+  [ORDER_STATUS.PENDING]: "Back",
   [ORDER_STATUS.IN_PROGRESS]: "Reopen",
 };
 
@@ -49,19 +52,24 @@ const countItems = (items = []) =>
   items.reduce((total, item) => total + (item.quantity ?? 0), 0);
 
 // Customer referenced by the Order, kept up to date in real time (it can be
-// edited from any ticket); null while loading or when unavailable.
+// edited from any ticket); null while loading or when unavailable. failed
+// tells a read error apart from a deleted Customer.
 function useCustomer(customerId) {
-  const [result, setResult] = useState({ id: null, customer: null });
+  const [result, setResult] = useState({
+    id: null,
+    customer: null,
+    failed: false,
+  });
 
   useEffect(() => {
     if (!customerId) return;
 
     return subscribeToCustomer(
       customerId,
-      (customer) => setResult({ id: customerId, customer }),
+      (customer) => setResult({ id: customerId, customer, failed: false }),
       (error) => {
-        console.log("Error loading customer -> ", error);
-        setResult({ id: customerId, customer: null });
+        logError("Error loading customer -> ", error);
+        setResult({ id: customerId, customer: null, failed: true });
       },
     );
   }, [customerId]);
@@ -69,11 +77,15 @@ function useCustomer(customerId) {
   return {
     loading: Boolean(customerId) && result.id !== customerId,
     customer: result.id === customerId ? result.customer : null,
+    failed: result.id === customerId && result.failed,
   };
 }
 
-function CustomerName({ loading, customer }) {
+function CustomerName({ loading, customer, failed }) {
   if (loading) return <span className={muted}>Loading customer ...</span>;
+  if (failed) {
+    return <span className="text-sm text-red-600">Could not load customer</span>;
+  }
   if (!customer) return <span className={muted}>Customer unavailable</span>;
 
   return (
@@ -120,7 +132,7 @@ function ActionsMenu({ disabled, onEdit, onCancel }) {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        className={`${button} size-10 min-h-10 px-0 ${open ? "border-brand-300 bg-brand-50 text-brand-700" : ""}`}
+        className={`${button} size-11 px-0 ${open ? "border-brand-300 bg-brand-50 text-brand-700" : ""}`}
         aria-label="More actions"
         title="More actions"
         aria-haspopup="menu"
@@ -166,17 +178,30 @@ function ActionsMenu({ disabled, onEdit, onCancel }) {
   );
 }
 
-// One ticket of the Tableau. Collapsed: time, customer, order type, item
-// count, total and actions; expanded (card click or the details toggle):
-// customer contacts and items. The status moves go one status back or
-// forward; edit and cancel sit in the "More actions" menu.
-export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) {
+/**
+ * One ticket of the Tableau. Collapsed: time, customer, order type, item
+ * count, total and actions; expanded (card click or the details toggle):
+ * customer contacts and items. The status moves go one status back or
+ * forward; edit and cancel sit in the "More actions" menu; the printer
+ * button opens the print preview with the Customer loaded here. The
+ * Customer is listened to in real time, so edits from another ticket show up.
+ * @param {object} props
+ * @param {object} props.order
+ * @param {function(object, string): Promise<void>} props.onChangeStatus
+ * @param {function(object): void} props.onEdit
+ * @param {function(object): Promise<void>} props.onCancel
+ * @param {function(object, ?object): void} props.onPrint - (order, customer).
+ * @returns {JSX.Element}
+ * @example
+ * <TicketCard order={order} onChangeStatus={move} onEdit={edit} onCancel={cancel} onPrint={print} />
+ */
+export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, onPrint }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(null);
   const detailsId = useId();
-  const { loading, customer } = useCustomer(order.customerId);
+  const { loading, customer, failed } = useCustomer(order.customerId);
 
   const statusIndex = ORDER_STATUSES.indexOf(order.status);
   const previousStatus = statusIndex > 0 ? ORDER_STATUSES[statusIndex - 1] : null;
@@ -193,7 +218,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
     try {
       await action();
     } catch (err) {
-      console.log("Error updating ticket -> ", err);
+      logError("Error updating ticket -> ", err);
       setError(err);
     } finally {
       setSaving(false);
@@ -212,14 +237,13 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
   const isDelivery = order.orderType === ORDER_TYPE.DELIVERY;
   const itemCount = countItems(order.items);
   const street = isDelivery ? formatStreet(customer?.address) : "";
-  const actionSize = "min-h-10 max-md:min-h-11";
   const backLabel = BACK_LABEL[previousStatus];
   const forwardLabel = FORWARD_LABEL[nextStatus];
   const hasStatusMoves = onChangeStatus && (previousStatus || nextStatus);
 
   return (
     <article
-      className={`flex flex-col gap-2.5 rounded-xl border border-l-4 bg-white p-3 shadow-sm transition-shadow ${
+      className={`@container flex flex-col gap-2.5 rounded-xl border border-l-4 bg-white p-3 shadow-sm transition-shadow ${
         expanded ? "border-brand-200 shadow-md" : "border-neutral-200"
       } ${styles?.border ?? "border-l-neutral-300"}`}
     >
@@ -230,7 +254,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
             <time className="shrink-0 text-lg font-bold tabular-nums text-neutral-900">
               {formatTime(order.scheduledTime)}
             </time>
-            <CustomerName loading={loading} customer={customer} />
+            <CustomerName loading={loading} customer={customer} failed={failed} />
           </div>
           <span
             className={`${badge} shrink-0 ${ORDER_TYPE_BADGE[order.orderType] ?? "bg-neutral-100 text-neutral-700"}`}
@@ -277,20 +301,27 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
         {hasStatusMoves && previousStatus && (
           <button
             type="button"
-            className={`${button} ${actionSize} ${backLabel ? "" : "size-10 px-0 max-md:size-11"}`}
+            className={`${button} ${backLabel ? "" : "size-11 px-0"}`}
             aria-label={backLabel ? undefined : `Move to ${previousStatus}`}
             title={`Move to ${previousStatus}`}
             disabled={saving}
             onClick={() => run(() => onChangeStatus(order, previousStatus))}
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
-            {backLabel}
+            {/* Next to a forward move a narrow card (three columns on a
+                tablet) has no room for the label: it stays for screen
+                readers only. */}
+            {backLabel && (
+              <span className={nextStatus ? "@max-[18rem]:sr-only" : undefined}>
+                {backLabel}
+              </span>
+            )}
           </button>
         )}
         {hasStatusMoves && nextStatus && (
           <button
             type="button"
-            className={`${primaryButton} ${actionSize} max-md:px-4`}
+            className={`${primaryButton} max-md:px-4`}
             title={`Move to ${nextStatus}`}
             disabled={saving}
             onClick={() => run(() => onChangeStatus(order, nextStatus))}
@@ -300,6 +331,17 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
           </button>
         )}
         <span className="ml-auto" />
+        {onPrint && (
+          <button
+            type="button"
+            className={`${button} size-11 min-h-11 shrink-0 px-0`}
+            aria-label="Print ticket"
+            title="Print ticket"
+            onClick={() => onPrint(order, customer)}
+          >
+            <Printer className="size-4" aria-hidden="true" />
+          </button>
+        )}
         {(onEdit || onCancel) && (
           <ActionsMenu
             disabled={saving}
@@ -309,7 +351,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
         )}
         <button
           type="button"
-          className={`${iconButton} size-10 max-md:size-11`}
+          className={`${iconButton} shrink-0`}
           aria-label={expanded ? "Hide details" : "Show details"}
           title={expanded ? "Hide details" : "Show details"}
           aria-expanded={expanded}

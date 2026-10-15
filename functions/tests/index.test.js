@@ -7,10 +7,12 @@ describe("functions entry point", () => {
     expect(Object.keys(module).sort()).toEqual(["createCheckoutSession", "stripeWebhook"]);
   });
 
-  it("deploys the functions in europe-west6", async () => {
+  it("deploys the functions in europe-west6 with at most 2 instances", async () => {
     const { createCheckoutSession, stripeWebhook } = await import("../index.js");
 
     expect(createCheckoutSession.__endpoint.region).toEqual(["europe-west6"]);
     expect(stripeWebhook.__endpoint.region).toEqual(["europe-west6"]);
+    expect(createCheckoutSession.__endpoint.maxInstances).toBe(2);
+    expect(stripeWebhook.__endpoint.maxInstances).toBe(2);
   });
 });

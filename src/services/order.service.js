@@ -16,6 +16,13 @@ import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { assertMaxItems, assertMaxLength } from "../utils/textValidation";
 import { db } from "./firebase";
 
+/**
+ * Order statuses as stored in Firestore. The values are the labels shown in
+ * the UI, so they stay in English and must match the security rules.
+ * @enum {string}
+ * @example
+ * order.status === ORDER_STATUS.PENDING;
+ */
 export const ORDER_STATUS = {
   PENDING: "Pending",
   IN_PROGRESS: "In progress",
@@ -24,13 +31,25 @@ export const ORDER_STATUS = {
   CANCELLED: "Cancelled",
 };
 
-// Active statuses, ordered as the Tableau columns
+/**
+ * Active statuses, ordered as the Tableau columns; Cancelled is left out
+ * because it never appears on the Tableau.
+ * @type {string[]}
+ * @example
+ * ORDER_STATUSES.map((status) => <TableauColumn key={status} status={status} />);
+ */
 export const ORDER_STATUSES = [
   ORDER_STATUS.PENDING,
   ORDER_STATUS.IN_PROGRESS,
   ORDER_STATUS.COMPLETED,
 ];
 
+/**
+ * Order types. Delivery requires a full Customer address and phone.
+ * @enum {string}
+ * @example
+ * validateCustomer(data, ORDER_TYPE.DELIVERY);
+ */
 export const ORDER_TYPE = {
   TAKEAWAY: "takeaway",
   DELIVERY: "delivery",
@@ -91,8 +110,21 @@ const validateOrderItem = (item) => {
   });
 };
 
-// Item snapshot for a Product and the options chosen on the ticket. The
-// Product data is copied so historical Orders stay correct.
+/**
+ * Builds the Item snapshot for a Product and the options chosen on the
+ * ticket. The Product data is copied (name, size, unit price) so historical
+ * Orders stay correct when the Menu changes or the Product is deleted.
+ * @param {object} product - Available Product with its id.
+ * @param {object} options
+ * @param {string} [options.size] - Required when the Product has sizes.
+ * @param {string} [options.cookingLevel] - Defaults to the Product default.
+ * @param {string[]} [options.customizations]
+ * @param {number} options.quantity - Positive integer.
+ * @returns {object} The Item with unitPrice and subtotal.
+ * @example
+ * buildItemSnapshot({ id: "p1", name: "Margherita", price: 12, isAvailable: true }, { quantity: 2 });
+ * // { productName: "Margherita", unitPrice: 12, quantity: 2, subtotal: 24, ... }
+ */
 export const buildItemSnapshot = (
   product,
   { size, cookingLevel, customizations = [], quantity } = {},
@@ -141,9 +173,18 @@ export const buildItemSnapshot = (
   };
 };
 
-// Reconfigured copy of an existing Item for its sellable Product. The saved
-// unit price is kept unless the size changes; then the current menu price
-// of the new size applies.
+/**
+ * Returns a reconfigured copy of an existing Item for its sellable Product.
+ * The saved unit price is kept unless the size changes (a menu price change
+ * must not silently reprice an accepted order); then the current menu price
+ * of the new size applies.
+ * @param {object} product - Current sellable Product.
+ * @param {object} item - Item saved in the ticket.
+ * @param {object} options - Same options as buildItemSnapshot.
+ * @returns {object} The new Item.
+ * @example
+ * reconfigureItem(product, item, { size: item.size, quantity: 3 }); // keeps item.unitPrice
+ */
 export const reconfigureItem = (product, item, options) => {
   const next = buildItemSnapshot(product, options);
 
@@ -156,25 +197,65 @@ export const reconfigureItem = (product, item, options) => {
   };
 };
 
-// Restricted edit of an Item whose Product is no longer sellable: only the
-// customizations and a quantity between 1 and maxQuantity (the quantity
-// saved in the ticket) can change; size, cooking level and price are kept.
-export const editRestrictedItem = (item, { customizations, quantity }, maxQuantity) => {
+/**
+ * Restricted edit of an Item whose Product is no longer sellable: only the
+ * customizations and a quantity between 1 and maxQuantity (the quantity
+ * saved in the ticket) can change; size and price are kept, so the kitchen
+ * never gets more of something it no longer sells. product is the
+ * unavailable Product still in the Menu (null when deleted): its cooking
+ * levels stay selectable because they do not affect the price; otherwise the
+ * saved cooking level is kept.
+ * @param {object} item - Item saved in the ticket.
+ * @param {object} changes
+ * @param {string[]} changes.customizations
+ * @param {number} changes.quantity
+ * @param {string} [changes.cookingLevel]
+ * @param {number} maxQuantity
+ * @param {?object} [product] - Unavailable Product, or null when deleted.
+ * @returns {object} The edited Item.
+ * @example
+ * editRestrictedItem(item, { customizations: ["No basil"], quantity: 1 }, 2);
+ */
+export const editRestrictedItem = (
+  item,
+  { customizations, quantity, cookingLevel },
+  maxQuantity,
+  product = null,
+) => {
   if (!Number.isInteger(quantity) || quantity < 1)
     throw new Error("Item quantity must be a positive integer");
 
   if (quantity > maxQuantity)
     throw new Error("Item quantity cannot exceed the quantity in the ticket");
 
+  let nextCookingLevel = item.cookingLevel;
+
+  if (product?.availableCookingLevels?.length) {
+    nextCookingLevel = cookingLevel ?? item.cookingLevel;
+
+    if (!product.availableCookingLevels.includes(nextCookingLevel))
+      throw new Error("Item cooking level is invalid");
+  }
+
   return {
     ...item,
+    cookingLevel: nextCookingLevel,
     customizations: normalizeCustomizations(customizations),
     quantity,
     subtotal: roundPrice(item.unitPrice * quantity),
   };
 };
 
-// Copy of an Item snapshot with a new quantity and the recalculated subtotal.
+/**
+ * Returns a copy of an Item snapshot with a new quantity and the
+ * recalculated subtotal, keeping the saved unit price (used by the +/- of
+ * the ticket summary).
+ * @param {object} item
+ * @param {number} quantity - Positive integer.
+ * @returns {object}
+ * @example
+ * updateItemQuantity({ unitPrice: 12, quantity: 1, subtotal: 12 }, 3); // subtotal 36
+ */
 export const updateItemQuantity = (item, quantity) => {
   if (!Number.isInteger(quantity) || quantity < 1)
     throw new Error("Item quantity must be a positive integer");
@@ -182,11 +263,28 @@ export const updateItemQuantity = (item, quantity) => {
   return { ...item, quantity, subtotal: roundPrice(item.unitPrice * quantity) };
 };
 
-// Order total: sum of the Item subtotals.
+/**
+ * Order total: sum of the Item subtotals, rounded to cents to avoid
+ * floating point leftovers such as 0.30000000000000004.
+ * @param {object[]} [items]
+ * @returns {number}
+ * @example
+ * calculateOrderTotal([{ subtotal: 0.1 }, { subtotal: 0.2 }]); // 0.3
+ */
 export const calculateOrderTotal = (items = []) =>
   roundPrice(items.reduce((sum, item) => sum + item.subtotal, 0));
 
-// Validates the Order data (customer excluded) and returns it with the total.
+/**
+ * Validates the Order data (customer excluded) and returns it with the
+ * total. The total is always recalculated here, never taken from the UI.
+ * @param {object} order
+ * @param {object[]} order.items - 1 to 50 Item snapshots.
+ * @param {"takeaway"|"delivery"} order.orderType
+ * @param {Date} order.scheduledTime
+ * @returns {{items: object[], orderType: string, scheduledTime: Date, total: number}}
+ * @example
+ * validateOrder({ items, orderType: "takeaway", scheduledTime: new Date() });
+ */
 export const validateOrder = ({ items, orderType, scheduledTime }) => {
   if (!Object.values(ORDER_TYPE).includes(orderType))
     throw new Error("Order type is invalid");
@@ -207,9 +305,25 @@ export const validateOrder = ({ items, orderType, scheduledTime }) => {
   return { items, orderType, scheduledTime, total };
 };
 
-// Creates the Order with status Pending. The Customer (created or updated
-// when changed) and the Order are written in a single batch. Returns the
-// new Order id.
+/**
+ * Creates the Order with status Pending. The Customer (created or updated
+ * when changed) and the Order are written in a single batch, so a ticket is
+ * never saved without its Customer.
+ * @param {object} data
+ * @param {string} data.companyId
+ * @param {string} data.storeId
+ * @param {"takeaway"|"delivery"} data.orderType
+ * @param {Date} data.scheduledTime
+ * @param {object[]} data.items
+ * @param {object} data.customerData - Customer form values.
+ * @param {?object} [data.existingCustomer]
+ * @returns {Promise<string>} The new Order id.
+ * @example
+ * const orderId = await createOrder({
+ *   companyId, storeId, orderType: "takeaway", scheduledTime, items,
+ *   customerData: { firstName: "Mario" },
+ * });
+ */
 export const createOrder = async ({
   companyId,
   storeId,
@@ -249,10 +363,23 @@ export const createOrder = async ({
   return orderRef.id;
 };
 
-// Updates the content of an existing Order: customer, order type, scheduled
-// time, items and total. The Customer (created or updated when changed) and
-// the Order are written in a single batch. Status, storeId and createdAt are
-// never written here.
+/**
+ * Updates the content of an existing Order: customer, order type, scheduled
+ * time, items and total. The Customer (created or updated when changed) and
+ * the Order are written in a single batch. Status, storeId and createdAt are
+ * never written here: they are immutable or changed only by status moves.
+ * @param {object} data
+ * @param {string} data.companyId
+ * @param {string} data.orderId
+ * @param {"takeaway"|"delivery"} data.orderType
+ * @param {Date} data.scheduledTime
+ * @param {object[]} data.items
+ * @param {object} data.customerData
+ * @param {?object} [data.existingCustomer]
+ * @returns {Promise<void>}
+ * @example
+ * await updateOrder({ companyId, orderId: "order1", orderType, scheduledTime, items, customerData });
+ */
 export const updateOrder = async ({
   companyId,
   orderId,
@@ -285,8 +412,16 @@ export const updateOrder = async ({
   await batch.commit();
 };
 
-// Moves an Order to one of the active Tableau statuses. completedAt records
-// when the Order moved to Completed and is cleared when it moves back.
+/**
+ * Moves an Order to one of the active Tableau statuses. completedAt records
+ * when the Order moved to Completed (server time, to sort the Completed
+ * column) and is cleared when it moves back.
+ * @param {string} orderId
+ * @param {string} status - One of ORDER_STATUSES.
+ * @returns {Promise<void>}
+ * @example
+ * await updateOrderStatus("order1", ORDER_STATUS.IN_PROGRESS);
+ */
 export const updateOrderStatus = async (orderId, status) => {
   if (!orderId) throw new Error("Order ID is required");
 
@@ -306,12 +441,19 @@ const toMillis = (value) => {
   return value instanceof Date ? value.getTime() : null;
 };
 
-// Orders of one Tableau column in display order: Pending and In progress by
-// scheduled time (earliest first); Completed by completion time (latest
-// first). In Completed, a pending server timestamp (null right after the
-// local write) counts as the latest, and Orders completed before completedAt
-// existed (field absent) go last; edits never move a ticket. Ties keep the
-// received order (creation time). Returns a new array.
+/**
+ * Sorts the Orders of one Tableau column: Pending and In progress by
+ * scheduled time (earliest first, what the kitchen must prepare next);
+ * Completed by completion time (latest first). In Completed, a pending
+ * server timestamp (null right after the local write) counts as the latest,
+ * and Orders completed before completedAt existed (field absent) go last;
+ * edits never move a ticket. Ties keep the received order (creation time).
+ * @param {string} status - Column status.
+ * @param {object[]} orders
+ * @returns {object[]} A new sorted array.
+ * @example
+ * const pending = sortColumnOrders(ORDER_STATUS.PENDING, ordersByStatus.Pending);
+ */
 export const sortColumnOrders = (status, orders) => {
   const compare = (x, y) => (x === y ? 0 : x - y);
 
@@ -330,7 +472,15 @@ export const sortColumnOrders = (status, orders) => {
   return [...orders].sort((a, b) => compare(scheduledAt(a), scheduledAt(b)));
 };
 
-// Cancels an Order (soft delete): the Order is kept with status Cancelled.
+/**
+ * Cancels an Order (soft delete): the Order is kept with status Cancelled,
+ * so it disappears from the Tableau but stays in the order history. The
+ * rules forbid deleting Orders.
+ * @param {string} orderId
+ * @returns {Promise<void>}
+ * @example
+ * await cancelOrder("order1");
+ */
 export const cancelOrder = async (orderId) => {
   if (!orderId) throw new Error("Order ID is required");
 
@@ -340,8 +490,16 @@ export const cancelOrder = async (orderId) => {
   });
 };
 
-// Day of the given date (default today) in the device time zone: [start, end),
-// end is the next day at 00:00.
+/**
+ * Day of the given date (default today) in the device time zone, as a
+ * half-open range [start, end) where end is the next day at 00:00, so an
+ * Order at 23:59:59.999 is still included and none is counted twice.
+ * @param {Date} [date]
+ * @returns {{start: Date, end: Date}}
+ * @example
+ * getDayRange(new Date(2026, 9, 15, 18, 30));
+ * // { start: 2026-10-15 00:00, end: 2026-10-16 00:00 }
+ */
 export const getDayRange = (date = new Date()) => {
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
@@ -362,8 +520,16 @@ const dayOrdersQuery = (storeId, date) => {
   );
 };
 
-// Reads once the Orders created on a day for a Store, newest first; Cancelled
-// Orders are included (order history).
+/**
+ * Reads once the Orders created on a day for a Store, newest first.
+ * Cancelled Orders are included because the order history shows them. One
+ * read instead of a listener: history does not need real-time updates.
+ * @param {string} storeId
+ * @param {Date} date
+ * @returns {Promise<object[]>}
+ * @example
+ * const orders = await getOrdersByDay("store1", new Date());
+ */
 export const getOrdersByDay = async (storeId, date) => {
   if (!storeId) throw new Error("Store ID is required");
 
@@ -375,9 +541,17 @@ export const getOrdersByDay = async (storeId, date) => {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).reverse();
 };
 
-// Listens to the Orders created today for a Store, oldest first; Cancelled
-// Orders are left out. Calls onChange with the full list at every change and
-// returns the unsubscribe function.
+/**
+ * Listens to the Orders created today for a Store, oldest first, with a
+ * single real-time listener feeding all Tableau columns. Cancelled Orders
+ * are left out. Calls onChange with the full list at every change.
+ * @param {string} storeId
+ * @param {function(object[]): void} onChange
+ * @param {function(Error): void} [onError]
+ * @returns {function(): void} Unsubscribe function.
+ * @example
+ * const stop = subscribeToTodayOrders("store1", setOrders, setError);
+ */
 export const subscribeToTodayOrders = (storeId, onChange, onError) => {
   if (!storeId) throw new Error("Store ID is required");
 

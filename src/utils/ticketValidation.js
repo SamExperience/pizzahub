@@ -13,9 +13,23 @@ const DELIVERY_ADDRESS_LABELS = {
 
 const isBlank = (value) => typeof value !== "string" || value.trim() === "";
 
-// Returns an object with one message per invalid field; empty when valid.
-// originalTime (edit mode): an unchanged scheduled time is accepted even
-// when it is already past.
+/**
+ * Validates the ticket form for inline errors. Returns an object with one
+ * message per invalid field; empty when valid. originalTime (edit mode): an
+ * unchanged scheduled time is accepted even when it is already past, so a
+ * late ticket can still be edited.
+ * @param {object} ticket
+ * @param {"takeaway"|"delivery"} ticket.orderType
+ * @param {object} ticket.form - Customer form values.
+ * @param {string} ticket.scheduledTime - "HH:MM".
+ * @param {object[]} ticket.items
+ * @param {?string} [ticket.originalTime]
+ * @param {Date} [ticket.now]
+ * @returns {Object<string, string>}
+ * @example
+ * validateTicketForm({ orderType: "takeaway", form: EMPTY_CUSTOMER_FORM, scheduledTime: "23:00", items: [] });
+ * // { firstName: "First name is required", items: "Add at least one product" }
+ */
 export const validateTicketForm = ({
   orderType,
   form,

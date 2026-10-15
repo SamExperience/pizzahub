@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Pizza } from "lucide-react";
-import { register, login } from "../services/auth.service";
+import { useRef, useState } from "react";
+import { Loader2, Pizza } from "lucide-react";
+import { register, login, resetPassword } from "../services/auth.service";
 import { loginWithGoogle } from "../services/auth.service";
 import { getAuthErrorMessage } from "../utils/authErrors";
 import {
@@ -13,16 +13,32 @@ import {
   pageTitle,
   primaryButton,
 } from "../utils/styles";
+import { logError } from "../utils/logger";
 
+/**
+ * Sign-in and sign-up page (email/password or Google) with the "Forgot
+ * password?" flow. One auth request runs at a time, and messages never
+ * reveal whether an email is registered.
+ * @returns {JSX.Element}
+ * @example
+ * if (!authUser) return <Login />;
+ */
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState(null);
+  const [info, setInfo] = useState(null);
+  // One auth request at a time: both buttons stay disabled until it answers.
+  const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
+    setInfo(null);
+    setSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email");
@@ -30,33 +46,60 @@ export default function Login() {
 
     try {
       if (isSignup) {
-        const user = await register(email, password);
-        console.log("register ok, user>>>", user);
+        await register(email, password);
       } else {
-        const userlog = await login(email, password);
-        console.log("login ok, user>>>", userlog);
+        await login(email, password);
       }
     } catch (error) {
-      console.log("Catch Error:", error.message);
+      logError("Login error -> ", error);
       setError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function handleLoginWithGoogle() {
+    if (submitting) return;
     setError(null);
+    setInfo(null);
+    setSubmitting(true);
 
     try {
-      const user = await loginWithGoogle();
-      console.log("login with google ok>>> ", user);
+      await loginWithGoogle();
     } catch (error) {
-      console.log("Catch Error:", error.message);
+      logError("Google login error -> ", error);
       setError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (submitting) return;
+    setError(null);
+    setInfo(null);
+    setSubmitting(true);
+
+    const email = new FormData(formRef.current).get("email");
+
+    try {
+      await resetPassword(email);
+      // Same message whether or not the account exists (no enumeration).
+      setInfo(
+        "If an account exists for this email, we sent a password reset link.",
+      );
+    } catch (error) {
+      logError("Password reset error -> ", error);
+      setError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
   function toggleMode() {
     setIsSignup((value) => !value);
     setError(null);
+    setInfo(null);
   }
 
   return (
@@ -80,7 +123,11 @@ export default function Login() {
           {isSignup ? "Sign up" : "Log in"}
         </h1>
 
-        <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
+        <form
+          ref={formRef}
+          className="mt-4 flex flex-col gap-4"
+          onSubmit={handleSubmit}
+        >
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className={label}>
               Email
@@ -108,6 +155,16 @@ export default function Login() {
               autoComplete={isSignup ? "new-password" : "current-password"}
               required
             />
+            {!isSignup && (
+              <button
+                type="button"
+                className="min-h-11 self-end text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:opacity-50"
+                onClick={handleResetPassword}
+                disabled={submitting}
+              >
+                Forgot password?
+              </button>
+            )}
           </div>
 
           {isSignup && (
@@ -136,11 +193,23 @@ export default function Login() {
             </div>
           )}
 
+          {info && (
+            <div
+              role="status"
+              className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+            >
+              {info}
+            </div>
+          )}
+
           <button
             type="submit"
             className={`${primaryButton} min-h-11 w-full`}
-            disabled={isSignup && password !== confirmPassword}
+            disabled={submitting || (isSignup && password !== confirmPassword)}
           >
+            {submitting && (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            )}
             {isSignup ? "Create account" : "Log in"}
           </button>
         </form>
@@ -154,6 +223,7 @@ export default function Login() {
         <button
           type="button"
           onClick={handleLoginWithGoogle}
+          disabled={submitting}
           className={`${button} min-h-11 w-full gap-3`}
         >
           <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">

@@ -139,4 +139,15 @@ describe("MenuTableauPanel", () => {
 
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it("recalls the ticket content in the Done button, which closes the panel", async () => {
+    const onClose = vi.fn();
+    renderPanel({ onClose, itemCount: 3, total: 21.5 });
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Done · 3 items · €21.50" }),
+    );
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
