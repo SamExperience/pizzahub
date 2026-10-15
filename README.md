@@ -2,7 +2,7 @@
 
 PizzaHub is a web application for pizzeria staff. It lets a team register (and reset a forgotten password), set up its Company and Store, select the Store to work on and manage that Store's Menu, create, edit and cancel tickets (orders), preview a ticket receipt, move tickets through their statuses, follow the Store's orders of the day in real time on the Tableau, browse the Store's order history by day on the Dashboard and subscribe to a demo plan through Stripe Checkout in test mode. The interface is responsive and usable on desktop, tablet and mobile.
 
-PizzaHub is an MVP (V1); this document describes only what is implemented. The app is live at [pizzahub-11284.web.app](https://pizzahub-11284.web.app).
+PizzaHub is an MVP (V1); this document describes only what is implemented. The app is live at [pizzahub-11284.web.app](https://pizzahub-11284.web.app). The documentation site, with guides on setup, features, architecture, data model, security, subscription and deployment, is at [samexperience.github.io/pizzahub-docs](https://samexperience.github.io/pizzahub-docs/).
 
 ## Implemented features
 
