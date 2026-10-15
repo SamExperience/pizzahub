@@ -5,7 +5,8 @@ import Stripe from "stripe";
 // Same region as the project's Firestore database and Storage bucket (europe-west6, Zurich).
 // Set here, not in index.js: every function module imports this file before
 // defining its triggers, and triggers read the global options when defined.
-setGlobalOptions({ region: "europe-west6", maxInstances: 10 });
+// Two instances are enough for MVP traffic and bound the cost of abusive bursts.
+setGlobalOptions({ region: "europe-west6", maxInstances: 2 });
 
 // Secrets live in Google Secret Manager (local emulator: functions/.secret.local).
 export const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
