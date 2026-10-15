@@ -158,16 +158,34 @@ export const reconfigureItem = (product, item, options) => {
 
 // Restricted edit of an Item whose Product is no longer sellable: only the
 // customizations and a quantity between 1 and maxQuantity (the quantity
-// saved in the ticket) can change; size, cooking level and price are kept.
-export const editRestrictedItem = (item, { customizations, quantity }, maxQuantity) => {
+// saved in the ticket) can change; size and price are kept. product is the
+// unavailable Product still in the Menu (null when deleted): its cooking
+// levels stay selectable because they do not affect the price; otherwise the
+// saved cooking level is kept.
+export const editRestrictedItem = (
+  item,
+  { customizations, quantity, cookingLevel },
+  maxQuantity,
+  product = null,
+) => {
   if (!Number.isInteger(quantity) || quantity < 1)
     throw new Error("Item quantity must be a positive integer");
 
   if (quantity > maxQuantity)
     throw new Error("Item quantity cannot exceed the quantity in the ticket");
 
+  let nextCookingLevel = item.cookingLevel;
+
+  if (product?.availableCookingLevels?.length) {
+    nextCookingLevel = cookingLevel ?? item.cookingLevel;
+
+    if (!product.availableCookingLevels.includes(nextCookingLevel))
+      throw new Error("Item cooking level is invalid");
+  }
+
   return {
     ...item,
+    cookingLevel: nextCookingLevel,
     customizations: normalizeCustomizations(customizations),
     quantity,
     subtotal: roundPrice(item.unitPrice * quantity),

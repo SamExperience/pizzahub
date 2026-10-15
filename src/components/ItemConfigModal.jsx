@@ -60,8 +60,10 @@ function LockedValue({ heading, value }) {
 // recalled in the header, sizes are a selector, options still offered by the
 // current product are prefilled and the saved price is kept unless the size
 // changes. restricted (Product no longer sellable, product may be null)
-// shows size and cooking level locked and allows only customizations and a
-// quantity up to maxQuantity.
+// shows the size locked and allows only customizations and a quantity up to
+// maxQuantity; the cooking level stays selectable while the unavailable
+// Product is still in the Menu (it has no price impact), otherwise it is
+// locked too.
 export default function ItemConfigModal({
   product,
   initialItem = null,
@@ -73,10 +75,9 @@ export default function ItemConfigModal({
   const isEdit = Boolean(initialItem);
   const name = restricted ? initialItem.productName : product.name;
   const sizes = !restricted && Array.isArray(product.sizes) ? product.sizes : [];
-  const cookingLevels =
-    !restricted && Array.isArray(product.availableCookingLevels)
-      ? product.availableCookingLevels
-      : [];
+  const cookingLevels = Array.isArray(product?.availableCookingLevels)
+    ? product.availableCookingLevels
+    : [];
 
   const [size, setSize] = useState(() =>
     sizes.some((item) => item.name === initialItem?.size) ? initialItem.size : null,
@@ -122,7 +123,12 @@ export default function ItemConfigModal({
 
   const buildItem = () => {
     if (restricted)
-      return editRestrictedItem(initialItem, { customizations, quantity }, maxQuantity);
+      return editRestrictedItem(
+        initialItem,
+        { cookingLevel, customizations, quantity },
+        maxQuantity,
+        product,
+      );
 
     const options = { size, cookingLevel, customizations, quantity };
 
@@ -244,15 +250,16 @@ export default function ItemConfigModal({
                     className="m-0 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
                   >
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    This product is no longer sellable: size, cooking level and price
+                    This product is no longer sellable:{" "}
+                    {cookingLevels.length > 0 ? "size and price" : "size, cooking level and price"}{" "}
                     are locked; the quantity can only be lowered.
                   </p>
-                  {(initialItem.size || initialItem.cookingLevel) && (
+                  {(initialItem.size || (initialItem.cookingLevel && !cookingLevels.length)) && (
                     <div className="grid grid-cols-2 gap-3">
                       {initialItem.size && (
                         <LockedValue heading="Size" value={initialItem.size} />
                       )}
-                      {initialItem.cookingLevel && (
+                      {initialItem.cookingLevel && cookingLevels.length === 0 && (
                         <LockedValue heading="Cooking level" value={initialItem.cookingLevel} />
                       )}
                     </div>

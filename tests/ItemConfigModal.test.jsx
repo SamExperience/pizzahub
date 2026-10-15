@@ -240,6 +240,26 @@ describe("ItemConfigModal reconfiguration", () => {
     });
   });
 
+  it("keeps the cooking level editable for an unavailable product", async () => {
+    const { onAdd } = renderModal(
+      { ...PIZZA, isAvailable: false },
+      { initialItem: ITEM, restricted: true, maxQuantity: 2 },
+    );
+
+    expect(screen.getByText(/size and price are locked/)).toBeTruthy();
+    expect(screen.getByText("Small").parentElement.textContent).toContain("(locked)");
+    expect(screen.queryByRole("button", { name: "Large" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Rare" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Well done" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item" }));
+
+    expect(onAdd).toHaveBeenCalledWith({ ...ITEM, cookingLevel: "Well done" });
+  });
+
   it("closes from Cancel without updating the Item", async () => {
     const { onAdd, onClose } = renderModal(PIZZA, { initialItem: ITEM });
 
