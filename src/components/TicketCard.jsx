@@ -50,19 +50,24 @@ const countItems = (items = []) =>
   items.reduce((total, item) => total + (item.quantity ?? 0), 0);
 
 // Customer referenced by the Order, kept up to date in real time (it can be
-// edited from any ticket); null while loading or when unavailable.
+// edited from any ticket); null while loading or when unavailable. failed
+// tells a read error apart from a deleted Customer.
 function useCustomer(customerId) {
-  const [result, setResult] = useState({ id: null, customer: null });
+  const [result, setResult] = useState({
+    id: null,
+    customer: null,
+    failed: false,
+  });
 
   useEffect(() => {
     if (!customerId) return;
 
     return subscribeToCustomer(
       customerId,
-      (customer) => setResult({ id: customerId, customer }),
+      (customer) => setResult({ id: customerId, customer, failed: false }),
       (error) => {
         logError("Error loading customer -> ", error);
-        setResult({ id: customerId, customer: null });
+        setResult({ id: customerId, customer: null, failed: true });
       },
     );
   }, [customerId]);
@@ -70,11 +75,15 @@ function useCustomer(customerId) {
   return {
     loading: Boolean(customerId) && result.id !== customerId,
     customer: result.id === customerId ? result.customer : null,
+    failed: result.id === customerId && result.failed,
   };
 }
 
-function CustomerName({ loading, customer }) {
+function CustomerName({ loading, customer, failed }) {
   if (loading) return <span className={muted}>Loading customer ...</span>;
+  if (failed) {
+    return <span className="text-sm text-red-600">Could not load customer</span>;
+  }
   if (!customer) return <span className={muted}>Customer unavailable</span>;
 
   return (
@@ -177,7 +186,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
   const [error, setError] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(null);
   const detailsId = useId();
-  const { loading, customer } = useCustomer(order.customerId);
+  const { loading, customer, failed } = useCustomer(order.customerId);
 
   const statusIndex = ORDER_STATUSES.indexOf(order.status);
   const previousStatus = statusIndex > 0 ? ORDER_STATUSES[statusIndex - 1] : null;
@@ -231,7 +240,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
             <time className="shrink-0 text-lg font-bold tabular-nums text-neutral-900">
               {formatTime(order.scheduledTime)}
             </time>
-            <CustomerName loading={loading} customer={customer} />
+            <CustomerName loading={loading} customer={customer} failed={failed} />
           </div>
           <span
             className={`${badge} shrink-0 ${ORDER_TYPE_BADGE[order.orderType] ?? "bg-neutral-100 text-neutral-700"}`}

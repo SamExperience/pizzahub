@@ -1,4 +1,4 @@
-import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { formatPrice } from "../utils/format";
@@ -22,7 +22,8 @@ const rowIconButton = `${iconButton} size-10 @sm:size-9`;
 // Rows sit on one line in wide containers and on two lines otherwise. Per
 // Item index: maxQuantities caps the quantity (null = no limit), itemStatuses
 // labels Products no longer sellable and itemMessages shows a message under
-// the Item.
+// the Item. editingIndex is the Item whose Product is loading for an edit:
+// every Edit button waits for it.
 export default function TicketSummary({
   items,
   onAddProduct,
@@ -32,6 +33,7 @@ export default function TicketSummary({
   maxQuantities = [],
   itemStatuses = [],
   itemMessages = {},
+  editingIndex = null,
 }) {
   const count = items.reduce((total, item) => total + (item.quantity ?? 0), 0);
   // A new line is refused at the limit; quantity changes are not new lines.
@@ -129,9 +131,15 @@ export default function TicketSummary({
                       className={rowIconButton}
                       aria-label={`Edit ${item.productName}`}
                       title="Edit"
+                      disabled={editingIndex !== null}
+                      aria-busy={editingIndex === index}
                       onClick={() => onEdit(index)}
                     >
-                      <Pencil className="size-4" aria-hidden="true" />
+                      {editingIndex === index ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Pencil className="size-4" aria-hidden="true" />
+                      )}
                     </button>
                   )}
                   <button

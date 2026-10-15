@@ -94,4 +94,43 @@ describe("Login", () => {
     await waitFor(() => expect(mocks.loginWithGoogle).toHaveBeenCalled());
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("disables both buttons while a login request is running", async () => {
+    let resolveLogin;
+    mocks.login.mockReturnValue(
+      new Promise((resolve) => {
+        resolveLogin = resolve;
+      }),
+    );
+    render(<Login />);
+
+    fillLogin("a@b.com", "secret1");
+    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    const submit = screen.getByRole("button", { name: "Log in" });
+    const google = screen.getByRole("button", { name: "Login with Google" });
+    expect(submit.disabled).toBe(true);
+    expect(google.disabled).toBe(true);
+
+    fireEvent.click(google);
+    expect(mocks.loginWithGoogle).not.toHaveBeenCalled();
+
+    resolveLogin({ uid: "u1" });
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    expect(mocks.login).toHaveBeenCalledTimes(1);
+  });
+
+  it("enables the buttons again after a failed Google login", async () => {
+    mocks.loginWithGoogle.mockRejectedValue({
+      code: "auth/network-request-failed",
+      message: "offline",
+    });
+    render(<Login />);
+
+    const google = screen.getByRole("button", { name: "Login with Google" });
+    fireEvent.click(google);
+
+    await screen.findByRole("alert");
+    expect(google.disabled).toBe(false);
+  });
 });

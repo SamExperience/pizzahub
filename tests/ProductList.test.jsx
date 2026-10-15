@@ -481,6 +481,54 @@ describe("ProductList", () => {
       );
     });
 
+    it("runs one product change at a time and disables the row actions meanwhile", async () => {
+      getProductsByCategoryId.mockResolvedValue(existing);
+      let resolveToggle;
+      setProductAvailability.mockReturnValue(
+        new Promise((resolve) => {
+          resolveToggle = resolve;
+        }),
+      );
+
+      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+      const toggle = await screen.findByRole("switch", {
+        name: "Mark unavailable Margherita",
+      });
+      await userEvent.click(toggle);
+
+      expect(toggle.disabled).toBe(true);
+      expect(
+        screen.getByRole("button", { name: "Move Diavola up" }).disabled,
+      ).toBe(true);
+      expect(screen.getByRole("button", { name: "Add product" }).disabled).toBe(true);
+      expect(screen.getByText("Saving ...")).toBeTruthy();
+
+      await userEvent.click(toggle);
+      expect(setProductAvailability).toHaveBeenCalledTimes(1);
+
+      resolveToggle();
+      await waitFor(() => expect(toggle.disabled).toBe(false));
+      expect(screen.queryByText("Saving ...")).toBeNull();
+    });
+
+    it("shows a generic message instead of a raw Storage error", async () => {
+      getProductsByCategoryId.mockResolvedValue(existing);
+      moveProductById.mockRejectedValue(
+        Object.assign(new Error("Firebase Storage: unauthorized"), {
+          code: "storage/unauthorized",
+        }),
+      );
+
+      render(<ProductList categoryId="c1" categoryName="Pizze" />);
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Move Diavola up" }),
+      );
+
+      expect((await screen.findByRole("alert")).textContent).toBe(
+        "Something went wrong. Please try again.",
+      );
+    });
+
     it("toggles the availability to the opposite value", async () => {
       getProductsByCategoryId
         .mockResolvedValueOnce([{ ...existing[0], isAvailable: true }])

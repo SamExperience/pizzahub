@@ -25,11 +25,16 @@ function deferred() {
 }
 
 function Probe() {
-  const { authUser, userProfile, loadingLogin } = useAuth();
+  const { authUser, userProfile, loadingLogin, profileError, retryProfile } =
+    useAuth();
 
   return (
     <div>
       <p>Loading: {String(loadingLogin)}</p>
+      <p>Error: {profileError ? "yes" : "no"}</p>
+      <button type="button" onClick={retryProfile}>
+        Retry
+      </button>
       <p>User: {authUser?.uid ?? "none"}</p>
       <p>Profile: {userProfile?.displayName ?? "none"}</p>
     </div>
@@ -109,12 +114,34 @@ describe("AuthProvider", () => {
     expect(screen.getByText("Loading: false")).toBeTruthy();
   });
 
-  it("ends loading without a profile when it cannot be read", async () => {
+  it("ends loading with a profile error when it cannot be read", async () => {
     getUserDB.mockRejectedValue(new Error("offline"));
 
     await signIn({ uid: "u1" });
 
     expect(screen.getByText("Loading: false")).toBeTruthy();
     expect(screen.getByText("Profile: none")).toBeTruthy();
+    expect(screen.getByText("Error: yes")).toBeTruthy();
+  });
+
+  it("reads the profile again on retry and clears the error", async () => {
+    getUserDB.mockRejectedValueOnce(new Error("offline"));
+    await signIn({ uid: "u1" });
+    expect(screen.getByText("Error: yes")).toBeTruthy();
+
+    getUserDB.mockResolvedValueOnce({ displayName: "Sam" });
+    await act(async () => screen.getByText("Retry").click());
+
+    expect(getUserDB).toHaveBeenLastCalledWith("u1");
+    expect(screen.getByText("Error: no")).toBeTruthy();
+    expect(screen.getByText("Profile: Sam")).toBeTruthy();
+  });
+
+  it("clears the profile error on logout", async () => {
+    getUserDB.mockRejectedValue(new Error("offline"));
+    await signIn({ uid: "u1" });
+    await signIn(null);
+
+    expect(screen.getByText("Error: no")).toBeTruthy();
   });
 });

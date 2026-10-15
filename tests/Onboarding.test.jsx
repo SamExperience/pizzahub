@@ -5,10 +5,12 @@ import Onboarding from "../src/pages/Onboarding";
 import { createOnboardingWorkspace } from "../src/services/onboarding.service";
 import { FIELD_LIMITS } from "../src/utils/fieldLimits";
 
+const refreshProfile = vi.hoisted(() => vi.fn());
+
 vi.mock("../src/contexts/AuthContext", () => ({
   useAuth: () => ({
     authUser: { uid: "u1", displayName: "Anna" },
-    refreshProfile: vi.fn(),
+    refreshProfile,
   }),
 }));
 vi.mock("../src/services/onboarding.service", () => ({
@@ -75,5 +77,24 @@ describe("Onboarding", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(
       "Unable to create workspace. Please try again.",
     );
+  });
+
+  it("only reads the profile again on retry once the workspace exists", async () => {
+    createOnboardingWorkspace.mockResolvedValue(undefined);
+    refreshProfile.mockRejectedValueOnce(new Error("offline"));
+    render(<Onboarding />);
+
+    await fillRequired();
+    await userEvent.click(screen.getByRole("button", { name: "Create workspace" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Workspace created, but your profile could not be loaded. Please try again.",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Create workspace" }));
+
+    expect(createOnboardingWorkspace).toHaveBeenCalledTimes(1);
+    expect(refreshProfile).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

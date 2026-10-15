@@ -216,8 +216,8 @@ describe("Dashboard page", () => {
     expect(screen.getByText("Customer unavailable")).toBeTruthy();
   });
 
-  it("shows Customer unavailable when the customers fail to load", async () => {
-    mocks.getCustomers.mockRejectedValue(new Error("boom"));
+  it("shows an error with Retry when the customers fail to load", async () => {
+    mocks.getCustomers.mockRejectedValueOnce(new Error("boom"));
     await renderDashboard();
 
     expect(console.error).toHaveBeenCalledWith(
@@ -225,7 +225,16 @@ describe("Dashboard page", () => {
       expect.any(Error),
     );
     expect(screen.getAllByText("Customer unavailable")).toHaveLength(2);
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Unable to load the customer details.",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await flush();
+
+    expect(mocks.getCustomers).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Customer unavailable")).toBeNull();
   });
 
   it("ignores a stale response that arrives after a newer one", async () => {

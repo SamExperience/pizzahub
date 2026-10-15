@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   register,
   login,
@@ -22,6 +28,9 @@ export function AuthProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingLogin, setloadingLogin] = useState(true);
+  // Set when the profile of a signed-in user cannot be read: routes show an
+  // error instead of treating the user as new (redirect to /onboarding).
+  const [profileError, setProfileError] = useState(null);
 
   const logout = async () => {
     await signout();
@@ -33,35 +42,48 @@ export function AuthProvider({ children }) {
     if (isCurrentUser(uid)) setUserProfile(userDB);
   }
 
+  // Keeps the app in its loading state until the profile is known, so routes
+  // never redirect to /onboarding for an existing user.
+  const loadProfile = useCallback(async (uid) => {
+    setloadingLogin(true);
+    setProfileError(null);
+
+    let dataUser = null;
+    let failure = null;
+    try {
+      dataUser = await getUserDB(uid);
+    } catch (error) {
+      logError("Error loading the user profile -> ", error);
+      failure = error;
+    }
+
+    if (!isCurrentUser(uid)) return;
+
+    setUserProfile(dataUser ?? null);
+    setProfileError(failure);
+    setloadingLogin(false);
+  }, []);
+
+  const retryProfile = useCallback(() => {
+    if (authUser) loadProfile(authUser.uid);
+  }, [authUser, loadProfile]);
+
   useEffect(() => {
     const authSubscription = onAuthStateChanged(auth, async (authUser) => {
       setAuthUser(authUser);
 
       if (!authUser) {
         setUserProfile(null);
+        setProfileError(null);
         setloadingLogin(false);
         return;
       }
 
-      // Keep the app in its loading state until the profile is known, so
-      // routes never redirect to /onboarding for an existing user.
-      setloadingLogin(true);
-
-      let dataUser = null;
-      try {
-        dataUser = await getUserDB(authUser.uid);
-      } catch (error) {
-        logError("Error loading the user profile -> ", error);
-      }
-
-      if (!isCurrentUser(authUser.uid)) return;
-
-      setUserProfile(dataUser ?? null);
-      setloadingLogin(false);
+      await loadProfile(authUser.uid);
     });
 
     return authSubscription;
-  }, []);
+  }, [loadProfile]);
 
   return (
     <AuthContext.Provider
@@ -72,6 +94,8 @@ export function AuthProvider({ children }) {
         authUser,
         userProfile,
         loadingLogin,
+        profileError,
+        retryProfile,
         logout,
         refreshProfile,
       }}

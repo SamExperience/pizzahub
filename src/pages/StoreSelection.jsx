@@ -3,7 +3,7 @@ import StoreCard from "../components/StoreCard";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import LoadingState from "../components/LoadingState";
-import { alert, button, muted, pageTitle } from "../utils/styles";
+import { alert, button, emptyBox, muted, pageTitle } from "../utils/styles";
 
 export default function StoreSelection() {
   const navigate = useNavigate();
@@ -47,6 +47,10 @@ export default function StoreSelection() {
       )}
 
       {loadingStore && <LoadingState />}
+
+      {!loadingStore && !errorStore && !accessibleStore && (
+        <p className={emptyBox}>No store found for your account.</p>
+      )}
 
       {accessibleStore && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

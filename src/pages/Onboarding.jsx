@@ -13,6 +13,7 @@ import {
   primaryButton,
   sectionTitle,
 } from "../utils/styles";
+import { getErrorMessage } from "../utils/errorMessage";
 import { logError } from "../utils/logger";
 
 const initialFormData = {
@@ -27,15 +28,13 @@ const initialFormData = {
 
 const fieldStack = "flex flex-col gap-1.5";
 
-// Validation errors of the service are readable messages (they are plain
-// Errors); Firebase errors carry a code and keep the generic text.
-const validationMessage = (err) =>
-  err instanceof Error && !err.code ? err.message : null;
-
 export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // Set once the workspace exists: a retry only reads the profile again,
+  // because a second creation would be refused.
+  const [workspaceCreated, setWorkspaceCreated] = useState(false);
   const { authUser, refreshProfile } = useAuth();
 
   function handleChange(event) {
@@ -54,11 +53,14 @@ export default function Onboarding() {
     setError(null);
 
     try {
-      await createOnboardingWorkspace({
-        uid: authUser.uid,
-        userName: authUser.displayName,
-        ...formData,
-      });
+      if (!workspaceCreated) {
+        await createOnboardingWorkspace({
+          uid: authUser.uid,
+          userName: authUser.displayName,
+          ...formData,
+        });
+        setWorkspaceCreated(true);
+      }
       await refreshProfile();
     } catch (err) {
       setError(err);
@@ -210,8 +212,12 @@ export default function Onboarding() {
 
         {error && (
           <div role="alert" className={alert}>
-            {validationMessage(error) ??
-              "Unable to create workspace. Please try again."}
+            {workspaceCreated
+              ? "Workspace created, but your profile could not be loaded. Please try again."
+              : getErrorMessage(
+                  error,
+                  "Unable to create workspace. Please try again.",
+                )}
           </div>
         )}
 

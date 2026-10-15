@@ -8,7 +8,7 @@ import {
   Trash2,
   UtensilsCrossed,
 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   createProduct,
   deleteProductById,
@@ -30,6 +30,7 @@ import {
 import ConfirmDialog from "./ConfirmDialog";
 import LoadingState from "./LoadingState";
 import ProductForm from "./ProductForm";
+import { getErrorMessage } from "../utils/errorMessage";
 import { logError } from "../utils/logger";
 
 // Chevron button used to move a row up/down: 40px wide, 32px tall.
@@ -37,7 +38,7 @@ const moveButton =
   "inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:text-neutral-300 disabled:hover:bg-transparent";
 
 const panelButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40";
 
 // Price rows: one per size, or a single "Price" row.
 function getPriceRows(product) {
@@ -116,8 +117,10 @@ function ProductDetails({ product }) {
   );
 }
 
+// busy disables the row actions while a product change runs.
 function ProductRow({
   product,
+  busy,
   isFirst,
   isLast,
   onMove,
@@ -159,7 +162,7 @@ function ProductRow({
             aria-label={`Move ${product.name} up`}
             title={`Move ${product.name} up`}
             className={moveButton}
-            disabled={isFirst}
+            disabled={busy || isFirst}
             onClick={() => onMove(product.id, "up")}
           >
             <ChevronUp className="size-5" aria-hidden="true" />
@@ -169,7 +172,7 @@ function ProductRow({
             aria-label={`Move ${product.name} down`}
             title={`Move ${product.name} down`}
             className={moveButton}
-            disabled={isLast}
+            disabled={busy || isLast}
             onClick={() => onMove(product.id, "down")}
           >
             <ChevronDown className="size-5" aria-hidden="true" />
@@ -248,7 +251,8 @@ function ProductRow({
           aria-checked={available}
           aria-label={toggleLabel}
           title={toggleLabel}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={busy}
           onClick={() => onToggleAvailability(product.id, !available)}
         >
           <span
@@ -268,7 +272,8 @@ function ProductRow({
           type="button"
           aria-label={`Delete ${product.name}`}
           title={`Delete ${product.name}`}
-          className="hidden size-11 shrink-0 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 @xl:inline-flex"
+          className="hidden size-11 shrink-0 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:cursor-not-allowed disabled:opacity-40 @xl:inline-flex"
+          disabled={busy}
           onClick={() => onRequestDelete(product)}
         >
           <Trash2 className="size-5" aria-hidden="true" />
@@ -308,6 +313,7 @@ function ProductRow({
               type="button"
               aria-label={`Edit ${product.name}`}
               className={`${panelButton} border-brand-200 bg-white text-brand-700 hover:bg-brand-50`}
+              disabled={busy}
               onClick={() => onEdit(product.id)}
             >
               <Pencil className="size-4" aria-hidden="true" />
@@ -317,6 +323,7 @@ function ProductRow({
               type="button"
               aria-label={`Delete ${product.name}`}
               className={`${panelButton} border-red-200 bg-white text-red-600 hover:bg-red-50 @xl:hidden`}
+              disabled={busy}
               onClick={() => onRequestDelete(product)}
             >
               <Trash2 className="size-4" aria-hidden="true" />
@@ -344,6 +351,10 @@ export default function ProductList({
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [productToDelete, setProductToDelete] = useState(null);
+  // One product change at a time: controls are disabled while it runs and
+  // the ref drops clicks that arrive before the next render.
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -376,6 +387,9 @@ export default function ProductList({
   // The list is reloaded on failure too: a partial change (e.g. product saved,
   // image upload failed) must not leave the list stale.
   const runAction = async (action) => {
+    if (pendingRef.current) return false;
+    pendingRef.current = true;
+    setPending(true);
     setActionError(null);
     let succeeded = false;
     try {
@@ -396,6 +410,8 @@ export default function ProductList({
       }
     }
 
+    pendingRef.current = false;
+    setPending(false);
     onChange?.();
 
     return succeeded;
@@ -471,6 +487,7 @@ export default function ProductList({
           <button
             type="button"
             className={`${primaryButton} min-h-10`}
+            disabled={pending}
             onClick={() => setShowForm(true)}
           >
             <Plus className="size-4" aria-hidden="true" />
@@ -478,12 +495,17 @@ export default function ProductList({
           </button>
         )}
       </div>
+      {pending && !showForm && editingId === null && (
+        <LoadingState text="Saving ..." />
+      )}
       {actionError && (
         <p role="alert" className={alert}>
-          {actionError.message}
+          {getErrorMessage(actionError)}
         </p>
       )}
-      {showForm && <ProductForm onSubmit={handleCreate} onCancel={closeForm} />}
+      {showForm && (
+        <ProductForm onSubmit={handleCreate} onCancel={closeForm} busy={pending} />
+      )}
       {loading && <LoadingState />}
       {error && (
         <p role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
@@ -505,12 +527,14 @@ export default function ProductList({
                   product={product}
                   onSubmit={handleUpdate}
                   onCancel={closeForm}
+                  busy={pending}
                 />
               </li>
             ) : (
               <ProductRow
                 key={product.id}
                 product={product}
+                busy={pending}
                 isFirst={index === 0}
                 isLast={index === products.length - 1}
                 onMove={handleMove}

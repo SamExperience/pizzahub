@@ -3,13 +3,14 @@ import { useState } from "react";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { input, primaryButton } from "../utils/styles";
 
-// `onSubmit` resolves to true when the category was saved.
-export default function CategoryForm({ onSubmit }) {
+// `onSubmit` resolves to true when the category was saved; busy disables the
+// submit while another category change runs.
+export default function CategoryForm({ onSubmit, busy = false }) {
   const [name, setName] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (busy || !name.trim()) return;
 
     if (await onSubmit(name)) {
       setName("");
@@ -30,7 +31,7 @@ export default function CategoryForm({ onSubmit }) {
       <button
         type="submit"
         className={`${primaryButton} min-h-10 w-full`}
-        disabled={!name.trim()}
+        disabled={busy || !name.trim()}
       >
         <Plus className="size-4" aria-hidden="true" />
         Add category

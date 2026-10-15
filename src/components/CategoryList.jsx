@@ -8,9 +8,11 @@ import ConfirmDialog from "./ConfirmDialog";
 const actionButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-40 md:size-9 md:rounded-lg md:text-neutral-500 md:hover:bg-brand-100 md:hover:text-brand-800 md:focus-visible:ring-brand-500/40";
 
-// `onRename` resolves to true when the category was saved.
+// `onRename` resolves to true when the category was saved; busy disables the
+// actions while a category change runs.
 function CategoryRow({
   category,
+  busy,
   isFirst,
   isLast,
   isSelected,
@@ -52,7 +54,7 @@ function CategoryRow({
             <button
               type="submit"
               className={primaryButton}
-              disabled={!name.trim()}
+              disabled={busy || !name.trim()}
             >
               Save
             </button>
@@ -97,7 +99,7 @@ function CategoryRow({
           aria-label={`Move ${category.name} up`}
           title={`Move ${category.name} up`}
           className={actionButton}
-          disabled={isFirst}
+          disabled={busy || isFirst}
           onClick={() => onMove(category.id, "up")}
         >
           <ChevronUp className="size-4" aria-hidden="true" />
@@ -107,7 +109,7 @@ function CategoryRow({
           aria-label={`Move ${category.name} down`}
           title={`Move ${category.name} down`}
           className={actionButton}
-          disabled={isLast}
+          disabled={busy || isLast}
           onClick={() => onMove(category.id, "down")}
         >
           <ChevronDown className="size-4" aria-hidden="true" />
@@ -126,6 +128,7 @@ function CategoryRow({
           aria-label={`Delete ${category.name}`}
           title={`Delete ${category.name}`}
           className={`${actionButton} md:hover:bg-red-50 md:hover:text-red-600`}
+          disabled={busy}
           onClick={() => onRequestDelete(category)}
         >
           <Trash2 className="size-4" aria-hidden="true" />
@@ -137,6 +140,7 @@ function CategoryRow({
 
 export default function CategoryList({
   categories,
+  busy = false,
   selectedId,
   onSelect,
   onRename,
@@ -162,6 +166,7 @@ export default function CategoryList({
         <CategoryRow
           key={category.id}
           category={category}
+          busy={busy}
           isFirst={index === 0}
           isLast={index === categories.length - 1}
           isSelected={category.id === selectedId}

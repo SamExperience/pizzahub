@@ -1,5 +1,5 @@
 import { Bike, Clock, ShoppingBag, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getCustomer, getCustomersByCompanyId } from "../services/customer.service";
 import {
   calculateOrderTotal,
@@ -69,6 +69,10 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   }, [config]);
   // Message under one Item of the summary: { index, text } or null.
   const [itemMessage, setItemMessage] = useState(null);
+  // Index of the Item whose Product is loading for an edit; the ref also
+  // blocks repeated clicks that arrive before the next render.
+  const [editingItem, setEditingItem] = useState(null);
+  const editingIndex = useRef(null);
   // The product panel can stay open after the last free line is used: a new
   // line is refused at the limit.
   const selectProduct = useCallback(
@@ -115,9 +119,12 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   // Product: full edit when it is sellable, restricted edit otherwise.
   const editItem = useCallback(
     async (index) => {
+      if (editingIndex.current !== null) return;
       const item = items[index];
 
       setItemMessage(null);
+      editingIndex.current = index;
+      setEditingItem(index);
 
       try {
         const { status, product } = await getItemProduct(item.productId);
@@ -132,6 +139,9 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       } catch (err) {
         logError("Error loading product -> ", err);
         setItemMessage({ index, text: "Could not load the product. Try again." });
+      } finally {
+        editingIndex.current = null;
+        setEditingItem(null);
       }
     },
     [items, savedQuantities],
@@ -147,8 +157,9 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   const [customerForm, setCustomerForm] = useState(EMPTY_CUSTOMER_FORM);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   // Edit mode: loading of the Order's Customer ("loading" | "ready" | "error").
+  // An Order without customerId has nothing to load.
   const [orderCustomerState, setOrderCustomerState] = useState(
-    isEdit ? "loading" : "ready",
+    isEdit && order?.customerId ? "loading" : "ready",
   );
   const [orderCustomerRetryKey, setOrderCustomerRetryKey] = useState(0);
   // Inline field errors appear after the first save attempt and then follow the form.
@@ -440,6 +451,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
               maxQuantities={maxQuantities}
               itemStatuses={items.map((item) => productStatuses[item.productId])}
               itemMessages={itemMessage ? { [itemMessage.index]: itemMessage.text } : {}}
+              editingIndex={editingItem}
             />
             <FieldError id="items-error" message={errors.items} />
             {saveError && (

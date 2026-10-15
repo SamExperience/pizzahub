@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pizza } from "lucide-react";
+import { Loader2, Pizza } from "lucide-react";
 import { register, login } from "../services/auth.service";
 import { loginWithGoogle } from "../services/auth.service";
 import { getAuthErrorMessage } from "../utils/authErrors";
@@ -20,10 +20,14 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState(null);
+  // One auth request at a time: both buttons stay disabled until it answers.
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
+    setSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email");
@@ -38,17 +42,23 @@ export default function Login() {
     } catch (error) {
       logError("Login error -> ", error);
       setError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function handleLoginWithGoogle() {
+    if (submitting) return;
     setError(null);
+    setSubmitting(true);
 
     try {
       await loginWithGoogle();
     } catch (error) {
       logError("Google login error -> ", error);
       setError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -137,8 +147,11 @@ export default function Login() {
           <button
             type="submit"
             className={`${primaryButton} min-h-11 w-full`}
-            disabled={isSignup && password !== confirmPassword}
+            disabled={submitting || (isSignup && password !== confirmPassword)}
           >
+            {submitting && (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            )}
             {isSignup ? "Create account" : "Log in"}
           </button>
         </form>
@@ -152,6 +165,7 @@ export default function Login() {
         <button
           type="button"
           onClick={handleLoginWithGoogle}
+          disabled={submitting}
           className={`${button} min-h-11 w-full gap-3`}
         >
           <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">

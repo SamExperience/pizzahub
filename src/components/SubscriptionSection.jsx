@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Info } from "lucide-react";
+import ErrorState from "./ErrorState";
 import LoadingState from "./LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { isSubscriptionActive, startCheckout } from "../services/billing.service";
@@ -26,7 +27,9 @@ const info =
 // Subscription status of the Company and the Stripe Checkout entry point (test mode).
 export default function SubscriptionSection() {
   const { userProfile } = useAuth();
-  const { subscription, loading, error } = useSubscription(userProfile?.companyId);
+  const { subscription, loading, error, retry } = useSubscription(
+    userProfile?.companyId,
+  );
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
@@ -64,9 +67,7 @@ export default function SubscriptionSection() {
       {loading ? (
         <LoadingState />
       ) : error ? (
-        <p role="alert" className={`${alert} m-0`}>
-          Unable to load the subscription.
-        </p>
+        <ErrorState message="Unable to load the subscription." onRetry={retry} />
       ) : (
         <div className={`${card} flex flex-col gap-4`}>
           {processing && (

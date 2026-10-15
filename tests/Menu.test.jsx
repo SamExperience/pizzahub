@@ -147,6 +147,50 @@ describe("Menu page", () => {
       expect(screen.getByLabelText("New category name").value).toBe("");
     });
 
+    it("runs one category change at a time and disables the controls meanwhile", async () => {
+      await renderMenu();
+      let resolveCreate;
+      createCategory.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCreate = resolve;
+        }),
+      );
+
+      await userEvent.type(screen.getByLabelText("New category name"), "Dolci");
+      await userEvent.click(screen.getByText("Add category"));
+
+      expect(screen.getByRole("button", { name: "Add category" }).disabled).toBe(true);
+      expect(screen.getByLabelText("Delete Pizze").disabled).toBe(true);
+      expect(screen.getByLabelText("Move Pizze down").disabled).toBe(true);
+      expect(screen.getByText("Saving ...")).toBeTruthy();
+
+      await userEvent.click(screen.getByLabelText("Move Pizze down"));
+      expect(moveCategory).not.toHaveBeenCalled();
+
+      resolveCreate({ id: "c3" });
+      await waitFor(() =>
+        expect(screen.getByLabelText("Delete Pizze").disabled).toBe(false),
+      );
+      expect(createCategory).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Saving ...")).toBeNull();
+    });
+
+    it("shows a generic message instead of a raw Firebase error", async () => {
+      await renderMenu();
+      createCategory.mockRejectedValue(
+        Object.assign(new Error("Missing or insufficient permissions."), {
+          code: "permission-denied",
+        }),
+      );
+
+      await userEvent.type(screen.getByLabelText("New category name"), "Dolci");
+      await userEvent.click(screen.getByText("Add category"));
+
+      expect((await screen.findByRole("alert")).textContent).toBe(
+        "Something went wrong. Please try again.",
+      );
+    });
+
     it("shows the service error and keeps the typed name", async () => {
       await renderMenu();
       createCategory.mockRejectedValue(new Error("Category name already exists"));

@@ -48,6 +48,9 @@ export default function OrderHistory() {
   const [error, setError] = useState(null);
   // Customers by id; null while loading, empty when they could not be loaded.
   const [customers, setCustomers] = useState(null);
+  const [customersError, setCustomersError] = useState(null);
+  // Bumped to read the Customers again on retry.
+  const [customersRetryKey, setCustomersRetryKey] = useState(0);
   // Bumped to read the orders again on retry.
   const [retryKey, setRetryKey] = useState(0);
 
@@ -98,6 +101,7 @@ export default function OrderHistory() {
     let ignore = false;
 
     setCustomers(null);
+    setCustomersError(null);
 
     getCustomersByCompanyId(companyId)
       .then((list) => {
@@ -105,13 +109,15 @@ export default function OrderHistory() {
       })
       .catch((err) => {
         logError("Error loading customers -> ", err);
-        if (!ignore) setCustomers(new Map());
+        if (ignore) return;
+        setCustomers(new Map());
+        setCustomersError(err);
       });
 
     return () => {
       ignore = true;
     };
-  }, [companyId]);
+  }, [companyId, customersRetryKey]);
 
   return (
     <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-4">
@@ -149,7 +155,21 @@ export default function OrderHistory() {
       ) : orders.length === 0 ? (
         <p className={emptyBox}>No orders on this day.</p>
       ) : (
-        <OrderHistoryList orders={orders} customers={customers} />
+        <>
+          {customersError && (
+            <div role="alert" className={`${alert} flex items-center justify-between gap-3`}>
+              <span>Unable to load the customer details.</span>
+              <button
+                type="button"
+                className={button}
+                onClick={() => setCustomersRetryKey((key) => key + 1)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          <OrderHistoryList orders={orders} customers={customers} />
+        </>
       )}
     </section>
   );

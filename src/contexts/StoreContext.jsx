@@ -41,6 +41,9 @@ export function StoreProvider({ children }) {
   const [errorStore, setErrorStore] = useState(null);
   // null until the selected Store's readiness is known.
   const [menuReady, setMenuReady] = useState(null);
+  // Set when the readiness check fails, so routes can show an error instead
+  // of treating the Menu as not ready.
+  const [menuReadyError, setMenuReadyError] = useState(null);
   const { authUser, loadingLogin, userProfile } = useAuth();
   // Each Store request gets an id: a response is applied only if no newer
   // request (or logout) happened meanwhile, e.g. after an account switch.
@@ -92,23 +95,25 @@ export function StoreProvider({ children }) {
     }
   }, [authUser]);
 
-  // On failure the Menu counts as not ready, which keeps the user on /menu.
+  // On failure menuReady stays null (unknown) and menuReadyError is set.
   const refreshMenuReady = useCallback(async () => {
     if (!selectedStore) return;
     const storeId = selectedStore.id;
+    setMenuReadyError(null);
 
     try {
       const ready = await isMenuReady(storeId);
       if (selectedStoreIdRef.current === storeId) setMenuReady(ready);
     } catch (error) {
       logError("Error checking menu readiness -> ", error);
-      if (selectedStoreIdRef.current === storeId) setMenuReady(false);
+      if (selectedStoreIdRef.current === storeId) setMenuReadyError(error);
     }
   }, [selectedStore]);
 
   useEffect(() => {
     selectedStoreIdRef.current = selectedStore?.id ?? null;
     setMenuReady(null);
+    setMenuReadyError(null);
     if (selectedStore) refreshMenuReady();
   }, [selectedStore, refreshMenuReady]);
 
@@ -141,6 +146,7 @@ export function StoreProvider({ children }) {
         selectedStore,
         setselectedStore,
         menuReady,
+        menuReadyError,
         refreshMenuReady,
       }}
     >

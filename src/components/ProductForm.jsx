@@ -1,4 +1,4 @@
-import { Plus, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { button, card, input, muted, primaryButton } from "../utils/styles";
@@ -82,10 +82,16 @@ function TextListField({ legend, itemLabel, addLabel, limitLabel, items, onChang
 }
 
 // `onSubmit(data)` saves the product; the parent closes the form on success.
-// With `product` the form starts from its values (edit mode).
+// With `product` the form starts from its values (edit mode). busy is true
+// while a product change (including the image upload) runs.
 // Validation rules live in the Product service; the checks here only decide
 // whether the submit button is enabled.
-export default function ProductForm({ product, onSubmit, onCancel }) {
+export default function ProductForm({
+  product,
+  onSubmit,
+  onCancel,
+  busy = false,
+}) {
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
   const [price, setPrice] = useState(
@@ -136,7 +142,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!canSubmit) return;
+    if (busy || !canSubmit) return;
 
     await onSubmit({
       name,
@@ -344,15 +350,17 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           type="button"
           className={`${button} min-h-11`}
           onClick={onCancel}
+          disabled={busy}
         >
           Cancel
         </button>
         <button
           type="submit"
           className={`${primaryButton} min-h-11`}
-          disabled={!canSubmit}
+          disabled={busy || !canSubmit}
         >
-          Save product
+          {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+          {busy ? "Saving ..." : "Save product"}
         </button>
       </div>
     </form>

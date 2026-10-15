@@ -4,6 +4,7 @@ import { useAuth } from "../src/contexts/AuthContext";
 import { useStore } from "../src/contexts/StoreContext";
 import ProtectedRoute from "../src/components/ProtectedRoute";
 import LoadingState from "../src/components/LoadingState";
+import ErrorState from "../src/components/ErrorState";
 
 vi.mock("../src/contexts/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -74,6 +75,24 @@ describe("ProtectedRoute", () => {
 
     expect(result.type).toBe(Navigate);
     expect(result.props.to).toBe("/onboarding");
+  });
+
+  it("shows an error instead of onboarding when the profile cannot be read", () => {
+    const retryProfile = vi.fn();
+    useAuth.mockReturnValue({
+      authUser: { uid: "user-1" },
+      userProfile: null,
+      loadingLogin: false,
+      profileError: new Error("offline"),
+      retryProfile,
+    });
+    useLocation.mockReturnValue({ pathname: "/tableau" });
+
+    const result = ProtectedRoute();
+
+    expect(result.type).toBe(ErrorState);
+    expect(result.props.fullPage).toBe(true);
+    expect(result.props.onRetry).toBe(retryProfile);
   });
 
   it("allows users without a profile to access onboarding", () => {
@@ -219,11 +238,15 @@ describe("ProtectedRoute", () => {
       });
     });
 
-    const setMenuReady = (menuReady, pathname) => {
+    const refreshMenuReady = vi.fn();
+
+    const setMenuReady = (menuReady, pathname, menuReadyError = null) => {
       useStore.mockReturnValue({
         accessibleStore: { id: "store-1" },
         selectedStore: { id: "store-1" },
         menuReady,
+        menuReadyError,
+        refreshMenuReady,
         loadingStore: false,
       });
       useLocation.mockReturnValue({ pathname });
@@ -233,6 +256,21 @@ describe("ProtectedRoute", () => {
       setMenuReady(null, "/tableau");
 
       expect(ProtectedRoute().type).toBe(LoadingState);
+    });
+
+    it("shows an error with retry when the readiness check fails", () => {
+      setMenuReady(null, "/tableau", new Error("offline"));
+
+      const result = ProtectedRoute();
+
+      expect(result.type).toBe(ErrorState);
+      expect(result.props.onRetry).toBe(refreshMenuReady);
+    });
+
+    it("keeps the known readiness when a later check fails", () => {
+      setMenuReady(true, "/tableau", new Error("offline"));
+
+      expect(ProtectedRoute().type).toBe(Outlet);
     });
 
     it.each(["/tableau", "/dashboard", "/stores"])(

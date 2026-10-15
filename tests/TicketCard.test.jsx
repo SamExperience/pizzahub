@@ -158,12 +158,13 @@ describe("TicketCard", () => {
     expect(await screen.findByText("Customer unavailable")).toBeTruthy();
   });
 
-  it("shows a fallback when the customer cannot be loaded", async () => {
+  it("shows a load error, not a missing customer, when the listener fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     listenWith(null, new Error("boom"));
     render(<TicketCard order={baseOrder} />);
 
-    expect(await screen.findByText("Customer unavailable")).toBeTruthy();
+    expect(await screen.findByText("Could not load customer")).toBeTruthy();
+    expect(screen.queryByText("Customer unavailable")).toBeNull();
   });
 });
 

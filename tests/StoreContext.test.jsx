@@ -16,10 +16,22 @@ const store = { id: "store-1", name: "Pizza Roma" };
 const KEY = "pizzahub.selectedStoreId";
 
 function Probe() {
-  const { selectedStore, setselectedStore, accessibleStore } = useStore();
+  const {
+    selectedStore,
+    setselectedStore,
+    accessibleStore,
+    menuReady,
+    menuReadyError,
+    refreshMenuReady,
+  } = useStore();
 
   return (
     <div>
+      <p>Menu ready: {String(menuReady)}</p>
+      <p>Menu error: {menuReadyError ? "yes" : "no"}</p>
+      <button type="button" onClick={refreshMenuReady}>
+        Check menu
+      </button>
       <p>Selected: {selectedStore?.name ?? "none"}</p>
       <button type="button" onClick={() => setselectedStore(accessibleStore)}>
         Select
@@ -221,5 +233,20 @@ describe("StoreProvider account switch and selection validation", () => {
     expect(await screen.findByText("Accessible: Pizza Milano")).toBeTruthy();
     expect(screen.getByText("Selected: none")).toBeTruthy();
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("reports a failed readiness check instead of a not-ready Menu", async () => {
+    getAccessibleStore.mockResolvedValue(store);
+    isMenuReady.mockRejectedValueOnce(new Error("offline"));
+    localStorage.setItem(KEY, store.id);
+    renderProvider();
+
+    await screen.findByText("Menu error: yes");
+    expect(screen.getByText("Menu ready: null")).toBeTruthy();
+
+    await userEvent.click(screen.getByText("Check menu"));
+
+    await screen.findByText("Menu ready: true");
+    expect(screen.getByText("Menu error: no")).toBeTruthy();
   });
 });

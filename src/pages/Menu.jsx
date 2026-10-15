@@ -13,6 +13,7 @@ import {
 import { createMenu, getMenuByStoreId } from "../services/menu.service";
 import LoadingState from "../components/LoadingState";
 import { alert, button, emptyBox, muted, pageTitle } from "../utils/styles";
+import { getErrorMessage } from "../utils/errorMessage";
 import { logError } from "../utils/logger";
 
 // Loads the Store's Menu (creating it on first access) and its categories.
@@ -30,6 +31,10 @@ export default function Menu() {
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [actionError, setActionError] = useState(null);
+  // One category change at a time: controls are disabled while it runs and
+  // the ref drops clicks that arrive before the next render.
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -72,6 +77,9 @@ export default function Menu() {
 
   // Runs a category change, then reloads the list. Resolves to true on success.
   const runAction = async (action) => {
+    if (pendingRef.current) return false;
+    pendingRef.current = true;
+    setPending(true);
     setActionError(null);
     try {
       await action();
@@ -82,6 +90,9 @@ export default function Menu() {
       logError("Error updating categories -> ", err);
       setActionError(err);
       return false;
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   };
 
@@ -124,13 +135,15 @@ export default function Menu() {
             <h2 className="m-0 text-sm font-semibold uppercase tracking-wide text-neutral-500">
               Categories
             </h2>
-            <CategoryForm onSubmit={handleCreate} />
+            <CategoryForm onSubmit={handleCreate} busy={pending} />
+            {pending && <LoadingState text="Saving ..." />}
             {actionError && (
               <p role="alert" className={alert}>
-                {actionError.message}
+                {getErrorMessage(actionError)}
               </p>
             )}
             <CategoryList
+              busy={pending}
               categories={categories}
               selectedId={selectedCategory?.id}
               onSelect={setSelectedCategoryId}

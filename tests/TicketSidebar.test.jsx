@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketSidebar from "../src/components/TicketSidebar";
@@ -411,6 +411,28 @@ describe("TicketSidebar item reconfiguration", () => {
     render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
     await addWater();
   };
+
+  it("loads the product of an edited item once and disables Edit meanwhile", async () => {
+    let resolveProduct;
+    getItemProduct.mockReturnValue(
+      new Promise((resolve) => {
+        resolveProduct = resolve;
+      }),
+    );
+    await renderWithWater();
+
+    const editButton = screen.getByRole("button", { name: "Edit Water" });
+    fireEvent.click(editButton);
+    fireEvent.click(editButton);
+
+    expect(getItemProduct).toHaveBeenCalledTimes(1);
+    expect(editButton.disabled).toBe(true);
+
+    await act(async () => resolveProduct({ status: "sellable", product: WATER }));
+
+    expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Water" }).disabled).toBe(false);
+  });
 
   it("reopens the full configuration step for a sellable product, keeping the price", async () => {
     const onClose = vi.fn();
