@@ -1,4 +1,4 @@
-import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onRequest } from "firebase-functions/v2/https";
 
@@ -7,34 +7,13 @@ import {
   stripeSecretKey,
   stripeWebhookSecret,
 } from "./config.js";
+import { applySubscription, buildSubscriptionData } from "./subscription.js";
 
 const SUBSCRIPTION_EVENTS = [
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
 ];
-
-function toTimestamp(seconds) {
-  return typeof seconds === "number" ? Timestamp.fromMillis(seconds * 1000) : null;
-}
-
-// Maps a Stripe Subscription to the subscriptions/{companyId} fields (spec/01-data-model.md).
-// The billing period lives on the subscription item in current Stripe API versions.
-export function buildSubscriptionData(subscription, eventCreated) {
-  const item = subscription.items?.data?.[0];
-  const customer = subscription.customer;
-
-  return {
-    status: subscription.status,
-    stripeCustomerId: typeof customer === "string" ? customer : customer?.id,
-    stripeSubscriptionId: subscription.id,
-    priceId: item?.price?.id ?? null,
-    currentPeriodEnd: toTimestamp(item?.current_period_end),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
-    lastEventAt: toTimestamp(eventCreated),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-}
 
 // Returns { companyId, subscription } for the handled event types, or null to ignore the event.
 async function resolveSubscription(event, stripe) {
@@ -62,23 +41,6 @@ async function resolveSubscription(event, stripe) {
   }
 
   return null;
-}
-
-// Writes the subscription unless a newer event was already applied (Stripe does not guarantee order).
-async function applySubscription(db, companyId, data) {
-  const ref = db.collection("subscriptions").doc(companyId);
-
-  return db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(ref);
-    const lastEventAt = snapshot.exists ? snapshot.data().lastEventAt : null;
-
-    if (lastEventAt && data.lastEventAt.toMillis() < lastEventAt.toMillis()) {
-      return false;
-    }
-
-    transaction.set(ref, data, { merge: true });
-    return true;
-  });
 }
 
 export async function stripeWebhookHandler(req, res, deps) {

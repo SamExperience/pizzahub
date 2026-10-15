@@ -35,9 +35,10 @@ export default function SubscriptionSection() {
   const active = isSubscriptionActive(subscription);
   const checkout = searchParams.get("checkout");
   // The ?checkout=success URL stays after the return from Checkout: the message
-  // is shown only while the webhook has not written a final status yet.
-  const processing =
-    checkout === "success" && (!subscription || subscription.status === "incomplete");
+  // is shown only while the webhook has not written a final status yet. A document
+  // without status holds only the Stripe Customer created on the first Subscribe.
+  const status = subscription?.status;
+  const processing = checkout === "success" && (!status || status === "incomplete");
   // The period date is meaningful only for an active subscription.
   const endDate = active ? formatDate(subscription.currentPeriodEnd) : null;
 
@@ -88,9 +89,7 @@ export default function SubscriptionSection() {
                 active ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
               }`}
             >
-              {subscription
-                ? (STATUS_LABELS[subscription.status] ?? subscription.status)
-                : "No subscription"}
+              {status ? (STATUS_LABELS[status] ?? status) : "No subscription"}
             </span>
           </div>
 

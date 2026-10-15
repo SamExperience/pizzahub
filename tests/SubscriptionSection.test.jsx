@@ -174,6 +174,15 @@ describe("SubscriptionSection", () => {
     expect(screen.getByText(/Payment is being processed/)).toBeTruthy();
   });
 
+  it("treats a document without status (Customer only) as no subscription yet", () => {
+    renderSection("/dashboard?checkout=success");
+    emit({ stripeCustomerId: "cus_1" });
+
+    expect(screen.getByText(/Payment is being processed/)).toBeTruthy();
+    expect(screen.getByText("No subscription")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Subscribe" })).toBeTruthy();
+  });
+
   it("hides the processing message once the subscription has a final status", () => {
     renderSection("/dashboard?checkout=success");
     emit({ status: "canceled", currentPeriodEnd: periodEnd, cancelAtPeriodEnd: false });
