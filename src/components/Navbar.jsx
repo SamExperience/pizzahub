@@ -1,13 +1,7 @@
 import { NavLink } from "react-router";
-import {
-  BookOpen,
-  LayoutDashboard,
-  LayoutGrid,
-  Store,
-} from "lucide-react";
+import { BookOpen, LayoutDashboard, LayoutGrid } from "lucide-react";
 
 const LINKS = [
-  { to: "/stores", label: "Stores", Icon: Store },
   { to: "/tableau", label: "Tableau", Icon: LayoutGrid },
   { to: "/menu", label: "Menu", Icon: BookOpen },
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },

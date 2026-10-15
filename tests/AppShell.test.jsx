@@ -88,11 +88,23 @@ describe("App shell", () => {
     renderShell("/menu");
 
     const nav = screen.getByRole("navigation", { name: "Main" });
-    for (const name of ["Stores", "Tableau", "Menu", "Dashboard"]) {
+    for (const name of ["Tableau", "Menu", "Dashboard"]) {
       expect(nav.querySelector(`a[href="/${name.toLowerCase()}"]`)).toBeTruthy();
     }
     expect(screen.getByRole("link", { name: "Menu" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "Tableau" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("does not link to the Store selection, on desktop or in the mobile menu", async () => {
+    const user = userEvent.setup();
+    renderShell("/tableau");
+
+    expect(screen.queryByRole("link", { name: "Stores" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+    expect(screen.queryByRole("link", { name: "Stores" })).toBeNull();
+    expect(document.querySelector('a[href="/stores"]')).toBeNull();
   });
 
   it("toggles the mobile menu", async () => {
