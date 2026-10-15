@@ -20,6 +20,11 @@ import {
 } from "firebase/storage";
 
 import { FIELD_LIMITS } from "../utils/fieldLimits";
+import {
+  IMAGE_CACHE_CONTROL,
+  IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+} from "../utils/productImage";
 import { assertMaxItems, assertMaxLength } from "../utils/textValidation";
 import { db, storage } from "./firebase";
 import { logError } from "../utils/logger";
@@ -432,23 +437,26 @@ export const getItemProduct = async (productId) => {
   }
 };
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-
 // Uploads the product image to a fixed path, so replacing it overwrites the
-// previous file. Limits mirror storage.rules. Returns the download URL.
+// previous file. Expects a file already compressed by compressProductImage;
+// limits mirror storage.rules. Returns the download URL.
 export const uploadProductImage = async (storeId, productId, file) => {
   if (!storeId) throw new Error("Store ID is required");
   if (!productId) throw new Error("Product ID is required");
   if (!file) throw new Error("Image file is required");
 
-  if (typeof file.type !== "string" || !file.type.startsWith("image/"))
-    throw new Error("Product image must be an image file");
+  if (!IMAGE_TYPES.includes(file.type))
+    throw new Error("Product image must be a WebP or JPEG file");
 
-  if (file.size >= MAX_IMAGE_SIZE)
-    throw new Error("Product image must be smaller than 5 MB");
+  if (file.size >= MAX_IMAGE_BYTES)
+    throw new Error("Product image must be smaller than 150 KB");
 
   const imageRef = ref(storage, `products/${storeId}/${productId}`);
-  await uploadBytes(imageRef, file, { contentType: file.type });
+  // Browsers reuse the image for a day instead of downloading it again.
+  await uploadBytes(imageRef, file, {
+    contentType: file.type,
+    cacheControl: IMAGE_CACHE_CONTROL,
+  });
 
   return getDownloadURL(imageRef);
 };

@@ -12,6 +12,11 @@ import {
   updateProductById,
   uploadProductImage,
 } from "../src/services/product.service";
+import { compressProductImage } from "../src/utils/productImage";
+
+vi.mock("../src/utils/productImage", () => ({
+  compressProductImage: vi.fn(),
+}));
 
 vi.mock("../src/services/product.service", () => ({
   createProduct: vi.fn(),
@@ -560,9 +565,11 @@ describe("ProductList", () => {
       },
     ];
     const file = new File(["x"], "pizza.png", { type: "image/png" });
+    const compressed = new Blob(["small"], { type: "image/webp" });
     beforeEach(() => {
       createProduct.mockResolvedValue({ id: "p9" });
       updateProductById.mockResolvedValue(undefined);
+      compressProductImage.mockResolvedValue(compressed);
     });
 
     const renderList = () =>
@@ -597,7 +604,30 @@ describe("ProductList", () => {
         }),
       );
       expect(createProduct.mock.calls[0][1]).not.toHaveProperty("imageFile");
-      expect(uploadProductImage).toHaveBeenCalledWith("s1", "p9", file);
+      expect(compressProductImage).toHaveBeenCalledWith(file);
+      expect(uploadProductImage).toHaveBeenCalledWith("s1", "p9", compressed);
+    });
+
+    it("creates no product when the image cannot be compressed", async () => {
+      getProductsByCategoryId.mockResolvedValue([]);
+      compressProductImage.mockRejectedValue(
+        new Error("Product image could not be read"),
+      );
+
+      renderList();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Add product" }),
+      );
+      await userEvent.type(screen.getByLabelText("Name"), "Diavola");
+      await userEvent.type(screen.getByLabelText("Price"), "9");
+      await userEvent.upload(screen.getByLabelText("Product image"), file);
+      await userEvent.click(screen.getByRole("button", { name: "Save product" }));
+
+      expect(
+        await screen.findByText("Product image could not be read"),
+      ).toBeTruthy();
+      expect(createProduct).not.toHaveBeenCalled();
+      expect(uploadProductImage).not.toHaveBeenCalled();
     });
 
     it("reloads the list when the image upload fails after the product was created", async () => {
@@ -638,7 +668,8 @@ describe("ProductList", () => {
           expect.objectContaining({ imageUrl: "https://example.com/new.png" }),
         ),
       );
-      expect(uploadProductImage).toHaveBeenCalledWith("s1", "p1", file);
+      expect(compressProductImage).toHaveBeenCalledWith(file);
+      expect(uploadProductImage).toHaveBeenCalledWith("s1", "p1", compressed);
       expect(deleteProductImage).not.toHaveBeenCalled();
     });
 

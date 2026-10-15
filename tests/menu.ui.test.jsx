@@ -26,6 +26,7 @@ import {
   updateProductById,
   uploadProductImage,
 } from "../src/services/product.service";
+import { compressProductImage } from "../src/utils/productImage";
 
 vi.mock("../src/contexts/StoreContext", () => ({ useStore: vi.fn() }));
 vi.mock("../src/services/menu.service", () => ({
@@ -38,6 +39,10 @@ vi.mock("../src/services/category.service", () => ({
   updateCategoryById: vi.fn(),
   deleteCategoryById: vi.fn(),
   moveCategory: vi.fn(),
+}));
+// jsdom cannot decode or encode images: compression is simulated.
+vi.mock("../src/utils/productImage", () => ({
+  compressProductImage: vi.fn(),
 }));
 vi.mock("../src/services/product.service", () => ({
   countProductsByCategoryId: vi.fn(),
@@ -128,6 +133,9 @@ const installFakeServices = () => {
   deleteProductById.mockImplementation(async (id) => {
     products = products.filter((product) => product.id !== id);
   });
+  compressProductImage.mockImplementation(
+    async () => new Blob(["small"], { type: "image/webp" }),
+  );
   uploadProductImage.mockResolvedValue("https://storage.test/pizza.jpg");
   deleteProductImage.mockResolvedValue();
 };
@@ -338,7 +346,7 @@ describe("Menu management through the UI", () => {
     expect(uploadProductImage).toHaveBeenCalledWith(
       store.id,
       products[0].id,
-      expect.any(File),
+      expect.objectContaining({ type: "image/webp" }),
     );
 
     await userEvent.click(

@@ -20,6 +20,8 @@ service firebase.storage {
 
     // Product images live under products/{storeId}/. Any user of the store
     // can read them; only the store's admin can create, update or delete.
+    // Uploads are small WebP/JPEG files compressed in the browser
+    // (src/utils/productImage.js): under 150 KB, no other content type.
     match /products/{storeId}/{allPaths=**} {
       allow read: if request.auth != null
         && userStoreId() == storeId;
@@ -31,8 +33,8 @@ service firebase.storage {
       allow create, update: if request.auth != null
         && isAdmin()
         && userStoreId() == storeId
-        && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.size < 150 * 1024
+        && request.resource.contentType in ['image/webp', 'image/jpeg'];
     }
   }
 }

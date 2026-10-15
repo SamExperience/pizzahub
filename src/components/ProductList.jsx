@@ -20,6 +20,7 @@ import {
   uploadProductImage,
 } from "../services/product.service";
 import { formatPrice } from "../utils/format";
+import { compressProductImage } from "../utils/productImage";
 import {
   alert,
   button,
@@ -423,16 +424,18 @@ export default function ProductList({
   };
 
   // The new product goes last: position is unique within the category.
-  // The image is uploaded once the product exists, as its path uses the id.
+  // The image is uploaded once the product exists, as its path uses the id;
+  // it is compressed first, so an unusable file never leaves a product behind.
   const handleCreate = async ({ imageFile, removeImage: _remove, ...data }) => {
     const saved = await runAction(async () => {
+      const image = imageFile ? await compressProductImage(imageFile) : null;
       const created = await createProduct(categoryId, {
         ...data,
         position: products.length + 1,
       });
 
-      if (imageFile) {
-        const imageUrl = await uploadProductImage(storeId, created.id, imageFile);
+      if (image) {
+        const imageUrl = await uploadProductImage(storeId, created.id, image);
         await updateProductById(created.id, { imageUrl });
       }
     });
@@ -450,7 +453,7 @@ export default function ProductList({
         updates.imageUrl = await uploadProductImage(
           storeId,
           editingId,
-          imageFile,
+          await compressProductImage(imageFile),
         );
       else if (removeImage) updates.imageUrl = null;
 

@@ -36,7 +36,7 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - Products: create, edit, delete and reorder within a Category.
 - Product fields: name (unique within its Category), description, single price or prices per size, ingredients, cooking levels, availability and position.
 - Compact product rows that expand in place: the collapsed row shows an ingredient preview, a price summary and an availability switch; the expanded row shows the price per size, the cooking levels and the edit and delete actions.
-- Product image upload, replacement and deletion.
+- Product image upload, replacement and deletion. Images are resized in the browser before upload (longest side at most 800 px) and compressed to WebP, or JPEG when the browser cannot encode WebP, under 150 KB; browsers cache them for one day.
 - Menu readiness guard: until the Menu has at least one Category containing at least one valid Product, only `/menu` is reachable, including via direct URL.
 
 ### Tableau (real-time orders)
@@ -101,7 +101,7 @@ PizzaHub is a web application for pizzeria staff. It lets a team register, set u
 - Products have either a single price or prices per size, never both.
 - Users can read, create and update the Orders of their Store. An Order has 1 to 50 items. An update is either a status change (with the matching completion time) or a content edit (customer, order type, scheduled time, items, total); cancelled Orders cannot be updated and Orders can never be deleted.
 - Users can read, create and update the Customers of their Company. A Delivery Order requires a Customer with a non-blank phone, street, street number, postal code and city.
-- Product images must be images smaller than 5 MB.
+- Product images must be WebP or JPEG files smaller than 150 KB.
 - `subscriptions/{companyId}` can be read only by the Users of that Company and can never be written by clients: only the Cloud Functions (Admin SDK) write it.
 
 ### Data validation
