@@ -13,6 +13,7 @@ export default function TableauColumn({
   onChangeStatus,
   onEdit,
   onCancel,
+  onPrint,
 }) {
   const styles = statusStyles[title];
 
@@ -53,6 +54,7 @@ export default function TableauColumn({
                 onChangeStatus={onChangeStatus}
                 onEdit={onEdit}
                 onCancel={onCancel}
+                onPrint={onPrint}
               />
             </li>
           ))}

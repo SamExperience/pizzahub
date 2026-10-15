@@ -171,4 +171,33 @@ describe("Tableau page wiring", () => {
     expect(unsubscribes[0]).toHaveBeenCalledOnce();
     expect(mocks.subscribe).toHaveBeenCalledTimes(2);
   });
+
+  it("opens the print preview of a ticket with the Store name and closes it", async () => {
+    mocks.store.selectedStore = { id: "store-1", name: "Pizzeria Bella" };
+    render(<Tableau />);
+    act(() =>
+      mocks.subscribe.mock.calls[0][1]([
+        {
+          id: "a",
+          status: "Pending",
+          orderType: "takeaway",
+          scheduledTime: new Date(2026, 9, 15, 19, 30),
+          total: 4,
+          items: [{ productName: "Water", quantity: 2, subtotal: 4, customizations: [] }],
+        },
+      ]),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Print ticket" }));
+
+    const receipt = screen.getByTestId("receipt").textContent;
+
+    expect(screen.getByRole("dialog", { name: "Print preview" })).toBeTruthy();
+    expect(receipt).toContain("Pizzeria Bella");
+    expect(receipt).toContain("2 x Water");
+
+    await userEvent.click(screen.getByRole("button", { name: "Print" }));
+
+    expect(screen.queryByRole("dialog", { name: "Print preview" })).toBeNull();
+  });
 });

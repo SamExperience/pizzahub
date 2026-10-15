@@ -27,6 +27,7 @@ export default function TableauBoard({
   onChangeStatus,
   onEdit,
   onCancel,
+  onPrint,
 }) {
   const [activeStatus, setActiveStatus] = useState(ORDER_STATUSES[0]);
 
@@ -115,6 +116,7 @@ export default function TableauBoard({
                 onChangeStatus={onChangeStatus}
                 onEdit={onEdit}
                 onCancel={onCancel}
+                onPrint={onPrint}
               />
             ))}
           </div>

@@ -12,6 +12,7 @@ import { getItemProduct, ITEM_PRODUCT_STATUS } from "../services/product.service
 import { customerToForm, EMPTY_CUSTOMER_FORM } from "../utils/customerForm";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { formatPrice } from "../utils/format";
+import { readPrintOnSave, writePrintOnSave } from "../utils/printPreference";
 import {
   alert,
   button,
@@ -45,8 +46,16 @@ const sectionHeading =
 const CUSTOMER_FIELDS = ["firstName", "phone", "street", "streetNumber", "postalCode", "city"];
 
 // Right sidebar for ticket creation: order type, customer and scheduled time.
-// With an order it edits that Order instead, prefilled from it.
-export default function TicketSidebar({ companyId, storeId, order = null, onClose }) {
+// With an order it edits that Order instead, prefilled from it. When "Print
+// on save" is on, onSaved receives the new ticket ({ order, customer }) for
+// the print preview; edits never print automatically.
+export default function TicketSidebar({
+  companyId,
+  storeId,
+  order = null,
+  onClose,
+  onSaved,
+}) {
   const isEdit = Boolean(order);
   const originalTime = isEdit ? dateToTime(order.scheduledTime) : null;
   const [orderType, setOrderType] = useState(order?.orderType ?? ORDER_TYPE.TAKEAWAY);
@@ -175,6 +184,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [printOnSave, setPrintOnSave] = useState(readPrintOnSave);
   const found = validateTicketForm({
     orderType,
     form: customerForm,
@@ -214,11 +224,24 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           scheduledTime: timeToDate(scheduledTime, day),
         });
       } else {
+        const newScheduledTime = timeToDate(scheduledTime);
+
         await createOrder({
           ...data,
           storeId,
-          scheduledTime: timeToDate(scheduledTime),
+          scheduledTime: newScheduledTime,
         });
+        if (printOnSave) {
+          onSaved?.({
+            order: {
+              orderType,
+              scheduledTime: newScheduledTime,
+              items,
+              total: calculateOrderTotal(items),
+            },
+            customer: customerForm,
+          });
+        }
       }
       onClose();
     } catch (err) {
@@ -501,7 +524,35 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
               {formatPrice(calculateOrderTotal(items))}
             </strong>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            {!isEdit && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={printOnSave}
+                title="Print on save"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-1 text-sm text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                onClick={() => {
+                  writePrintOnSave(!printOnSave);
+                  setPrintOnSave(!printOnSave);
+                }}
+              >
+                <span
+                  className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+                    printOnSave ? "bg-brand-600" : "bg-neutral-300"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform ${
+                      printOnSave ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </span>
+                {/* Visible label from sm; the switch keeps its name below. */}
+                <span className="max-sm:sr-only">Print on save</span>
+              </button>
+            )}
             <button
               type="button"
               className={`${button} min-h-11 px-4`}

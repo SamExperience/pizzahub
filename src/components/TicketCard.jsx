@@ -8,6 +8,7 @@ import {
   MapPin,
   Pencil,
   Phone,
+  Printer,
   ShoppingBag,
 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
@@ -180,8 +181,9 @@ function ActionsMenu({ disabled, onEdit, onCancel }) {
 // One ticket of the Tableau. Collapsed: time, customer, order type, item
 // count, total and actions; expanded (card click or the details toggle):
 // customer contacts and items. The status moves go one status back or
-// forward; edit and cancel sit in the "More actions" menu.
-export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) {
+// forward; edit and cancel sit in the "More actions" menu; the printer
+// button opens the print preview with the Customer loaded here.
+export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, onPrint }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -318,6 +320,17 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
           </button>
         )}
         <span className="ml-auto" />
+        {onPrint && (
+          <button
+            type="button"
+            className={`${button} size-11 min-h-11 shrink-0 px-0`}
+            aria-label="Print ticket"
+            title="Print ticket"
+            onClick={() => onPrint(order, customer)}
+          >
+            <Printer className="size-4" aria-hidden="true" />
+          </button>
+        )}
         {(onEdit || onCancel) && (
           <ActionsMenu
             disabled={saving}

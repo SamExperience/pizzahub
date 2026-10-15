@@ -732,6 +732,20 @@ describe("TicketSidebar edit mode", () => {
     expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("has no switch and never prints when editing", async () => {
+    const onSaved = vi.fn();
+    updateOrder.mockResolvedValue();
+    renderEdit({ onSaved });
+
+    expect(screen.queryByRole("switch", { name: "Print on save" })).toBeNull();
+    await screen.findByText("Mario Rossi");
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(updateOrder).toHaveBeenCalledTimes(1);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
 });
 
 describe("TicketSidebar line limit", () => {
@@ -807,5 +821,86 @@ describe("TicketSidebar line limit", () => {
 
     expect(screen.getByRole("button", { name: "Add product" }).disabled).toBe(false);
     expect(screen.queryByText(/Maximum .* products per ticket/)).toBeNull();
+  });
+});
+
+describe("TicketSidebar print on save", () => {
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  const saveTicket = async (props = {}) => {
+    createOrder.mockResolvedValue("order-1");
+    const onSaved = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <TicketSidebar
+        companyId="co1"
+        storeId="store-1"
+        onClose={onClose}
+        onSaved={onSaved}
+        {...props}
+      />,
+    );
+
+    return { onSaved, onClose };
+  };
+
+  it("is on by default and passes the new ticket to onSaved", async () => {
+    const { onSaved, onClose } = await saveTicket();
+
+    expect(screen.getByRole("switch", { name: "Print on save" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(onSaved).toHaveBeenCalledTimes(1);
+
+    const { order, customer } = onSaved.mock.calls[0][0];
+
+    expect(order).toMatchObject({ orderType: "takeaway", total: 2 });
+    expect(order.items).toHaveLength(1);
+    expect(order.scheduledTime).toEqual(createOrder.mock.calls[0][0].scheduledTime);
+    expect(customer.firstName).toBe("Anna");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not print when switched off and remembers the choice", async () => {
+    const { onSaved, onClose } = await saveTicket();
+
+    await userEvent.click(screen.getByRole("switch", { name: "Print on save" }));
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    expect(screen.getByRole("switch", { name: "Print on save" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
+  });
+
+  it("does not print when saving fails", async () => {
+    const { onSaved } = await saveTicket();
+    createOrder.mockRejectedValueOnce(new Error("boom"));
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });

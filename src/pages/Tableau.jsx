@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import ReceiptPreview from "../components/ReceiptPreview";
 import TableauBoard from "../components/TableauBoard";
 import TicketSidebar from "../components/TicketSidebar";
 import { useStore } from "../contexts/StoreContext";
@@ -9,6 +10,7 @@ import {
   updateOrderStatus,
 } from "../services/order.service";
 import { logError } from "../utils/logger";
+import { formatReceipt } from "../utils/receipt";
 
 const changeTicketStatus = (order, status) => updateOrderStatus(order.id, status);
 const cancelTicket = (order) => cancelOrder(order.id);
@@ -34,6 +36,13 @@ export default function Tableau() {
     setEditingOrder(order);
     setTicketOpen(true);
   }, []);
+  // Print preview: { order, customer } from a ticket card or a new ticket
+  // just saved; null when closed.
+  const [printing, setPrinting] = useState(null);
+  const printTicket = useCallback(
+    (order, customer) => setPrinting({ order, customer }),
+    [],
+  );
 
   useEffect(() => {
     if (!storeId) return;
@@ -78,6 +87,7 @@ export default function Tableau() {
         onChangeStatus={changeTicketStatus}
         onEdit={editTicket}
         onCancel={cancelTicket}
+        onPrint={printTicket}
       />
       {ticketOpen && (
         <TicketSidebar
@@ -85,6 +95,18 @@ export default function Tableau() {
           storeId={storeId}
           order={editingOrder}
           onClose={closeTicket}
+          onSaved={setPrinting}
+        />
+      )}
+      {printing && (
+        <ReceiptPreview
+          receipt={formatReceipt({
+            storeName: selectedStore?.name,
+            order: printing.order,
+            customer: printing.customer,
+            printedAt: new Date(),
+          })}
+          onClose={() => setPrinting(null)}
         />
       )}
     </>

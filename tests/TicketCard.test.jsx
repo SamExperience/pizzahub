@@ -358,4 +358,20 @@ describe("TicketCard status arrows", () => {
     );
     expect(screen.getByRole("button", { name: "Start" }).disabled).toBe(false);
   });
+
+  it("opens the print preview with the order and its loaded customer", async () => {
+    const onPrint = vi.fn();
+    render(<TicketCard order={baseOrder} onPrint={onPrint} />);
+    await screen.findByText("Mario Rossi");
+
+    fireEvent.click(screen.getByRole("button", { name: "Print ticket" }));
+
+    expect(onPrint).toHaveBeenCalledWith(baseOrder, customer);
+  });
+
+  it("has no print button without onPrint", () => {
+    render(<TicketCard order={baseOrder} />);
+
+    expect(screen.queryByRole("button", { name: "Print ticket" })).toBeNull();
+  });
 });
