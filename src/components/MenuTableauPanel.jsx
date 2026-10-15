@@ -6,6 +6,7 @@ import { getProductsByCategoryId } from "../services/product.service";
 import { formatPrice } from "../utils/format";
 import { alert, button, emptyBox, iconButton, sectionTitle } from "../utils/styles";
 import LoadingState from "./LoadingState";
+import { logError } from "../utils/logger";
 
 // Single price, or "From <lowest size price>" when the product has sizes.
 const formatCardPrice = ({ price, sizes }) =>
@@ -85,7 +86,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         if (!cancelled) setCategories(list);
       })
       .catch((err) => {
-        console.log("Error loading categories -> ", err);
+        logError("Error loading categories -> ", err);
         if (!cancelled) setCategoriesError(err);
       })
       .finally(() => {
@@ -111,7 +112,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         if (!cancelled) setProducts(list);
       })
       .catch((err) => {
-        console.log("Error loading products -> ", err);
+        logError("Error loading products -> ", err);
         if (!cancelled) setProductsError(err);
       })
       .finally(() => {

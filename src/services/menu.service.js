@@ -21,15 +21,8 @@ export const getMenuByStoreId = async (storeId) => {
   const menusSnap = await getDocs(q);
 
   if (!menusSnap.empty) {
-    console.log(
-      ">>> Menu exists! Here is the first result:",
-      menusSnap.docs[0].data(),
-    );
-
     return { id: menusSnap.docs[0].id, ...menusSnap.docs[0].data() };
   } else {
-    console.log(">>> Menu does not exist.");
-
     return null;
   }
 };
@@ -47,7 +40,6 @@ export const createMenu = async (storeId, nameMenu) => {
     updatedAt: serverTimestamp(),
   };
   const menuSnap = await addDoc(menuRef, data);
-  console.log(">>>Menu created");
 
   return {
     id: menuSnap.id,

@@ -13,6 +13,7 @@ import {
   pageTitle,
   primaryButton,
 } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
@@ -30,14 +31,12 @@ export default function Login() {
 
     try {
       if (isSignup) {
-        const user = await register(email, password);
-        console.log("register ok, user>>>", user);
+        await register(email, password);
       } else {
-        const userlog = await login(email, password);
-        console.log("login ok, user>>>", userlog);
+        await login(email, password);
       }
     } catch (error) {
-      console.log("Catch Error:", error.message);
+      logError("Login error -> ", error);
       setError(getAuthErrorMessage(error));
     }
   }
@@ -46,10 +45,9 @@ export default function Login() {
     setError(null);
 
     try {
-      const user = await loginWithGoogle();
-      console.log("login with google ok>>> ", user);
+      await loginWithGoogle();
     } catch (error) {
-      console.log("Catch Error:", error.message);
+      logError("Google login error -> ", error);
       setError(getAuthErrorMessage(error));
     }
   }

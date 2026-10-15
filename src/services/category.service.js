@@ -109,7 +109,6 @@ export const createCategory = async (menuId, nameCategory, position) => {
   };
 
   const categorySnap = await addDoc(categoryRef, data);
-  console.log(`Category ${normalizedName} created`);
 
   return {
     id: categorySnap.id,

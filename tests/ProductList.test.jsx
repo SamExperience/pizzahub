@@ -41,7 +41,7 @@ const expandRow = (name) =>
 describe("ProductList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {

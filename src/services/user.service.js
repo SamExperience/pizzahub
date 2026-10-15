@@ -8,9 +8,6 @@ export const getUserDB = async (uid) => {
   const snap = await getDoc(ref);
 
   if (snap.exists()) {
-    console.log("User Exist!!!", snap.data());
     return snap.data();
-  } else {
-    console.log("Service: User NOT  Exist!!!");
   }
 };

@@ -85,7 +85,7 @@ describe("Dashboard page", () => {
     mocks.getOrders.mockResolvedValue(orders);
     mocks.getCustomers.mockReset();
     mocks.getCustomers.mockResolvedValue(customers);
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -220,7 +220,7 @@ describe("Dashboard page", () => {
     mocks.getCustomers.mockRejectedValue(new Error("boom"));
     await renderDashboard();
 
-    expect(console.log).toHaveBeenCalledWith(
+    expect(console.error).toHaveBeenCalledWith(
       "Error loading customers -> ",
       expect.any(Error),
     );

@@ -468,7 +468,7 @@ describe("TicketSidebar item reconfiguration", () => {
   });
 
   it("shows a load error when the product cannot be read", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     getItemProduct.mockRejectedValue(new Error("offline"));
     await renderWithWater();
 
@@ -617,7 +617,7 @@ describe("TicketSidebar edit mode", () => {
   });
 
   it("blocks saving until the Customer loads and retries after an error", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     getCustomer.mockRejectedValueOnce(new Error("boom"));
     renderEdit();
 
@@ -634,7 +634,7 @@ describe("TicketSidebar edit mode", () => {
   });
 
   it("keeps the sidebar open and shows an error when the update fails", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const onClose = vi.fn();
     updateOrder.mockRejectedValue(new Error("denied"));
     renderEdit({ onClose });

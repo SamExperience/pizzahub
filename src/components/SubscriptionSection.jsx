@@ -7,6 +7,7 @@ import { isSubscriptionActive, startCheckout } from "../services/billing.service
 import { formatDate } from "../utils/format";
 import useSubscription from "../utils/useSubscription";
 import { alert, badge, card, muted, primaryButton, sectionTitle } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 // Labels of the Stripe statuses (spec/01-data-model.md); unknown ones are shown as received.
 const STATUS_LABELS = {
@@ -48,7 +49,7 @@ export default function SubscriptionSection() {
       // On success the browser leaves the page, so redirecting stays true.
       await startCheckout();
     } catch (err) {
-      console.log("Error starting the checkout -> ", err);
+      logError("Error starting the checkout -> ", err);
       setCheckoutError(err);
       setRedirecting(false);
     }

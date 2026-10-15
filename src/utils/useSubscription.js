@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { subscribeToSubscription } from "../services/billing.service";
+import { logError } from "./logger";
 
 // Real-time subscription of a Company: subscription is null when the Company
 // never subscribed; loading stays true until the first snapshot or error.
@@ -17,7 +18,7 @@ export default function useSubscription(companyId) {
       companyId,
       (subscription) => setState({ companyId, subscription, error: null }),
       (error) => {
-        console.log("Error loading the subscription -> ", error);
+        logError("Error loading the subscription -> ", error);
         setState({ companyId, subscription: null, error });
       },
     );

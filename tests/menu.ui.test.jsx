@@ -156,7 +156,7 @@ const clickDialog = (name) =>
 describe("Menu management through the UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     useStore.mockReturnValue({ selectedStore: store, refreshMenuReady });
     installFakeServices();
   });

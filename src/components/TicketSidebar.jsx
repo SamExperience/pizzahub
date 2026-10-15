@@ -29,6 +29,7 @@ import ItemConfigModal from "./ItemConfigModal";
 import MenuTableauPanel from "./MenuTableauPanel";
 import TicketCustomerSection from "./TicketCustomerSection";
 import TicketSummary from "./TicketSummary";
+import { logError } from "../utils/logger";
 
 const ORDER_TYPE_OPTIONS = [
   { value: ORDER_TYPE.TAKEAWAY, label: "Takeaway", Icon: ShoppingBag },
@@ -129,7 +130,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
           maxQuantity: savedQuantities[index] ?? item.quantity,
         });
       } catch (err) {
-        console.log("Error loading product -> ", err);
+        logError("Error loading product -> ", err);
         setItemMessage({ index, text: "Could not load the product. Try again." });
       }
     },
@@ -201,7 +202,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
       }
       onClose();
     } catch (err) {
-      console.log("Error saving ticket -> ", err);
+      logError("Error saving ticket -> ", err);
       setSaveError(err);
       setSaving(false);
     }
@@ -233,7 +234,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
         if (!cancelled) setCustomers(list);
       })
       .catch((err) => {
-        console.log("Error loading customers -> ", err);
+        logError("Error loading customers -> ", err);
         if (!cancelled) setCustomersError(err);
       })
       .finally(() => {
@@ -264,7 +265,7 @@ export default function TicketSidebar({ companyId, storeId, order = null, onClos
         setOrderCustomerState("ready");
       })
       .catch((err) => {
-        console.log("Error loading the ticket customer -> ", err);
+        logError("Error loading the ticket customer -> ", err);
         if (!cancelled) setOrderCustomerState("error");
       });
 

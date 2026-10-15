@@ -47,7 +47,7 @@ const clickDialog = (name) =>
 describe("Menu page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     useStore.mockReturnValue({ selectedStore: store, refreshMenuReady });
     getProductsByCategoryId.mockResolvedValue([]);
   });

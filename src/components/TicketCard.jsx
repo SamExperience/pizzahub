@@ -33,6 +33,7 @@ import {
   primaryButton,
   statusStyles,
 } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 // Visible labels of the status moves, keyed by target status; moves without
 // a label are icon-only ("Move to <status>").
@@ -60,7 +61,7 @@ function useCustomer(customerId) {
       customerId,
       (customer) => setResult({ id: customerId, customer }),
       (error) => {
-        console.log("Error loading customer -> ", error);
+        logError("Error loading customer -> ", error);
         setResult({ id: customerId, customer: null });
       },
     );
@@ -193,7 +194,7 @@ export default function TicketCard({ order, onChangeStatus, onEdit, onCancel }) 
     try {
       await action();
     } catch (err) {
-      console.log("Error updating ticket -> ", err);
+      logError("Error updating ticket -> ", err);
       setError(err);
     } finally {
       setSaving(false);

@@ -8,6 +8,7 @@ import {
   subscribeToTodayOrders,
   updateOrderStatus,
 } from "../services/order.service";
+import { logError } from "../utils/logger";
 
 const changeTicketStatus = (order, status) => updateOrderStatus(order.id, status);
 const cancelTicket = (order) => cancelOrder(order.id);
@@ -48,7 +49,7 @@ export default function Tableau() {
         setLoading(false);
       },
       (err) => {
-        console.log("Error loading orders -> ", err);
+        logError("Error loading orders -> ", err);
         setError(err);
         setLoading(false);
       },

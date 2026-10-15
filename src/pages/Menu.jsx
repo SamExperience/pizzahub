@@ -13,6 +13,7 @@ import {
 import { createMenu, getMenuByStoreId } from "../services/menu.service";
 import LoadingState from "../components/LoadingState";
 import { alert, button, emptyBox, muted, pageTitle } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 // Loads the Store's Menu (creating it on first access) and its categories.
 const loadMenu = async (store) => {
@@ -53,7 +54,7 @@ export default function Menu() {
       })
       .catch((err) => {
         if (cancelled) return;
-        console.log("Error loading menu -> ", err);
+        logError("Error loading menu -> ", err);
         setError(err);
         setLoading(false);
       });
@@ -78,7 +79,7 @@ export default function Menu() {
       refreshMenuReady();
       return true;
     } catch (err) {
-      console.log("Error updating categories -> ", err);
+      logError("Error updating categories -> ", err);
       setActionError(err);
       return false;
     }

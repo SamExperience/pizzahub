@@ -13,6 +13,7 @@ import {
   primaryButton,
   sectionTitle,
 } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 const initialFormData = {
   companyName: "",
@@ -53,21 +54,15 @@ export default function Onboarding() {
     setError(null);
 
     try {
-      const { userId, companyId, storeId } = await createOnboardingWorkspace({
+      await createOnboardingWorkspace({
         uid: authUser.uid,
         userName: authUser.displayName,
         ...formData,
       });
-
-      console.log("Onboarding success:", {
-        userId,
-        companyId,
-        storeId,
-      });
       await refreshProfile();
     } catch (err) {
       setError(err);
-      console.error("Onboarding error:", err);
+      logError("Onboarding error -> ", err);
     } finally {
       setIsSubmitting(false);
     }

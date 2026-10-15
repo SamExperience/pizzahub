@@ -30,6 +30,7 @@ import {
 import ConfirmDialog from "./ConfirmDialog";
 import LoadingState from "./LoadingState";
 import ProductForm from "./ProductForm";
+import { logError } from "../utils/logger";
 
 // Chevron button used to move a row up/down: 40px wide, 32px tall.
 const moveButton =
@@ -355,7 +356,7 @@ export default function ProductList({
       })
       .catch((err) => {
         if (cancelled) return;
-        console.log("Error loading products -> ", err);
+        logError("Error loading products -> ", err);
         setError(err);
         setLoading(false);
       });
@@ -381,14 +382,14 @@ export default function ProductList({
       await action();
       succeeded = true;
     } catch (err) {
-      console.log("Error updating products -> ", err);
+      logError("Error updating products -> ", err);
       setActionError(err);
     }
 
     try {
       setProducts(await getProductsByCategoryId(categoryId));
     } catch (err) {
-      console.log("Error reloading products -> ", err);
+      logError("Error reloading products -> ", err);
       if (succeeded) {
         setActionError(err);
         succeeded = false;

@@ -159,7 +159,7 @@ describe("TicketCard", () => {
   });
 
   it("shows a fallback when the customer cannot be loaded", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     listenWith(null, new Error("boom"));
     render(<TicketCard order={baseOrder} />);
 
@@ -275,7 +275,7 @@ describe("TicketCard status arrows", () => {
   });
 
   it("disables the actions menu while saving and shows an error when it fails", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     let reject;
     const onCancel = vi.fn(() => new Promise((_, r) => (reject = r)));
     render(<TicketCard order={baseOrder} onCancel={onCancel} />);
@@ -347,7 +347,7 @@ describe("TicketCard status arrows", () => {
   });
 
   it("shows an error and re-enables the arrows when the update fails", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     renderCard("Pending", vi.fn().mockRejectedValue(new Error("denied")));
 
     fireEvent.click(screen.getByRole("button", { name: "Start" }));

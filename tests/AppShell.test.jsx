@@ -182,7 +182,7 @@ describe("App shell", () => {
     });
 
     it("is hidden when the subscription cannot be read", () => {
-      vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
       billing.subscribe.mockImplementation((companyId, onChange, onError) => {
         onError(new Error("denied"));
         return () => {};

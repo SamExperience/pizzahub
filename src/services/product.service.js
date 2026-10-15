@@ -21,6 +21,7 @@ import {
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { assertMaxItems, assertMaxLength } from "../utils/textValidation";
 import { db, storage } from "./firebase";
+import { logError } from "../utils/logger";
 
 const isValidPrice = (value) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -237,7 +238,6 @@ export const createProduct = async (categoryId, data) => {
   };
 
   const productSnap = await addDoc(collection(db, "products"), productData);
-  console.log(`Product ${productData.name} created`);
 
   return {
     id: productSnap.id,
@@ -447,7 +447,7 @@ export const deleteProductImage = async (imageUrl) => {
   try {
     await deleteObject(ref(storage, imageUrl));
   } catch (error) {
-    console.warn(`Product image not deleted: ${error.message}`);
+    logError("Product image not deleted -> ", error);
   }
 };
 

@@ -12,6 +12,7 @@ import {
   label,
   sectionTitle,
 } from "../utils/styles";
+import { logError } from "../utils/logger";
 
 const pad = (value) => String(value).padStart(2, "0");
 
@@ -80,7 +81,7 @@ export default function OrderHistory() {
       })
       .catch((err) => {
         if (ignore) return;
-        console.log("Error loading orders -> ", err);
+        logError("Error loading orders -> ", err);
         setError(err);
         setLoading(false);
       });
@@ -103,7 +104,7 @@ export default function OrderHistory() {
         if (!ignore) setCustomers(new Map(list.map((c) => [c.id, c])));
       })
       .catch((err) => {
-        console.log("Error loading customers -> ", err);
+        logError("Error loading customers -> ", err);
         if (!ignore) setCustomers(new Map());
       });
 

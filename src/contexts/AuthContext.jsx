@@ -7,11 +7,16 @@ import {
 } from "../services/auth.service";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebase";
+import { logError } from "../utils/logger";
 
 //db
 import { getUserDB } from "../services/user.service";
 
 const AuthContext = createContext();
+
+// A profile request is stale when another account signed in (or out) while it
+// was running: its result must not overwrite the current user's state.
+const isCurrentUser = (uid) => auth.currentUser?.uid === uid;
 
 export function AuthProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
@@ -20,33 +25,38 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await signout();
-    console.log("Logout successfull >>>>>>>>>>>>>>");
   };
+
   async function refreshProfile() {
-    const userDB = await getUserDB(authUser.uid);
-    setUserProfile(userDB);
+    const uid = authUser.uid;
+    const userDB = await getUserDB(uid);
+    if (isCurrentUser(uid)) setUserProfile(userDB);
   }
 
   useEffect(() => {
     const authSubscription = onAuthStateChanged(auth, async (authUser) => {
       setAuthUser(authUser);
+
       if (!authUser) {
         setUserProfile(null);
-      } else {
-        const dataUser = await getUserDB(authUser.uid);
-
-        if (!dataUser) {
-          console.log(
-            ">>>User Auth OK but NOT found on DB, go to onboarding page",
-          );
-          setUserProfile(null);
-        } else {
-          console.log(">>>User auth OK and OK IN DB, go to stores page");
-          setUserProfile(dataUser);
-        }
+        setloadingLogin(false);
+        return;
       }
 
-      console.log("USER ON CHANGE>>> ", authUser);
+      // Keep the app in its loading state until the profile is known, so
+      // routes never redirect to /onboarding for an existing user.
+      setloadingLogin(true);
+
+      let dataUser = null;
+      try {
+        dataUser = await getUserDB(authUser.uid);
+      } catch (error) {
+        logError("Error loading the user profile -> ", error);
+      }
+
+      if (!isCurrentUser(authUser.uid)) return;
+
+      setUserProfile(dataUser ?? null);
       setloadingLogin(false);
     });
 
