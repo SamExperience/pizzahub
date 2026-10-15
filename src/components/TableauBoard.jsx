@@ -12,12 +12,28 @@ import {
   statusStyles,
 } from "../utils/styles";
 
-// Presentational Tableau: three status columns (each in its display order,
-// see sortColumnOrders) plus loading and error states. Below md the columns
-// are shown one at a time through tabs and "Create Ticket" is a floating
-// button; from md they sit side by side, and from lg the board fills the
-// viewport (below the header and its 1px border) with each column scrolling
-// on its own.
+/**
+ * Presentational Tableau: three status columns (each in its display order,
+ * see sortColumnOrders) plus loading and error states. Below md the columns
+ * are shown one at a time through tabs and "Create Ticket" is a floating
+ * button; from md they sit side by side, and from lg the board fills the
+ * viewport (below the header and its 1px border) with each column scrolling
+ * on its own.
+ * @param {object} props
+ * @param {object[]} [props.orders]
+ * @param {boolean} [props.loading]
+ * @param {?Error} [props.error]
+ * @param {function(): void} [props.onRetry]
+ * @param {function(): void} props.onCreateTicket
+ * @param {function(object, string): Promise<void>} props.onChangeStatus
+ * @param {function(object): void} props.onEdit
+ * @param {function(object): Promise<void>} props.onCancel
+ * @param {function(object, ?object): void} props.onPrint - (order, customer).
+ * @returns {JSX.Element}
+ * @example
+ * <TableauBoard orders={orders} onCreateTicket={open} onChangeStatus={move}
+ *   onEdit={edit} onCancel={cancel} onPrint={print} />
+ */
 export default function TableauBoard({
   orders = [],
   loading = false,
@@ -27,6 +43,7 @@ export default function TableauBoard({
   onChangeStatus,
   onEdit,
   onCancel,
+  onPrint,
 }) {
   const [activeStatus, setActiveStatus] = useState(ORDER_STATUSES[0]);
 
@@ -49,7 +66,7 @@ export default function TableauBoard({
         </div>
         <button
           type="button"
-          className={`${primaryButton} min-h-10 max-md:fixed max-md:right-4 max-md:bottom-6 max-md:z-20 max-md:size-14 max-md:rounded-full max-md:p-0 max-md:shadow-xl`}
+          className={`${primaryButton} max-md:fixed max-md:right-4 max-md:bottom-6 max-md:z-20 max-md:size-14 max-md:rounded-full max-md:p-0 max-md:shadow-xl`}
           onClick={onCreateTicket}
         >
           <Plus className="size-4 max-md:size-7" aria-hidden="true" />
@@ -115,6 +132,7 @@ export default function TableauBoard({
                 onChangeStatus={onChangeStatus}
                 onEdit={onEdit}
                 onCancel={onCancel}
+                onPrint={onPrint}
               />
             ))}
           </div>

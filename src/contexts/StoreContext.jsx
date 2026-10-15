@@ -3,10 +3,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { isMenuReady } from "../services/menu.service";
 import { getAccessibleStore } from "../services/store.service";
+import { logError } from "../utils/logger";
 import { useAuth } from "./AuthContext";
 
 const StoreContext = createContext();
@@ -32,67 +34,110 @@ const writeSelectedStoreId = (storeId) => {
   }
 };
 
+/**
+ * Provides the Store the user can access, the selected (active) Store and
+ * whether its Menu is ready. Kept apart from AuthProvider because it depends
+ * on the profile; the selection survives reloads (localStorage) and is valid
+ * only while it is the accessible Store, and responses that arrive after an
+ * account switch are discarded.
+ * @param {object} props
+ * @param {ReactNode} props.children
+ * @returns {JSX.Element}
+ * @example
+ * <AuthProvider><StoreProvider><App /></StoreProvider></AuthProvider>
+ */
 export function StoreProvider({ children }) {
   const [accessibleStore, setAccessibleStore] = useState(null);
-  const [selectedStore, setSelectedStoreState] = useState(null);
+  const [selectedStoreState, setSelectedStoreState] = useState(null);
   const [loadingStore, setLoadingStore] = useState(true);
   const [errorStore, setErrorStore] = useState(null);
   // null until the selected Store's readiness is known.
   const [menuReady, setMenuReady] = useState(null);
+  // Set when the readiness check fails, so routes can show an error instead
+  // of treating the Menu as not ready.
+  const [menuReadyError, setMenuReadyError] = useState(null);
   const { authUser, loadingLogin, userProfile } = useAuth();
+  // Each Store request gets an id: a response is applied only if no newer
+  // request (or logout) happened meanwhile, e.g. after an account switch.
+  const storeRequestRef = useRef(0);
+  const selectedStoreIdRef = useRef(null);
 
-  const setselectedStore = useCallback((store) => {
-    writeSelectedStoreId(store?.id ?? null);
-    setSelectedStoreState(store);
-  }, []);
+  // The selection is valid only while it is the accessible Store.
+  const selectedStore =
+    selectedStoreState &&
+    accessibleStore &&
+    selectedStoreState.id === accessibleStore.id
+      ? selectedStoreState
+      : null;
+
+  const setselectedStore = useCallback(
+    (store) => {
+      if (store && store.id !== accessibleStore?.id) return;
+      writeSelectedStoreId(store?.id ?? null);
+      setSelectedStoreState(store ? accessibleStore : null);
+    },
+    [accessibleStore],
+  );
 
   const fetchAccesibleStore = useCallback(async () => {
+    const requestId = ++storeRequestRef.current;
     setErrorStore(null);
     setLoadingStore(true);
 
     try {
       const store = await getAccessibleStore(authUser.uid);
-      setLoadingStore(false);
+      if (requestId !== storeRequestRef.current) return;
+
+      // Restore the Store chosen before a reload, if it is still accessible;
+      // any other selection belongs to a Store the user cannot access.
+      const savedStoreId = readSelectedStoreId();
+      if (savedStoreId && savedStoreId !== store.id) writeSelectedStoreId(null);
+      setSelectedStoreState((current) =>
+        current?.id === store.id || savedStoreId === store.id ? store : null,
+      );
       setAccessibleStore(store);
-      // Restore the Store chosen before a reload, if it is still accessible.
-      if (readSelectedStoreId() === store.id) setSelectedStoreState(store);
-      console.log(">>>Store: ", store);
+      setLoadingStore(false);
     } catch (error) {
-      console.log("Error fetch store-> ", error);
+      if (requestId !== storeRequestRef.current) return;
+
+      logError("Error fetch store-> ", error);
       setAccessibleStore(null);
       setErrorStore(error);
       setLoadingStore(false);
     }
   }, [authUser]);
 
-  // On failure the Menu counts as not ready, which keeps the user on /menu.
+  // On failure menuReady stays null (unknown) and menuReadyError is set.
   const refreshMenuReady = useCallback(async () => {
     if (!selectedStore) return;
+    const storeId = selectedStore.id;
+    setMenuReadyError(null);
 
     try {
-      setMenuReady(await isMenuReady(selectedStore.id));
+      const ready = await isMenuReady(storeId);
+      if (selectedStoreIdRef.current === storeId) setMenuReady(ready);
     } catch (error) {
-      console.log("Error checking menu readiness -> ", error);
-      setMenuReady(false);
+      logError("Error checking menu readiness -> ", error);
+      if (selectedStoreIdRef.current === storeId) setMenuReadyError(error);
     }
   }, [selectedStore]);
 
   useEffect(() => {
-    if (!selectedStore) {
-      setMenuReady(null);
-      return;
-    }
-
+    selectedStoreIdRef.current = selectedStore?.id ?? null;
     setMenuReady(null);
-    refreshMenuReady();
+    setMenuReadyError(null);
+    if (selectedStore) refreshMenuReady();
   }, [selectedStore, refreshMenuReady]);
 
   useEffect(() => {
     if (loadingLogin === true) return;
 
     if (!authUser) {
+      // Invalidate any Store request still running for the previous user.
+      storeRequestRef.current += 1;
+      writeSelectedStoreId(null);
       setAccessibleStore(null);
-      setselectedStore(null);
+      setSelectedStoreState(null);
       setErrorStore(null);
       setLoadingStore(true);
       return;
@@ -101,13 +146,7 @@ export function StoreProvider({ children }) {
     if (!userProfile) return;
 
     fetchAccesibleStore();
-  }, [
-    authUser,
-    loadingLogin,
-    userProfile,
-    fetchAccesibleStore,
-    setselectedStore,
-  ]);
+  }, [authUser, loadingLogin, userProfile, fetchAccesibleStore]);
 
   return (
     <StoreContext.Provider
@@ -119,6 +158,7 @@ export function StoreProvider({ children }) {
         selectedStore,
         setselectedStore,
         menuReady,
+        menuReadyError,
         refreshMenuReady,
       }}
     >
@@ -127,6 +167,14 @@ export function StoreProvider({ children }) {
   );
 }
 
+/**
+ * Reads the Store state (accessibleStore, selectedStore, loadingStore,
+ * errorStore, menuReady, menuReadyError) and actions (setselectedStore,
+ * fetchAccesibleStore, refreshMenuReady). Must be used inside StoreProvider.
+ * @returns {object}
+ * @example
+ * const { selectedStore, menuReady } = useStore();
+ */
 export function useStore() {
   return useContext(StoreContext);
 }

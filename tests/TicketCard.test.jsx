@@ -158,12 +158,13 @@ describe("TicketCard", () => {
     expect(await screen.findByText("Customer unavailable")).toBeTruthy();
   });
 
-  it("shows a fallback when the customer cannot be loaded", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+  it("shows a load error, not a missing customer, when the listener fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     listenWith(null, new Error("boom"));
     render(<TicketCard order={baseOrder} />);
 
-    expect(await screen.findByText("Customer unavailable")).toBeTruthy();
+    expect(await screen.findByText("Could not load customer")).toBeTruthy();
+    expect(screen.queryByText("Customer unavailable")).toBeNull();
   });
 });
 
@@ -188,15 +189,15 @@ describe("TicketCard status arrows", () => {
     renderCard("Pending");
 
     expect(screen.getByRole("button", { name: "Start" }).title).toBe("Move to In progress");
-    expect(screen.queryByRole("button", { name: /Move to Pending/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Back|Move to Pending/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Reopen" })).toBeNull();
     await screen.findByText("Mario Rossi");
   });
 
-  it("shows the back arrow and Complete for In progress", async () => {
+  it("shows Back and Complete for In progress", async () => {
     renderCard("In progress");
 
-    expect(screen.getByRole("button", { name: "Move to Pending" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back" }).title).toBe("Move to Pending");
     expect(screen.getByRole("button", { name: "Complete" }).title).toBe("Move to Completed");
     await screen.findByText("Mario Rossi");
   });
@@ -232,14 +233,14 @@ describe("TicketCard status arrows", () => {
     let resolve;
     renderCard("In progress", vi.fn(() => new Promise((r) => (resolve = r))));
 
-    fireEvent.click(screen.getByRole("button", { name: "Move to Pending" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(screen.getByRole("button", { name: "Move to Pending" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Complete" }).disabled).toBe(true);
 
     resolve();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Move to Pending" }).disabled).toBe(false),
+      expect(screen.getByRole("button", { name: "Back" }).disabled).toBe(false),
     );
   });
 
@@ -275,7 +276,7 @@ describe("TicketCard status arrows", () => {
   });
 
   it("disables the actions menu while saving and shows an error when it fails", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     let reject;
     const onCancel = vi.fn(() => new Promise((_, r) => (reject = r)));
     render(<TicketCard order={baseOrder} onCancel={onCancel} />);
@@ -347,7 +348,7 @@ describe("TicketCard status arrows", () => {
   });
 
   it("shows an error and re-enables the arrows when the update fails", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     renderCard("Pending", vi.fn().mockRejectedValue(new Error("denied")));
 
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
@@ -356,5 +357,21 @@ describe("TicketCard status arrows", () => {
       "Could not update the ticket",
     );
     expect(screen.getByRole("button", { name: "Start" }).disabled).toBe(false);
+  });
+
+  it("opens the print preview with the order and its loaded customer", async () => {
+    const onPrint = vi.fn();
+    render(<TicketCard order={baseOrder} onPrint={onPrint} />);
+    await screen.findByText("Mario Rossi");
+
+    fireEvent.click(screen.getByRole("button", { name: "Print ticket" }));
+
+    expect(onPrint).toHaveBeenCalledWith(baseOrder, customer);
+  });
+
+  it("has no print button without onPrint", () => {
+    render(<TicketCard order={baseOrder} />);
+
+    expect(screen.queryByRole("button", { name: "Print ticket" })).toBeNull();
   });
 });

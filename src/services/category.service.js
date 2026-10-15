@@ -44,8 +44,19 @@ const validateCategoryPosition = async (menuId, position) => {
   return result.empty;
 };
 
-// Assigns sequential positions (1, 2, 3...) keeping the current order.
-// If a batch is passed, updates are added to it and the caller commits.
+/**
+ * Assigns sequential positions (1, 2, 3...) keeping the current order, so
+ * deleting a Category never leaves gaps that would break move up/down. If a
+ * batch is passed, updates are added to it and the caller commits (used by
+ * deleteCategoryById to stay atomic).
+ * @param {string} menuId
+ * @param {object} [options]
+ * @param {WriteBatch} [options.batch]
+ * @param {string} [options.excludeCategoryId] - Category being deleted.
+ * @returns {Promise<void>}
+ * @example
+ * await reorderCategories("menu1");
+ */
 export const reorderCategories = async (
   menuId,
   { batch, excludeCategoryId } = {},
@@ -76,6 +87,16 @@ export const reorderCategories = async (
   }
 };
 
+/**
+ * Creates a Category in the Menu. Names and positions must be unique in the
+ * Menu: the rules cannot check uniqueness, so it is checked here first.
+ * @param {string} menuId
+ * @param {string} nameCategory
+ * @param {number} position - Positive integer, not already in use.
+ * @returns {Promise<object>} The created Category with its id.
+ * @example
+ * await createCategory("menu1", "Pizzas", 1);
+ */
 export const createCategory = async (menuId, nameCategory, position) => {
   //check parameter
   if (!menuId) throw new Error("Menu ID is required");
@@ -109,7 +130,6 @@ export const createCategory = async (menuId, nameCategory, position) => {
   };
 
   const categorySnap = await addDoc(categoryRef, data);
-  console.log(`Category ${normalizedName} created`);
 
   return {
     id: categorySnap.id,
@@ -117,6 +137,14 @@ export const createCategory = async (menuId, nameCategory, position) => {
   };
 };
 
+/**
+ * Reads the Menu's Categories in display order (position ascending; needs
+ * the categories(menuId, position) composite index in production).
+ * @param {string} menuId
+ * @returns {Promise<object[]>}
+ * @example
+ * const categories = await getCategoriesByMenuId("menu1");
+ */
 export const getCategoriesByMenuId = async (menuId) => {
   const categoryRef = collection(db, "categories");
   const q = query(
@@ -133,6 +161,15 @@ export const getCategoriesByMenuId = async (menuId) => {
   }));
 };
 
+/**
+ * Deletes a Category together with all its Products and renumbers the
+ * remaining Categories in one batch, so no orphan Product is left. Product
+ * images are removed afterwards; past Orders keep their Item snapshots.
+ * @param {string} categoryId
+ * @returns {Promise<void>}
+ * @example
+ * await deleteCategoryById("category1");
+ */
 export const deleteCategoryById = async (categoryId) => {
   if (!categoryId) {
     throw new Error("Category ID is required");
@@ -163,8 +200,16 @@ export const deleteCategoryById = async (categoryId) => {
   );
 };
 
-// Swaps the position of a category with its previous ("up") or next ("down")
-// neighbour in a single batch. Does nothing at the first/last position.
+/**
+ * Swaps the position of a Category with its previous ("up") or next ("down")
+ * neighbour in a single batch, so positions stay unique even if one write
+ * fails. Does nothing at the first/last position.
+ * @param {string} categoryId
+ * @param {"up"|"down"} direction
+ * @returns {Promise<void>}
+ * @example
+ * await moveCategory("category2", "up");
+ */
 export const moveCategory = async (categoryId, direction) => {
   if (!categoryId) {
     throw new Error("Category ID is required");
@@ -199,6 +244,18 @@ export const moveCategory = async (categoryId, direction) => {
   await batch.commit();
 };
 
+/**
+ * Updates a Category's name and/or position. Only the provided fields are
+ * validated and written; uniqueness is checked only when the value changes,
+ * so saving an unchanged name does not fail against itself.
+ * @param {string} categoryId
+ * @param {object} data
+ * @param {string} [data.name]
+ * @param {number} [data.position]
+ * @returns {Promise<void>}
+ * @example
+ * await updateCategoryById("category1", { name: "Red pizzas" });
+ */
 export const updateCategoryById = async (categoryId, data) => {
   // Check parameters
   if (!categoryId) {

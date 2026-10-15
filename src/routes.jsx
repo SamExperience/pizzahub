@@ -7,6 +7,14 @@ import Dashboard from "./pages/Dashboard";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+/**
+ * Route table. "/" is the public login page; every other page sits behind
+ * ProtectedRoute (auth, onboarding and menu guards) and shares AppLayout, so
+ * guards and the app shell are written once.
+ * @type {RouteObject[]}
+ * @example
+ * const router = createBrowserRouter(routes);
+ */
 export const routes = [
   {
     path: "/",

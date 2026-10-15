@@ -2,6 +2,16 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { getUserDB } from "./user.service";
 
+/**
+ * Reads the one Store the User can access. V1 has one admin User and one
+ * Store per Company, so the Store comes from the profile's storeId rather
+ * than from a query over all Stores.
+ * @param {string} uid - Firebase Auth uid.
+ * @returns {Promise<object>} The Store with its id.
+ * @throws {Error} When the profile or the Store is missing.
+ * @example
+ * const store = await getAccessibleStore(user.uid);
+ */
 export const getAccessibleStore = async (uid) => {
   if (!uid) {
     throw new Error("User ID is required");

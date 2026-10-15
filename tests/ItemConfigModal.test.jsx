@@ -99,6 +99,42 @@ describe("ItemConfigModal", () => {
     expect(onAdd.mock.calls[0][0].customizations).toEqual(["no ice"]);
   });
 
+  it("adds a typed customization when the field loses focus", async () => {
+    renderModal(WATER);
+
+    await userEvent.type(screen.getByLabelText("Customizations"), "no ice");
+    await userEvent.click(screen.getByText("Quantity"));
+
+    expect(screen.getByRole("button", { name: "Remove no ice" })).toBeTruthy();
+    expect(screen.getByLabelText("Customizations").value).toBe("");
+  });
+
+  it("keeps a typed customization that was not added when adding to the ticket", async () => {
+    const { onAdd } = renderModal(WATER);
+
+    await userEvent.type(screen.getByLabelText("Customizations"), "lemon{Enter}");
+    await userEvent.type(screen.getByLabelText("Customizations"), " no ice ");
+    await userEvent.click(screen.getByRole("button", { name: /Add to ticket/ }));
+
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd.mock.calls[0][0].customizations).toEqual(["lemon", "no ice"]);
+  });
+
+  it("keeps the focus in the customization field when a button is pressed", async () => {
+    const { onAdd } = renderModal(WATER);
+    const field = screen.getByLabelText("Customizations");
+
+    await userEvent.type(field, "no ice");
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity" }));
+
+    expect(document.activeElement).toBe(field);
+    expect(screen.queryByRole("button", { name: "Remove no ice" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /Add to ticket/ }));
+
+    expect(onAdd.mock.calls[0][0]).toMatchObject({ quantity: 2, customizations: ["no ice"] });
+  });
+
   it("changes the quantity (minimum 1) and updates the line total", async () => {
     const { onAdd } = renderModal(WATER);
 
@@ -238,6 +274,26 @@ describe("ItemConfigModal reconfiguration", () => {
       quantity: 2,
       subtotal: 10,
     });
+  });
+
+  it("keeps the cooking level editable for an unavailable product", async () => {
+    const { onAdd } = renderModal(
+      { ...PIZZA, isAvailable: false },
+      { initialItem: ITEM, restricted: true, maxQuantity: 2 },
+    );
+
+    expect(screen.getByText(/size and price are locked/)).toBeTruthy();
+    expect(screen.getByText("Small").parentElement.textContent).toContain("(locked)");
+    expect(screen.queryByRole("button", { name: "Large" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Rare" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Increase quantity" }).disabled).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Well done" }));
+    await userEvent.click(screen.getByRole("button", { name: "Update item" }));
+
+    expect(onAdd).toHaveBeenCalledWith({ ...ITEM, cookingLevel: "Well done" });
   });
 
   it("closes from Cancel without updating the Item", async () => {

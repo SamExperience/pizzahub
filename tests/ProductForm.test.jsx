@@ -208,6 +208,16 @@ describe("ProductForm", () => {
     );
   });
 
+  it("shows Saving and disables Save and Cancel while busy", async () => {
+    render(<ProductForm onSubmit={onSubmit} onCancel={onCancel} busy />);
+    await fillBasics();
+
+    const save = screen.getByRole("button", { name: "Saving ..." });
+    expect(save.disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Cancel" }).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Save product" })).toBeNull();
+  });
+
   it("calls onCancel", async () => {
     renderForm();
 

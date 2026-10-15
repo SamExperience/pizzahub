@@ -1,14 +1,16 @@
 import { useId, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Info } from "lucide-react";
+import ErrorState from "./ErrorState";
 import LoadingState from "./LoadingState";
 import { useAuth } from "../contexts/AuthContext";
 import { isSubscriptionActive, startCheckout } from "../services/billing.service";
 import { formatDate } from "../utils/format";
 import useSubscription from "../utils/useSubscription";
 import { alert, badge, card, muted, primaryButton, sectionTitle } from "../utils/styles";
+import { logError } from "../utils/logger";
 
-// Labels of the Stripe statuses (docs/01-data-model.md); unknown ones are shown as received.
+// Labels of the Stripe statuses (spec/01-data-model.md); unknown ones are shown as received.
 const STATUS_LABELS = {
   active: "Active",
   past_due: "Past due",
@@ -22,10 +24,19 @@ const STATUS_LABELS = {
 const info =
   "flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800";
 
-// Subscription status of the Company and the Stripe Checkout entry point (test mode).
+/**
+ * Dashboard section with the Company's subscription status and the Stripe
+ * Checkout entry point (test mode). After the return from Checkout it shows
+ * "payment processing" until the webhook writes the active status.
+ * @returns {JSX.Element}
+ * @example
+ * <SubscriptionSection />
+ */
 export default function SubscriptionSection() {
   const { userProfile } = useAuth();
-  const { subscription, loading, error } = useSubscription(userProfile?.companyId);
+  const { subscription, loading, error, retry } = useSubscription(
+    userProfile?.companyId,
+  );
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
@@ -34,9 +45,10 @@ export default function SubscriptionSection() {
   const active = isSubscriptionActive(subscription);
   const checkout = searchParams.get("checkout");
   // The ?checkout=success URL stays after the return from Checkout: the message
-  // is shown only while the webhook has not written a final status yet.
-  const processing =
-    checkout === "success" && (!subscription || subscription.status === "incomplete");
+  // is shown only while the webhook has not written a final status yet. A document
+  // without status holds only the Stripe Customer created on the first Subscribe.
+  const status = subscription?.status;
+  const processing = checkout === "success" && (!status || status === "incomplete");
   // The period date is meaningful only for an active subscription.
   const endDate = active ? formatDate(subscription.currentPeriodEnd) : null;
 
@@ -48,7 +60,7 @@ export default function SubscriptionSection() {
       // On success the browser leaves the page, so redirecting stays true.
       await startCheckout();
     } catch (err) {
-      console.log("Error starting the checkout -> ", err);
+      logError("Error starting the checkout -> ", err);
       setCheckoutError(err);
       setRedirecting(false);
     }
@@ -62,9 +74,7 @@ export default function SubscriptionSection() {
       {loading ? (
         <LoadingState />
       ) : error ? (
-        <p role="alert" className={`${alert} m-0`}>
-          Unable to load the subscription.
-        </p>
+        <ErrorState message="Unable to load the subscription." onRetry={retry} />
       ) : (
         <div className={`${card} flex flex-col gap-4`}>
           {processing && (
@@ -87,9 +97,7 @@ export default function SubscriptionSection() {
                 active ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
               }`}
             >
-              {subscription
-                ? (STATUS_LABELS[subscription.status] ?? subscription.status)
-                : "No subscription"}
+              {status ? (STATUS_LABELS[status] ?? status) : "No subscription"}
             </span>
           </div>
 

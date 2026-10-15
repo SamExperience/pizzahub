@@ -10,8 +10,15 @@
     "preview": "vite preview",
     "test": "vitest --no-file-parallelism",
     "test:functions": "npm --prefix functions test -- --run",
-    "emulator": "firebase emulators:start --import=./emulator-data",
-    "emulator:export": "firebase emulators:export ./emulator-data"
+    "emulator": "concurrently --names firebase,stripe --prefix-colors yellow,magenta \"npm:emulator:firebase\" \"npm:stripe:listen\"",
+    "emulator:firebase": "firebase emulators:start --import=./emulator-data",
+    "emulator:export": "firebase emulators:export ./emulator-data",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:backend": "firebase deploy --only firestore:rules,firestore:indexes,storage,functions",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "stripe:listen": "stripe listen --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted --forward-to http://127.0.0.1:5001/pizzahub-11284/europe-west6/stripeWebhook",
+    "docs": "jsdoc -c jsdoc.json"
   },
   "dependencies": {
     "firebase": "12.19.0",
@@ -28,7 +35,9 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
+    "concurrently": "10.0.5",
     "firebase-tools": "15.31.0",
+    "jsdoc": "4.0.5",
     "jsdom": "30.1.1",
     "oxlint": "1.81.0",
     "tailwindcss": "4.3.3",

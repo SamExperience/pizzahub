@@ -1,4 +1,4 @@
-import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { ITEM_PRODUCT_STATUS } from "../services/product.service";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { formatPrice } from "../utils/format";
@@ -10,19 +10,38 @@ const STATUS_LABEL = {
   [ITEM_PRODUCT_STATUS.DELETED]: "No longer on the menu",
 };
 
-// Stepper button inside the quantity pill: 40px touch target, smaller in
-// wide containers.
+// Stepper button inside the quantity pill: 44px touch target at every width
+// (wide containers are tablets too).
 const stepButton =
-  "inline-flex size-10 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-30 @sm:size-8";
+  "inline-flex size-11 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-30";
 
-const rowIconButton = `${iconButton} size-10 @sm:size-9`;
+const rowIconButton = `${iconButton} size-11`;
 
 // Ticket summary: header with the item count and "Add product", then one
 // compact row per Item with quantity controls, reconfiguration and removal.
 // Rows sit on one line in wide containers and on two lines otherwise. Per
-// Item index: maxQuantities caps the quantity (null = no limit), itemStatuses
-// labels Products no longer sellable and itemMessages shows a message under
-// the Item.
+/**
+ * Ticket summary: item rows with quantity +/-, remove and edit, plus the
+ * "Add product" entry point. Per-item props are indexed by Item index:
+ * maxQuantities caps the quantity (null = no limit), itemStatuses labels
+ * Products no longer sellable and itemMessages shows a message under the
+ * Item. editingIndex is the Item whose Product is loading for an edit:
+ * every Edit button waits for it.
+ * @param {object} props
+ * @param {object[]} props.items
+ * @param {function(): void} props.onAddProduct
+ * @param {function(number, number): void} props.onChangeQuantity - (index, quantity).
+ * @param {function(number): void} props.onRemove
+ * @param {function(number): void} props.onEdit
+ * @param {Array<?number>} [props.maxQuantities]
+ * @param {Array<?string>} [props.itemStatuses]
+ * @param {Object<number, string>} [props.itemMessages]
+ * @param {?number} [props.editingIndex]
+ * @returns {JSX.Element}
+ * @example
+ * <TicketSummary items={items} onAddProduct={openMenu} onChangeQuantity={setQty}
+ *   onRemove={remove} onEdit={edit} />
+ */
 export default function TicketSummary({
   items,
   onAddProduct,
@@ -32,6 +51,7 @@ export default function TicketSummary({
   maxQuantities = [],
   itemStatuses = [],
   itemMessages = {},
+  editingIndex = null,
 }) {
   const count = items.reduce((total, item) => total + (item.quantity ?? 0), 0);
   // A new line is refused at the limit; quantity changes are not new lines.
@@ -46,7 +66,7 @@ export default function TicketSummary({
         {onAddProduct && (
           <button
             type="button"
-            className={`${primaryButton} min-h-10 px-3`}
+            className={`${primaryButton} px-3`}
             disabled={linesFull}
             onClick={onAddProduct}
           >
@@ -129,9 +149,15 @@ export default function TicketSummary({
                       className={rowIconButton}
                       aria-label={`Edit ${item.productName}`}
                       title="Edit"
+                      disabled={editingIndex !== null}
+                      aria-busy={editingIndex === index}
                       onClick={() => onEdit(index)}
                     >
-                      <Pencil className="size-4" aria-hidden="true" />
+                      {editingIndex === index ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Pencil className="size-4" aria-hidden="true" />
+                      )}
                     </button>
                   )}
                   <button

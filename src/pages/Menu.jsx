@@ -11,24 +11,53 @@ import {
   updateCategoryById,
 } from "../services/category.service";
 import { createMenu, getMenuByStoreId } from "../services/menu.service";
+import { countProductsByCategoryId } from "../services/product.service";
 import LoadingState from "../components/LoadingState";
 import { alert, button, emptyBox, muted, pageTitle } from "../utils/styles";
+import { getErrorMessage } from "../utils/errorMessage";
+import { logError } from "../utils/logger";
 
-// Loads the Store's Menu (creating it on first access) and its categories.
+// Loads the Store's Menu (creating it on first access), its categories and
+// the product count of each category for the sidebar badges.
 const loadMenu = async (store) => {
   const menu =
     (await getMenuByStoreId(store.id)) ??
     (await createMenu(store.id, store.name));
+  const categories = await getCategoriesByMenuId(menu.id);
+  const counts = await Promise.all(
+    categories.map((category) => countProductsByCategoryId(category.id)),
+  );
 
-  return { menuId: menu.id, categories: await getCategoriesByMenuId(menu.id) };
+  return {
+    menuId: menu.id,
+    categories,
+    productCounts: Object.fromEntries(
+      categories.map((category, index) => [category.id, counts[index]]),
+    ),
+  };
 };
 
+/**
+ * Menu management page of the active Store: category sidebar and the
+ * products of the selected category. It is the only page reachable until
+ * the Menu is ready, so it refreshes the readiness after product changes;
+ * category changes run one at a time.
+ * @returns {JSX.Element}
+ * @example
+ * { path: "/menu", element: <Menu /> }
+ */
 export default function Menu() {
   const { selectedStore, refreshMenuReady } = useStore();
   const [menuId, setMenuId] = useState(null);
   const [categories, setCategories] = useState([]);
+  // Product count per category id; a category missing here is new, so empty.
+  const [productCounts, setProductCounts] = useState({});
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [actionError, setActionError] = useState(null);
+  // One category change at a time: controls are disabled while it runs and
+  // the ref drops clicks that arrive before the next render.
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -49,11 +78,12 @@ export default function Menu() {
         if (cancelled) return;
         setMenuId(result.menuId);
         setCategories(result.categories);
+        setProductCounts(result.productCounts);
         setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
-        console.log("Error loading menu -> ", err);
+        logError("Error loading menu -> ", err);
         setError(err);
         setLoading(false);
       });
@@ -71,6 +101,9 @@ export default function Menu() {
 
   // Runs a category change, then reloads the list. Resolves to true on success.
   const runAction = async (action) => {
+    if (pendingRef.current) return false;
+    pendingRef.current = true;
+    setPending(true);
     setActionError(null);
     try {
       await action();
@@ -78,9 +111,12 @@ export default function Menu() {
       refreshMenuReady();
       return true;
     } catch (err) {
-      console.log("Error updating categories -> ", err);
+      logError("Error updating categories -> ", err);
       setActionError(err);
       return false;
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   };
 
@@ -92,6 +128,14 @@ export default function Menu() {
     runAction(() => deleteCategoryById(categoryId));
   const handleMove = (categoryId, direction) =>
     runAction(() => moveCategory(categoryId, direction));
+
+  // ProductList reports the new count after each product change.
+  const handleProductsChange = (categoryId, count) => {
+    refreshMenuReady();
+    if (count !== undefined) {
+      setProductCounts((current) => ({ ...current, [categoryId]: count }));
+    }
+  };
 
   // The first category is selected until the user picks another one, or when
   // the picked one no longer exists (e.g. it was deleted).
@@ -123,14 +167,17 @@ export default function Menu() {
             <h2 className="m-0 text-sm font-semibold uppercase tracking-wide text-neutral-500">
               Categories
             </h2>
-            <CategoryForm onSubmit={handleCreate} />
+            <CategoryForm onSubmit={handleCreate} busy={pending} />
+            {pending && <LoadingState text="Saving ..." />}
             {actionError && (
               <p role="alert" className={alert}>
-                {actionError.message}
+                {getErrorMessage(actionError)}
               </p>
             )}
             <CategoryList
+              busy={pending}
               categories={categories}
+              productCounts={productCounts}
               selectedId={selectedCategory?.id}
               onSelect={setSelectedCategoryId}
               onRename={handleRename}
@@ -145,7 +192,9 @@ export default function Menu() {
                 storeId={selectedStore.id}
                 categoryId={selectedCategory.id}
                 categoryName={selectedCategory.name}
-                onChange={refreshMenuReady}
+                onChange={(count) =>
+                  handleProductsChange(selectedCategory.id, count)
+                }
               />
             ) : (
               <p className={emptyBox}>Create a category to start adding products.</p>

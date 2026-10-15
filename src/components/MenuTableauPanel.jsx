@@ -4,8 +4,16 @@ import { getCategoriesByMenuId } from "../services/category.service";
 import { getMenuByStoreId } from "../services/menu.service";
 import { getProductsByCategoryId } from "../services/product.service";
 import { formatPrice } from "../utils/format";
-import { alert, button, emptyBox, iconButton, sectionTitle } from "../utils/styles";
+import {
+  alert,
+  button,
+  emptyBox,
+  iconButton,
+  primaryButton,
+  sectionTitle,
+} from "../utils/styles";
 import LoadingState from "./LoadingState";
+import { logError } from "../utils/logger";
 
 // Single price, or "From <lowest size price>" when the product has sizes.
 const formatCardPrice = ({ price, sizes }) =>
@@ -53,9 +61,28 @@ function ProductCard({ product, onSelect }) {
   );
 }
 
-// Left overlay of the ticket creation: quick Menu browsing for the cashier.
-// Unavailable products are shown but cannot be selected.
-export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) {
+/**
+ * Left overlay of the ticket creation: quick Menu browsing for the cashier.
+ * Unavailable products are shown but cannot be selected. Below md the panel
+ * covers the ticket, so a "Done" footer recalls itemCount and total (the
+ * ticket's current content) and closes the panel.
+ * @param {object} props
+ * @param {string} props.storeId
+ * @param {function(object): void} props.onSelectProduct
+ * @param {function(): void} props.onClose
+ * @param {number} [props.itemCount]
+ * @param {number} [props.total]
+ * @returns {JSX.Element}
+ * @example
+ * <MenuTableauPanel storeId={storeId} onSelectProduct={configure} onClose={close} />
+ */
+export default function MenuTableauPanel({
+  storeId,
+  onSelectProduct,
+  onClose,
+  itemCount = 0,
+  total = 0,
+}) {
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -85,7 +112,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         if (!cancelled) setCategories(list);
       })
       .catch((err) => {
-        console.log("Error loading categories -> ", err);
+        logError("Error loading categories -> ", err);
         if (!cancelled) setCategoriesError(err);
       })
       .finally(() => {
@@ -111,7 +138,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         if (!cancelled) setProducts(list);
       })
       .catch((err) => {
-        console.log("Error loading products -> ", err);
+        logError("Error loading products -> ", err);
         if (!cancelled) setProductsError(err);
       })
       .finally(() => {
@@ -143,7 +170,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
         <h2 className={`${sectionTitle} m-0`}>Add product</h2>
         <button
           type="button"
-          className={iconButton}
+          className={`${iconButton} size-11`}
           aria-label="Close menu"
           title="Close menu"
           onClick={onClose}
@@ -183,7 +210,7 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
                     aria-current={
                       category.id === categoryId ? "true" : undefined
                     }
-                    className="min-h-10 w-full rounded-full border border-neutral-300 px-4 py-2 text-left text-sm font-medium whitespace-nowrap text-neutral-800 hover:bg-neutral-50 focus:outline-none md:min-h-11 md:rounded-lg md:border-transparent md:whitespace-normal focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:border-brand-600 aria-[current=true]:bg-brand-600 aria-[current=true]:text-white"
+                    className="min-h-11 w-full rounded-full border border-neutral-300 px-4 py-2 text-left text-sm font-medium whitespace-nowrap text-neutral-800 hover:bg-neutral-50 focus:outline-none md:rounded-lg md:border-transparent md:whitespace-normal focus-visible:ring-2 focus-visible:ring-brand-400 aria-[current=true]:border-brand-600 aria-[current=true]:bg-brand-600 aria-[current=true]:text-white"
                     onClick={() => setSelectedCategoryId(category.id)}
                   >
                     {category.name}
@@ -214,7 +241,9 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
               <p className={emptyBox}>No products in this category yet.</p>
             )}
             {!productsLoading && !productsError && products.length > 0 && (
-              <ul className="m-0 grid list-none grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 p-0">
+              // Columns follow the space left by the ticket sidebar, so cards
+              // never get too narrow to read or tap.
+              <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 p-0">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -227,6 +256,16 @@ export default function MenuTableauPanel({ storeId, onSelectProduct, onClose }) 
           </div>
         </div>
       )}
+
+      <footer className="border-t border-neutral-200 bg-white px-4 py-3 md:hidden">
+        <button
+          type="button"
+          className={`${primaryButton} min-h-12 w-full text-base`}
+          onClick={onClose}
+        >
+          Done · {itemCount} {itemCount === 1 ? "item" : "items"} · {formatPrice(total)}
+        </button>
+      </footer>
     </section>
   );
 }

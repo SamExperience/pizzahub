@@ -17,7 +17,7 @@ const ADDRESS_INPUTS = [
   { field: "country", label: "Country", required: false, span: "col-span-6 sm:col-span-2", max: FIELD_LIMITS.ADDRESS_LINE },
 ];
 
-const fieldInput = `${input} min-h-11 sm:min-h-10`;
+const fieldInput = input;
 const fieldLabel = `${label} mb-1 block`;
 
 const describeCustomer = ({ lastName, phone, address }) =>
@@ -64,7 +64,7 @@ function CustomerCard({ form, isDelivery, onEdit }) {
       </div>
       <button
         type="button"
-        className={`${button} min-h-10 shrink-0 px-2.5 text-xs`}
+        className={`${button} shrink-0 px-2.5 text-xs`}
         onClick={onEdit}
       >
         <Pencil className="size-3.5" aria-hidden="true" />
@@ -74,10 +74,30 @@ function CustomerCard({ form, isDelivery, onEdit }) {
   );
 }
 
-// Customer part of the ticket: the first name input also searches the
-// Company's Customers; selecting one fills the form. A selected Customer is
-// shown as a card until "Edit details"; the form opens by itself while a
-// required field is missing (incomplete) and stays open once edited.
+/**
+ * Customer part of the ticket: the first name input also searches the
+ * Company's Customers; selecting one fills the form. A selected Customer is
+ * shown as a card until "Edit details"; the form opens by itself while a
+ * required field is missing (incomplete) and stays open once edited.
+ * Controlled by TicketSidebar, which owns the form state.
+ * @param {object} props
+ * @param {"takeaway"|"delivery"} props.orderType - Delivery shows phone and address.
+ * @param {object[]} props.customers
+ * @param {boolean} props.loading
+ * @param {?Error} props.error
+ * @param {function(): void} props.onRetry
+ * @param {object} props.form
+ * @param {function(object): void} props.onFormChange
+ * @param {?object} props.selectedCustomer
+ * @param {function(object): void} props.onSelect
+ * @param {function(): void} props.onClear
+ * @param {boolean} [props.incomplete]
+ * @param {Object<string, string>} [props.errors]
+ * @returns {JSX.Element}
+ * @example
+ * <TicketCustomerSection orderType="takeaway" customers={customers} form={form}
+ *   onFormChange={setForm} onSelect={select} onClear={clear} ... />
+ */
 export default function TicketCustomerSection({
   orderType,
   customers,
@@ -122,7 +142,7 @@ export default function TicketCustomerSection({
         {selectedCustomer && (
           <button
             type="button"
-            className={`${ghostButton} min-h-10 font-medium tracking-normal text-brand-700 normal-case`}
+            className={`${ghostButton} min-h-11 font-medium tracking-normal text-brand-700 normal-case`}
             onClick={onClear}
           >
             New customer

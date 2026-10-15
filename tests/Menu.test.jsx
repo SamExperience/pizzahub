@@ -12,7 +12,10 @@ import {
   updateCategoryById,
 } from "../src/services/category.service";
 import { createMenu, getMenuByStoreId } from "../src/services/menu.service";
-import { getProductsByCategoryId } from "../src/services/product.service";
+import {
+  countProductsByCategoryId,
+  getProductsByCategoryId,
+} from "../src/services/product.service";
 
 vi.mock("../src/contexts/StoreContext", () => ({
   useStore: vi.fn(),
@@ -32,11 +35,18 @@ vi.mock("../src/services/category.service", () => ({
 }));
 
 vi.mock("../src/services/product.service", () => ({
+  countProductsByCategoryId: vi.fn(),
   getProductsByCategoryId: vi.fn(),
 }));
 
 const store = { id: "store-1", name: "Pizza Roma" };
 const refreshMenuReady = vi.fn();
+
+// Category names shown in the sidebar, top to bottom.
+const categoryNames = () =>
+  screen
+    .getAllByRole("button", { name: /^Select / })
+    .map((button) => button.getAttribute("aria-label").slice(7));
 
 // Clicks a button of the open confirmation dialog.
 const clickDialog = (name) =>
@@ -47,9 +57,10 @@ const clickDialog = (name) =>
 describe("Menu page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     useStore.mockReturnValue({ selectedStore: store, refreshMenuReady });
     getProductsByCategoryId.mockResolvedValue([]);
+    countProductsByCategoryId.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -75,13 +86,43 @@ describe("Menu page", () => {
     render(<Menu />);
 
     await screen.findByLabelText("Select Pizze");
-    const items = screen.getAllByRole("listitem");
-    expect(items.map((item) => item.textContent.split(" ")[0])).toEqual([
-      "Pizze",
-      "Bevande",
-    ]);
+    expect(categoryNames()).toEqual(["Pizze", "Bevande"]);
     expect(createMenu).not.toHaveBeenCalled();
     expect(getCategoriesByMenuId).toHaveBeenCalledWith("menu-1");
+  });
+
+  it("shows the product count of each category, capped at 99+", async () => {
+    getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+    getCategoriesByMenuId.mockResolvedValue([
+      { id: "c1", name: "Pizze", position: 1 },
+      { id: "c2", name: "Bevande", position: 2 },
+    ]);
+    countProductsByCategoryId.mockImplementation(async (categoryId) =>
+      categoryId === "c1" ? 120 : 1,
+    );
+
+    render(<Menu />);
+
+    const pizze = await screen.findByLabelText("Select Pizze");
+    expect(within(pizze).getByText("99+")).toBeTruthy();
+    expect(within(pizze).getByText("120 products")).toBeTruthy();
+    const bevande = screen.getByLabelText("Select Bevande");
+    expect(within(bevande).getByText("1")).toBeTruthy();
+    expect(within(bevande).getByText("1 product")).toBeTruthy();
+    expect(countProductsByCategoryId).toHaveBeenCalledWith("c1");
+    expect(countProductsByCategoryId).toHaveBeenCalledWith("c2");
+  });
+
+  it("shows the load error when a product count fails", async () => {
+    getMenuByStoreId.mockResolvedValue({ id: "menu-1" });
+    getCategoriesByMenuId.mockResolvedValue([
+      { id: "c1", name: "Pizze", position: 1 },
+    ]);
+    countProductsByCategoryId.mockRejectedValue(new Error("boom"));
+
+    render(<Menu />);
+
+    expect(await screen.findByText("Unable to load the menu.")).toBeTruthy();
   });
 
   it("creates the Menu once when the Store has none and shows the empty state", async () => {
@@ -145,6 +186,50 @@ describe("Menu page", () => {
       expect(createCategory).toHaveBeenCalledWith("menu-1", "Dolci", 3);
       expect(refreshMenuReady).toHaveBeenCalled();
       expect(screen.getByLabelText("New category name").value).toBe("");
+    });
+
+    it("runs one category change at a time and disables the controls meanwhile", async () => {
+      await renderMenu();
+      let resolveCreate;
+      createCategory.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCreate = resolve;
+        }),
+      );
+
+      await userEvent.type(screen.getByLabelText("New category name"), "Dolci");
+      await userEvent.click(screen.getByText("Add category"));
+
+      expect(screen.getByRole("button", { name: "Add category" }).disabled).toBe(true);
+      expect(screen.getByLabelText("Delete Pizze").disabled).toBe(true);
+      expect(screen.getByLabelText("Move Pizze down").disabled).toBe(true);
+      expect(screen.getByText("Saving ...")).toBeTruthy();
+
+      await userEvent.click(screen.getByLabelText("Move Pizze down"));
+      expect(moveCategory).not.toHaveBeenCalled();
+
+      resolveCreate({ id: "c3" });
+      await waitFor(() =>
+        expect(screen.getByLabelText("Delete Pizze").disabled).toBe(false),
+      );
+      expect(createCategory).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Saving ...")).toBeNull();
+    });
+
+    it("shows a generic message instead of a raw Firebase error", async () => {
+      await renderMenu();
+      createCategory.mockRejectedValue(
+        Object.assign(new Error("Missing or insufficient permissions."), {
+          code: "permission-denied",
+        }),
+      );
+
+      await userEvent.type(screen.getByLabelText("New category name"), "Dolci");
+      await userEvent.click(screen.getByText("Add category"));
+
+      expect((await screen.findByRole("alert")).textContent).toBe(
+        "Something went wrong. Please try again.",
+      );
     });
 
     it("shows the service error and keeps the typed name", async () => {
@@ -220,11 +305,7 @@ describe("Menu page", () => {
       await userEvent.click(screen.getByLabelText("Move Bevande up"));
 
       await waitFor(() =>
-        expect(
-          screen
-            .getAllByRole("listitem")
-            .map((item) => item.textContent.split(" ")[0]),
-        ).toEqual(["Bevande", "Pizze"]),
+        expect(categoryNames()).toEqual(["Bevande", "Pizze"]),
       );
       expect(moveCategory).toHaveBeenCalledWith("c2", "up");
     });

@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   register,
   login,
@@ -7,51 +13,89 @@ import {
 } from "../services/auth.service";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebase";
+import { logError } from "../utils/logger";
 
 //db
 import { getUserDB } from "../services/user.service";
 
 const AuthContext = createContext();
 
+// A profile request is stale when another account signed in (or out) while it
+// was running: its result must not overwrite the current user's state.
+const isCurrentUser = (uid) => auth.currentUser?.uid === uid;
+
+/**
+ * Provides the signed-in user, their PizzaHub profile and the auth actions.
+ * One place listens to Firebase Auth, so every route sees the same state;
+ * loadingLogin stays true until the profile is known, so an existing user is
+ * never sent to /onboarding, and profileError replaces a wrong redirect with
+ * a retry.
+ * @param {object} props
+ * @param {ReactNode} props.children
+ * @returns {JSX.Element}
+ * @example
+ * <AuthProvider><App /></AuthProvider>
+ */
 export function AuthProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingLogin, setloadingLogin] = useState(true);
+  // Set when the profile of a signed-in user cannot be read: routes show an
+  // error instead of treating the user as new (redirect to /onboarding).
+  const [profileError, setProfileError] = useState(null);
 
   const logout = async () => {
     await signout();
-    console.log("Logout successfull >>>>>>>>>>>>>>");
   };
+
   async function refreshProfile() {
-    const userDB = await getUserDB(authUser.uid);
-    setUserProfile(userDB);
+    const uid = authUser.uid;
+    const userDB = await getUserDB(uid);
+    if (isCurrentUser(uid)) setUserProfile(userDB);
   }
+
+  // Keeps the app in its loading state until the profile is known, so routes
+  // never redirect to /onboarding for an existing user.
+  const loadProfile = useCallback(async (uid) => {
+    setloadingLogin(true);
+    setProfileError(null);
+
+    let dataUser = null;
+    let failure = null;
+    try {
+      dataUser = await getUserDB(uid);
+    } catch (error) {
+      logError("Error loading the user profile -> ", error);
+      failure = error;
+    }
+
+    if (!isCurrentUser(uid)) return;
+
+    setUserProfile(dataUser ?? null);
+    setProfileError(failure);
+    setloadingLogin(false);
+  }, []);
+
+  const retryProfile = useCallback(() => {
+    if (authUser) loadProfile(authUser.uid);
+  }, [authUser, loadProfile]);
 
   useEffect(() => {
     const authSubscription = onAuthStateChanged(auth, async (authUser) => {
       setAuthUser(authUser);
+
       if (!authUser) {
         setUserProfile(null);
-      } else {
-        const dataUser = await getUserDB(authUser.uid);
-
-        if (!dataUser) {
-          console.log(
-            ">>>User Auth OK but NOT found on DB, go to onboarding page",
-          );
-          setUserProfile(null);
-        } else {
-          console.log(">>>User auth OK and OK IN DB, go to stores page");
-          setUserProfile(dataUser);
-        }
+        setProfileError(null);
+        setloadingLogin(false);
+        return;
       }
 
-      console.log("USER ON CHANGE>>> ", authUser);
-      setloadingLogin(false);
+      await loadProfile(authUser.uid);
     });
 
     return authSubscription;
-  }, []);
+  }, [loadProfile]);
 
   return (
     <AuthContext.Provider
@@ -62,6 +106,8 @@ export function AuthProvider({ children }) {
         authUser,
         userProfile,
         loadingLogin,
+        profileError,
+        retryProfile,
         logout,
         refreshProfile,
       }}
@@ -71,6 +117,14 @@ export function AuthProvider({ children }) {
   );
 }
 
+/**
+ * Reads the auth state (authUser, userProfile, loadingLogin, profileError)
+ * and actions (login, register, loginWithGoogle, logout, retryProfile,
+ * refreshProfile). Must be used inside AuthProvider.
+ * @returns {object}
+ * @example
+ * const { authUser, userProfile, logout } = useAuth();
+ */
 export function useAuth() {
   return useContext(AuthContext);
 }

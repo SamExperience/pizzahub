@@ -1,13 +1,7 @@
 import { NavLink } from "react-router";
-import {
-  BookOpen,
-  LayoutDashboard,
-  LayoutGrid,
-  Store,
-} from "lucide-react";
+import { BookOpen, LayoutDashboard, LayoutGrid } from "lucide-react";
 
 const LINKS = [
-  { to: "/stores", label: "Stores", Icon: Store },
   { to: "/tableau", label: "Tableau", Icon: LayoutGrid },
   { to: "/menu", label: "Menu", Icon: BookOpen },
   { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -17,10 +11,21 @@ const linkBase =
   "inline-flex items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
 
 const linkSize = {
-  horizontal: "min-h-9 py-1.5",
+  horizontal: "min-h-11 py-1.5",
   vertical: "min-h-11 py-2.5 text-base",
 };
 
+/**
+ * Main navigation links (Tableau, Menu, Dashboard) with the active state.
+ * The same component serves the desktop bar and the vertical mobile menu,
+ * where onNavigate closes the menu after a click.
+ * @param {object} props
+ * @param {"horizontal"|"vertical"} [props.orientation]
+ * @param {function(): void} [props.onNavigate]
+ * @returns {JSX.Element}
+ * @example
+ * <Navbar orientation="vertical" onNavigate={() => setOpen(false)} />
+ */
 export default function Navbar({ orientation = "horizontal", onNavigate }) {
   const vertical = orientation === "vertical";
 

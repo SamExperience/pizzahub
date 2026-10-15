@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { register, login } from "../src/services/auth.service";
+import {
+  register,
+  login,
+  resetPassword,
+} from "../src/services/auth.service";
 
 describe("register", () => {
   it("registers a new user with valid credentials", async () => {
@@ -70,6 +74,27 @@ describe("login", () => {
 
     await expect(login(email, "WrongPassword123!")).rejects.toMatchObject({
       code: "auth/wrong-password",
+    });
+  });
+});
+
+describe("resetPassword", () => {
+  it("resolves for a registered email", async () => {
+    const email = `reset-${Date.now()}@example.com`;
+    await register(email, "Password123!");
+
+    await expect(resetPassword(email)).resolves.toBeUndefined();
+  });
+
+  it("resolves for an unknown email (no account enumeration)", async () => {
+    const email = `reset-unknown-${Date.now()}@example.com`;
+
+    await expect(resetPassword(email)).resolves.toBeUndefined();
+  });
+
+  it("throws an error when the email is missing", async () => {
+    await expect(resetPassword("")).rejects.toMatchObject({
+      code: "auth/missing-email",
     });
   });
 });

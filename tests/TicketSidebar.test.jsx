@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TicketSidebar from "../src/components/TicketSidebar";
@@ -288,7 +288,7 @@ describe("TicketSidebar", () => {
     expect(screen.getByLabelText("Total").textContent).toBe(formatPrice(4));
   });
 
-  it("closes from the close button, Cancel, Escape and the backdrop", async () => {
+  it("closes at once from the close button, Cancel, Escape and the backdrop when nothing was entered", async () => {
     const onClose = vi.fn();
     render(<TicketSidebar onClose={onClose} />);
 
@@ -298,6 +298,56 @@ describe("TicketSidebar", () => {
     await userEvent.click(screen.getByTestId("ticket-backdrop"));
 
     expect(onClose).toHaveBeenCalledTimes(4);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("asks before discarding entered data from every close action", async () => {
+    const onClose = vi.fn();
+    render(<TicketSidebar companyId="co1" onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Luca");
+
+    for (const close of [
+      () => userEvent.click(screen.getByTestId("ticket-backdrop")),
+      () => userEvent.click(screen.getByRole("button", { name: "Close" })),
+      () => userEvent.click(screen.getByRole("button", { name: "Cancel" })),
+      () => userEvent.keyboard("{Escape}"),
+    ]) {
+      await close();
+      expect(screen.getByRole("alertdialog", { name: "Discard this ticket?" })).toBeTruthy();
+      await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    }
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/First name/).value).toBe("Luca");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before discarding added items", async () => {
+    const onClose = vi.fn();
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={onClose} />);
+
+    await addWater();
+    await userEvent.click(screen.getByTestId("ticket-backdrop"));
+
+    expect(screen.getByRole("alertdialog", { name: "Discard this ticket?" })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows the ticket count and total in the menu panel's Done button", async () => {
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Add product" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: `Done · 1 item · ${formatPrice(2)}` }),
+    );
+
+    expect(screen.queryByRole("dialog", { name: "Add product" })).toBeNull();
   });
 
   it("shows inline errors and does not save an invalid ticket", async () => {
@@ -412,6 +462,28 @@ describe("TicketSidebar item reconfiguration", () => {
     await addWater();
   };
 
+  it("loads the product of an edited item once and disables Edit meanwhile", async () => {
+    let resolveProduct;
+    getItemProduct.mockReturnValue(
+      new Promise((resolve) => {
+        resolveProduct = resolve;
+      }),
+    );
+    await renderWithWater();
+
+    const editButton = screen.getByRole("button", { name: "Edit Water" });
+    fireEvent.click(editButton);
+    fireEvent.click(editButton);
+
+    expect(getItemProduct).toHaveBeenCalledTimes(1);
+    expect(editButton.disabled).toBe(true);
+
+    await act(async () => resolveProduct({ status: "sellable", product: WATER }));
+
+    expect(await screen.findByRole("dialog", { name: "Configure Water" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Water" }).disabled).toBe(false);
+  });
+
   it("reopens the full configuration step for a sellable product, keeping the price", async () => {
     const onClose = vi.fn();
     // The menu price changed from 2 to 2.5 since the Item was added.
@@ -468,7 +540,7 @@ describe("TicketSidebar item reconfiguration", () => {
   });
 
   it("shows a load error when the product cannot be read", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     getItemProduct.mockRejectedValue(new Error("offline"));
     await renderWithWater();
 
@@ -554,6 +626,21 @@ describe("TicketSidebar edit mode", () => {
     vi.clearAllMocks();
   });
 
+  it("closes an untouched edit at once and asks after a change", async () => {
+    const onClose = vi.fn();
+    renderEdit({ onClose });
+
+    await screen.findByText("Mario Rossi");
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Decrease quantity of Water" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.getByRole("alertdialog", { name: "Discard your changes?" })).toBeTruthy();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("prefills the sidebar from the Order and its Customer", async () => {
     renderEdit();
 
@@ -617,7 +704,7 @@ describe("TicketSidebar edit mode", () => {
   });
 
   it("blocks saving until the Customer loads and retries after an error", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     getCustomer.mockRejectedValueOnce(new Error("boom"));
     renderEdit();
 
@@ -634,7 +721,7 @@ describe("TicketSidebar edit mode", () => {
   });
 
   it("keeps the sidebar open and shows an error when the update fails", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const onClose = vi.fn();
     updateOrder.mockRejectedValue(new Error("denied"));
     renderEdit({ onClose });
@@ -644,6 +731,20 @@ describe("TicketSidebar edit mode", () => {
 
     expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("has no switch and never prints when editing", async () => {
+    const onSaved = vi.fn();
+    updateOrder.mockResolvedValue();
+    renderEdit({ onSaved });
+
+    expect(screen.queryByRole("switch", { name: "Print on save" })).toBeNull();
+    await screen.findByText("Mario Rossi");
+    await userEvent.click(screen.getByRole("button", { name: "Increase quantity of Water" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(updateOrder).toHaveBeenCalledTimes(1);
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });
 
@@ -720,5 +821,86 @@ describe("TicketSidebar line limit", () => {
 
     expect(screen.getByRole("button", { name: "Add product" }).disabled).toBe(false);
     expect(screen.queryByText(/Maximum .* products per ticket/)).toBeNull();
+  });
+});
+
+describe("TicketSidebar print on save", () => {
+  beforeEach(() => {
+    getCustomersByCompanyId.mockResolvedValue(CUSTOMERS);
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  const saveTicket = async (props = {}) => {
+    createOrder.mockResolvedValue("order-1");
+    const onSaved = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <TicketSidebar
+        companyId="co1"
+        storeId="store-1"
+        onClose={onClose}
+        onSaved={onSaved}
+        {...props}
+      />,
+    );
+
+    return { onSaved, onClose };
+  };
+
+  it("is on by default and passes the new ticket to onSaved", async () => {
+    const { onSaved, onClose } = await saveTicket();
+
+    expect(screen.getByRole("switch", { name: "Print on save" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(onSaved).toHaveBeenCalledTimes(1);
+
+    const { order, customer } = onSaved.mock.calls[0][0];
+
+    expect(order).toMatchObject({ orderType: "takeaway", total: 2 });
+    expect(order.items).toHaveLength(1);
+    expect(order.scheduledTime).toEqual(createOrder.mock.calls[0][0].scheduledTime);
+    expect(customer.firstName).toBe("Anna");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not print when switched off and remembers the choice", async () => {
+    const { onSaved, onClose } = await saveTicket();
+
+    await userEvent.click(screen.getByRole("switch", { name: "Print on save" }));
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    render(<TicketSidebar companyId="co1" storeId="store-1" onClose={vi.fn()} />);
+
+    expect(screen.getByRole("switch", { name: "Print on save" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
+  });
+
+  it("does not print when saving fails", async () => {
+    const { onSaved } = await saveTicket();
+    createOrder.mockRejectedValueOnce(new Error("boom"));
+
+    await userEvent.type(screen.getByLabelText(/First name/), "Anna");
+    await addWater();
+    await userEvent.click(screen.getByRole("button", { name: "Save ticket" }));
+
+    expect(await screen.findByText("Could not save the ticket. Try again.")).toBeTruthy();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });

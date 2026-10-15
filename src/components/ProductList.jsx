@@ -8,7 +8,7 @@ import {
   Trash2,
   UtensilsCrossed,
 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   createProduct,
   deleteProductById,
@@ -20,6 +20,7 @@ import {
   uploadProductImage,
 } from "../services/product.service";
 import { formatPrice } from "../utils/format";
+import { compressProductImage } from "../utils/productImage";
 import {
   alert,
   button,
@@ -30,13 +31,16 @@ import {
 import ConfirmDialog from "./ConfirmDialog";
 import LoadingState from "./LoadingState";
 import ProductForm from "./ProductForm";
+import { getErrorMessage } from "../utils/errorMessage";
+import { logError } from "../utils/logger";
 
-// Chevron button used to move a row up/down: 40px wide, 32px tall.
+// Chevron button used to move a row up/down: 44px wide, 36px tall, so the
+// two stacked arrows fill the 72px row.
 const moveButton =
-  "inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:text-neutral-300 disabled:hover:bg-transparent";
+  "inline-flex h-9 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:text-neutral-300 disabled:hover:bg-transparent";
 
 const panelButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40";
 
 // Price rows: one per size, or a single "Price" row.
 function getPriceRows(product) {
@@ -115,8 +119,10 @@ function ProductDetails({ product }) {
   );
 }
 
+// busy disables the row actions while a product change runs.
 function ProductRow({
   product,
+  busy,
   isFirst,
   isLast,
   onMove,
@@ -158,7 +164,7 @@ function ProductRow({
             aria-label={`Move ${product.name} up`}
             title={`Move ${product.name} up`}
             className={moveButton}
-            disabled={isFirst}
+            disabled={busy || isFirst}
             onClick={() => onMove(product.id, "up")}
           >
             <ChevronUp className="size-5" aria-hidden="true" />
@@ -168,7 +174,7 @@ function ProductRow({
             aria-label={`Move ${product.name} down`}
             title={`Move ${product.name} down`}
             className={moveButton}
-            disabled={isLast}
+            disabled={busy || isLast}
             onClick={() => onMove(product.id, "down")}
           >
             <ChevronDown className="size-5" aria-hidden="true" />
@@ -192,7 +198,7 @@ function ProductRow({
           type="button"
           aria-expanded={expanded}
           aria-controls={panelId}
-          className={`flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-0.5 rounded-lg px-1 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${dim}`}
+          className={`flex min-h-11 min-w-0 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 rounded-lg px-1 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${dim}`}
           onClick={toggleExpanded}
         >
           <span className="flex max-w-full items-center gap-2">
@@ -247,7 +253,8 @@ function ProductRow({
           aria-checked={available}
           aria-label={toggleLabel}
           title={toggleLabel}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={busy}
           onClick={() => onToggleAvailability(product.id, !available)}
         >
           <span
@@ -267,7 +274,8 @@ function ProductRow({
           type="button"
           aria-label={`Delete ${product.name}`}
           title={`Delete ${product.name}`}
-          className="hidden size-11 shrink-0 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 @xl:inline-flex"
+          className="hidden size-11 shrink-0 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 disabled:cursor-not-allowed disabled:opacity-40 @xl:inline-flex"
+          disabled={busy}
           onClick={() => onRequestDelete(product)}
         >
           <Trash2 className="size-5" aria-hidden="true" />
@@ -307,6 +315,7 @@ function ProductRow({
               type="button"
               aria-label={`Edit ${product.name}`}
               className={`${panelButton} border-brand-200 bg-white text-brand-700 hover:bg-brand-50`}
+              disabled={busy}
               onClick={() => onEdit(product.id)}
             >
               <Pencil className="size-4" aria-hidden="true" />
@@ -316,6 +325,7 @@ function ProductRow({
               type="button"
               aria-label={`Delete ${product.name}`}
               className={`${panelButton} border-red-200 bg-white text-red-600 hover:bg-red-50 @xl:hidden`}
+              disabled={busy}
               onClick={() => onRequestDelete(product)}
             >
               <Trash2 className="size-4" aria-hidden="true" />
@@ -328,7 +338,19 @@ function ProductRow({
   );
 }
 
-// Products of one category ordered by position, with a form to add new ones.
+/**
+ * Products of one category ordered by position, with a form to add new ones.
+ * Rows are compact and expand in place, so long menus stay scannable;
+ * onChange gives the Menu page the new product count (badge and readiness).
+ * @param {object} props
+ * @param {string} props.storeId - Storage path of the images.
+ * @param {string} props.categoryId
+ * @param {string} props.categoryName
+ * @param {function(number): void} [props.onChange] - Product count.
+ * @returns {JSX.Element}
+ * @example
+ * <ProductList storeId={storeId} categoryId={id} categoryName="Pizzas" onChange={refresh} />
+ */
 export default function ProductList({
   storeId,
   categoryId,
@@ -343,6 +365,10 @@ export default function ProductList({
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [productToDelete, setProductToDelete] = useState(null);
+  // One product change at a time: controls are disabled while it runs and
+  // the ref drops clicks that arrive before the next render.
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -355,7 +381,7 @@ export default function ProductList({
       })
       .catch((err) => {
         if (cancelled) return;
-        console.log("Error loading products -> ", err);
+        logError("Error loading products -> ", err);
         setError(err);
         setLoading(false);
       });
@@ -375,42 +401,53 @@ export default function ProductList({
   // The list is reloaded on failure too: a partial change (e.g. product saved,
   // image upload failed) must not leave the list stale.
   const runAction = async (action) => {
+    if (pendingRef.current) return false;
+    pendingRef.current = true;
+    setPending(true);
     setActionError(null);
     let succeeded = false;
+    let count;
     try {
       await action();
       succeeded = true;
     } catch (err) {
-      console.log("Error updating products -> ", err);
+      logError("Error updating products -> ", err);
       setActionError(err);
     }
 
     try {
-      setProducts(await getProductsByCategoryId(categoryId));
+      const reloaded = await getProductsByCategoryId(categoryId);
+      setProducts(reloaded);
+      count = reloaded.length;
     } catch (err) {
-      console.log("Error reloading products -> ", err);
+      logError("Error reloading products -> ", err);
       if (succeeded) {
         setActionError(err);
         succeeded = false;
       }
     }
 
-    onChange?.();
+    pendingRef.current = false;
+    setPending(false);
+    // The count is undefined when the reload failed.
+    onChange?.(count);
 
     return succeeded;
   };
 
   // The new product goes last: position is unique within the category.
-  // The image is uploaded once the product exists, as its path uses the id.
+  // The image is uploaded once the product exists, as its path uses the id;
+  // it is compressed first, so an unusable file never leaves a product behind.
   const handleCreate = async ({ imageFile, removeImage: _remove, ...data }) => {
     const saved = await runAction(async () => {
+      const image = imageFile ? await compressProductImage(imageFile) : null;
       const created = await createProduct(categoryId, {
         ...data,
         position: products.length + 1,
       });
 
-      if (imageFile) {
-        const imageUrl = await uploadProductImage(storeId, created.id, imageFile);
+      if (image) {
+        const imageUrl = await uploadProductImage(storeId, created.id, image);
         await updateProductById(created.id, { imageUrl });
       }
     });
@@ -428,7 +465,7 @@ export default function ProductList({
         updates.imageUrl = await uploadProductImage(
           storeId,
           editingId,
-          imageFile,
+          await compressProductImage(imageFile),
         );
       else if (removeImage) updates.imageUrl = null;
 
@@ -469,7 +506,8 @@ export default function ProductList({
         {!loading && !error && !showForm && editingId === null && (
           <button
             type="button"
-            className={`${primaryButton} min-h-10`}
+            className={primaryButton}
+            disabled={pending}
             onClick={() => setShowForm(true)}
           >
             <Plus className="size-4" aria-hidden="true" />
@@ -477,12 +515,17 @@ export default function ProductList({
           </button>
         )}
       </div>
+      {pending && !showForm && editingId === null && (
+        <LoadingState text="Saving ..." />
+      )}
       {actionError && (
         <p role="alert" className={alert}>
-          {actionError.message}
+          {getErrorMessage(actionError)}
         </p>
       )}
-      {showForm && <ProductForm onSubmit={handleCreate} onCancel={closeForm} />}
+      {showForm && (
+        <ProductForm onSubmit={handleCreate} onCancel={closeForm} busy={pending} />
+      )}
       {loading && <LoadingState />}
       {error && (
         <p role="alert" className={`${alert} flex flex-wrap items-center gap-3`}>
@@ -504,12 +547,14 @@ export default function ProductList({
                   product={product}
                   onSubmit={handleUpdate}
                   onCancel={closeForm}
+                  busy={pending}
                 />
               </li>
             ) : (
               <ProductRow
                 key={product.id}
                 product={product}
+                busy={pending}
                 isFirst={index === 0}
                 isLast={index === products.length - 1}
                 onMove={handleMove}

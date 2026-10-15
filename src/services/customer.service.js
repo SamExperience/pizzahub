@@ -42,7 +42,14 @@ const normalizeCustomer = (data = {}) => {
 const isSameCustomer = (current, next) =>
   JSON.stringify(normalizeCustomer(current)) === JSON.stringify(next);
 
-// Reads a Customer by id; returns null when it does not exist.
+/**
+ * Reads a Customer by id. Orders store only the customerId, so screens that
+ * show the contact read it here; null when it does not exist.
+ * @param {string} customerId
+ * @returns {Promise<?object>}
+ * @example
+ * const customer = await getCustomer(order.customerId);
+ */
 export const getCustomer = async (customerId) => {
   if (!customerId) throw new Error("Customer ID is required");
 
@@ -51,9 +58,17 @@ export const getCustomer = async (customerId) => {
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
 };
 
-// Listens to a Customer in real time. Calls onChange with the Customer, or
-// null when it does not exist, at every change and returns the unsubscribe
-// function.
+/**
+ * Listens to a Customer in real time, so a customer edit made from any
+ * ticket updates every Tableau card showing that Customer. Calls onChange
+ * with the Customer, or null when it does not exist.
+ * @param {string} customerId
+ * @param {function(?object): void} onChange
+ * @param {function(Error): void} [onError]
+ * @returns {function(): void} Unsubscribe function.
+ * @example
+ * const stop = subscribeToCustomer(order.customerId, setCustomer);
+ */
 export const subscribeToCustomer = (customerId, onChange, onError) => {
   if (!customerId) throw new Error("Customer ID is required");
 
@@ -68,8 +83,15 @@ export const subscribeToCustomer = (customerId, onChange, onError) => {
   );
 };
 
-// All Customers of a Company, sorted by first name. Search is done on the
-// client with filterCustomersByFirstName.
+/**
+ * Reads all Customers of a Company, sorted by first name. They are loaded
+ * once when the ticket sidebar opens and searched on the client with
+ * filterCustomersByFirstName: Firestore has no "contains" query.
+ * @param {string} companyId
+ * @returns {Promise<object[]>}
+ * @example
+ * const customers = await getCustomersByCompanyId("company1");
+ */
 export const getCustomersByCompanyId = async (companyId) => {
   if (!companyId) throw new Error("Company ID is required");
 
@@ -85,8 +107,16 @@ export const getCustomersByCompanyId = async (companyId) => {
     .sort((a, b) => (a.firstName ?? "").localeCompare(b.firstName ?? ""));
 };
 
-// Customers whose first name contains the search text (case-insensitive).
-// An empty search returns no results.
+/**
+ * Filters Customers whose first name contains the search text
+ * (case-insensitive). An empty search returns no results, so the list stays
+ * empty until the user types.
+ * @param {object[]} customers
+ * @param {string} searchText
+ * @returns {object[]}
+ * @example
+ * filterCustomersByFirstName([{ firstName: "Mario" }], "ar"); // [{ firstName: "Mario" }]
+ */
 export const filterCustomersByFirstName = (customers, searchText) => {
   const search = normalizeText(searchText)?.toLowerCase();
 
@@ -111,9 +141,18 @@ const CUSTOMER_ADDRESS_FIELD_LIMITS = [
   ["country", "Country", FIELD_LIMITS.ADDRESS_LINE],
 ];
 
-// Validates the Customer for the order type and returns the normalized data.
-// Takeaway: first name. Delivery: also phone and street, street number,
-// postal code and city.
+/**
+ * Validates the Customer for the order type and returns the normalized
+ * data. Takeaway needs only a first name; Delivery also needs phone and
+ * street, street number, postal code and city, because the rider must reach
+ * the customer.
+ * @param {object} data - Customer form values.
+ * @param {"takeaway"|"delivery"} orderType
+ * @returns {{firstName: string, lastName: ?string, phone: ?string, address: ?object}}
+ * @throws {Error} With a user-facing message when a field is missing or too long.
+ * @example
+ * validateCustomer({ firstName: " Mario " }, "takeaway"); // firstName "Mario"
+ */
 export const validateCustomer = (data, orderType) => {
   if (!Object.values(ORDER_TYPE).includes(orderType))
     throw new Error("Order type is invalid");
@@ -146,9 +185,23 @@ export const validateCustomer = (data, orderType) => {
   return customer;
 };
 
-// Adds the Customer write to the batch and returns the Customer id; the
-// caller commits. A new Customer is created; an existing one is updated
-// only when its fields changed.
+/**
+ * Adds the Customer write to the caller's batch and returns the Customer id,
+ * so the Customer and the Order are saved atomically. A new Customer is
+ * created; an existing one is updated only when its fields changed (no
+ * useless writes).
+ * @param {WriteBatch} batch
+ * @param {object} options
+ * @param {string} options.companyId
+ * @param {"takeaway"|"delivery"} options.orderType
+ * @param {object} options.data - Customer form values.
+ * @param {?object} [options.existingCustomer] - Selected Customer, if any.
+ * @returns {string} The Customer id.
+ * @example
+ * const customerId = addCustomerToBatch(batch, {
+ *   companyId: "company1", orderType: "takeaway", data: { firstName: "Mario" },
+ * });
+ */
 export const addCustomerToBatch = (
   batch,
   { companyId, orderType, data, existingCustomer = null },

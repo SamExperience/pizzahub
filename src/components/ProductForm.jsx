@@ -1,4 +1,4 @@
-import { Plus, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { button, card, input, muted, primaryButton } from "../utils/styles";
@@ -11,11 +11,11 @@ const fieldsetClass =
   "m-0 flex min-w-0 flex-col gap-3 border-0 p-0";
 const sectionClass = "border-t border-neutral-200 pt-4";
 const legendClass = "mb-3 p-0 text-sm font-semibold text-neutral-900";
-const fieldInput = `${input} min-h-10`;
+const fieldInput = input;
 // Square 40px icon button for removing a row.
 const removeButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
-const addButton = `${button} min-h-10 self-start`;
+const addButton = `${button} self-start`;
 
 const isValidPrice = (value) =>
   value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -81,11 +81,28 @@ function TextListField({ legend, itemLabel, addLabel, limitLabel, items, onChang
   );
 }
 
-// `onSubmit(data)` saves the product; the parent closes the form on success.
-// With `product` the form starts from its values (edit mode).
-// Validation rules live in the Product service; the checks here only decide
-// whether the submit button is enabled.
-export default function ProductForm({ product, onSubmit, onCancel }) {
+/**
+ * Product create/edit form (name, description, price or sizes, ingredients,
+ * cooking levels, availability, image). With `product` the form starts from
+ * its values (edit mode). `onSubmit(data)` saves the product; the parent
+ * closes the form on success. busy is true while a product change
+ * (including the image upload) runs. Validation rules live in the Product
+ * service; the checks here only decide whether the submit button is enabled.
+ * @param {object} props
+ * @param {?object} [props.product]
+ * @param {function(object): Promise<*>} props.onSubmit
+ * @param {function(): void} props.onCancel
+ * @param {boolean} [props.busy]
+ * @returns {JSX.Element}
+ * @example
+ * <ProductForm product={product} onSubmit={save} onCancel={close} busy={pending} />
+ */
+export default function ProductForm({
+  product,
+  onSubmit,
+  onCancel,
+  busy = false,
+}) {
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
   const [price, setPrice] = useState(
@@ -136,7 +153,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!canSubmit) return;
+    if (busy || !canSubmit) return;
 
     await onSubmit({
       name,
@@ -295,7 +312,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
       <div className={sectionClass}>
       <fieldset className={fieldsetClass}>
         <legend className={legendClass}>Availability</legend>
-        <label className="flex min-h-10 items-center gap-2 text-sm font-medium text-neutral-700">
+        <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-neutral-700">
           <input
             type="checkbox"
             className="size-4 rounded accent-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1"
@@ -319,7 +336,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
             />
             <button
               type="button"
-              className={`${button} min-h-10`}
+              className={button}
               onClick={() => setRemoveImage(true)}
             >
               Remove image
@@ -333,7 +350,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           type="file"
           accept="image/*"
           aria-label="Product image"
-          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
+          className="w-full min-w-0 text-sm text-neutral-600 file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-700 hover:file:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
           onChange={(event) => setImageFile(event.target.files[0] ?? null)}
         />
       </fieldset>
@@ -344,15 +361,17 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
           type="button"
           className={`${button} min-h-11`}
           onClick={onCancel}
+          disabled={busy}
         >
           Cancel
         </button>
         <button
           type="submit"
           className={`${primaryButton} min-h-11`}
-          disabled={!canSubmit}
+          disabled={busy || !canSubmit}
         >
-          Save product
+          {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+          {busy ? "Saving ..." : "Save product"}
         </button>
       </div>
     </form>
