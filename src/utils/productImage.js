@@ -2,9 +2,36 @@
 // Storage only holds small files (spec/09 S1-S2). The limits are repeated in
 // storage.rules, which reject anything a bypassed client might send.
 
+/**
+ * Longest side in pixels of an uploaded product image: enough for the
+ * product cards, small enough to load fast.
+ * @type {number}
+ * @example
+ * Math.min(1, MAX_IMAGE_SIDE / bitmap.width);
+ */
 export const MAX_IMAGE_SIDE = 800;
+/**
+ * Maximum upload size (150 KB, exclusive), the same limit as storage.rules.
+ * @type {number}
+ * @example
+ * if (file.size >= MAX_IMAGE_BYTES) throw new Error("Too big");
+ */
 export const MAX_IMAGE_BYTES = 150 * 1024;
+/**
+ * Content types accepted by storage.rules: WebP, with JPEG as the fallback
+ * for browsers that cannot encode WebP.
+ * @type {string[]}
+ * @example
+ * IMAGE_TYPES.includes(file.type);
+ */
 export const IMAGE_TYPES = ["image/webp", "image/jpeg"];
+/**
+ * Cache-Control metadata of uploaded images: browsers reuse an image for a
+ * day; a replaced image gets a new download token, so no stale image is shown.
+ * @type {string}
+ * @example
+ * uploadBytes(imageRef, file, { cacheControl: IMAGE_CACHE_CONTROL });
+ */
 export const IMAGE_CACHE_CONTROL = "public, max-age=86400";
 
 const QUALITY_STEPS = [0.8, 0.7, 0.6, 0.5, 0.4];
@@ -36,8 +63,17 @@ const drawImage = (bitmap, width, height) => {
   return canvas;
 };
 
-// Returns a WebP (or JPEG) Blob under MAX_IMAGE_BYTES whose longest side is
-// at most MAX_IMAGE_SIDE. Quality is lowered first, then the dimensions.
+/**
+ * Resizes and compresses an image in the browser with a native canvas (no
+ * library) before upload. Returns a WebP (or JPEG) Blob under
+ * MAX_IMAGE_BYTES whose longest side is at most MAX_IMAGE_SIDE. Quality is
+ * lowered first, then the dimensions, to keep as much detail as possible.
+ * @param {File} file - Any image the browser can decode.
+ * @returns {Promise<Blob>}
+ * @throws {Error} When the file is not an image or cannot fit the limit.
+ * @example
+ * const blob = await compressProductImage(input.files[0]);
+ */
 export const compressProductImage = async (file) => {
   if (!file || typeof file.type !== "string" || !file.type.startsWith("image/"))
     throw new Error("Product image must be an image file");

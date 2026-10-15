@@ -8,6 +8,29 @@ import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { optionalText, requireText } from "../utils/textValidation";
 import { db } from "./firebase";
 
+/**
+ * Creates the Company, its Store and the admin User profile in one
+ * transaction, so a failed onboarding never leaves a half-created workspace.
+ * The User document id is the auth uid: that link is what the security
+ * rules use for Company and Store isolation.
+ * @param {object} data
+ * @param {string} data.uid - Firebase Auth uid.
+ * @param {?string} data.userName - Display name from the auth provider.
+ * @param {string} data.companyName
+ * @param {string} data.storeName
+ * @param {string} data.street
+ * @param {string} [data.streetNumber]
+ * @param {string} data.postalCode
+ * @param {string} data.city
+ * @param {string} data.country
+ * @returns {Promise<{userId: string, companyId: string, storeId: string}>}
+ * @example
+ * await createOnboardingWorkspace({
+ *   uid: user.uid, userName: "Mario", companyName: "Bella Napoli SA",
+ *   storeName: "Lugano", street: "Via Nassa", streetNumber: "5",
+ *   postalCode: "6900", city: "Lugano", country: "Switzerland",
+ * });
+ */
 export async function createOnboardingWorkspace({
   uid,
   userName,

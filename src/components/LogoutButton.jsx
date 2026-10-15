@@ -4,6 +4,15 @@ import { useAuth } from "../contexts/AuthContext";
 import { logError } from "../utils/logger";
 import { button } from "../utils/styles";
 
+/**
+ * Logout button with its own pending and error state, so it can also be
+ * offered on error screens where the rest of the app is unusable.
+ * @param {object} props
+ * @param {string} [props.className]
+ * @returns {JSX.Element}
+ * @example
+ * <ErrorState message="Unable to load your profile."><LogoutButton /></ErrorState>
+ */
 export default function LogoutButton({ className = "" }) {
   const { logout } = useAuth();
   const [pending, setPending] = useState(false);

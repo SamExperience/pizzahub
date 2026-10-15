@@ -43,6 +43,21 @@ async function resolveSubscription(event, stripe) {
   return null;
 }
 
+/**
+ * Logic of the Stripe webhook, separated from onRequest for testing. The
+ * signature is verified on the raw body (400 when invalid), so nobody can
+ * fake a payment; unknown event types get 200 so Stripe stops retrying
+ * them, while processing errors get 500 so Stripe retries later.
+ * @param {object} req - Request with rawBody and the stripe-signature header.
+ * @param {object} res - Express-style response.
+ * @param {object} deps
+ * @param {Firestore} deps.db
+ * @param {function(): object} deps.getStripe
+ * @param {string} deps.webhookSecret
+ * @returns {Promise<void>}
+ * @example
+ * await stripeWebhookHandler(req, res, { db, getStripe, webhookSecret: "whsec_..." });
+ */
 export async function stripeWebhookHandler(req, res, deps) {
   if (req.method !== "POST") {
     res.status(405).send("Method not allowed");
@@ -105,6 +120,13 @@ export async function stripeWebhookHandler(req, res, deps) {
   }
 }
 
+/**
+ * HTTPS endpoint registered in Stripe as the webhook. It is the main writer
+ * of subscriptions/{companyId} (the client can only read it).
+ * @type {HttpsFunction}
+ * @example
+ * // stripe listen --forward-to http://127.0.0.1:5001/<project>/europe-west6/stripeWebhook
+ */
 export const stripeWebhook = onRequest(
   { secrets: [stripeSecretKey, stripeWebhookSecret] },
   (req, res) =>

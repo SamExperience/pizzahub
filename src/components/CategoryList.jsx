@@ -163,6 +163,25 @@ function CategoryRow({
   );
 }
 
+/**
+ * Category cards of the Menu sidebar (a top selector on mobile) with product
+ * count badges and, on the selected card, rename, move and delete actions.
+ * Actions appear only on the selected card to keep the list compact and the
+ * touch targets 44px.
+ * @param {object} props
+ * @param {object[]} props.categories - Ordered by position.
+ * @param {Object<string, number>} [props.productCounts] - By category id.
+ * @param {boolean} [props.busy] - Disables actions while a change runs.
+ * @param {?string} props.selectedId
+ * @param {function(string): void} props.onSelect
+ * @param {function(string, string): Promise<boolean>} props.onRename - (id, name); true when saved.
+ * @param {function(string): void} props.onDelete - Category id, after confirmation.
+ * @param {function(string, string): void} props.onMove - (id, "up" or "down").
+ * @returns {JSX.Element}
+ * @example
+ * <CategoryList categories={categories} selectedId={id} onSelect={setId}
+ *   onRename={rename} onDelete={remove} onMove={move} />
+ */
 export default function CategoryList({
   categories,
   productCounts = {},

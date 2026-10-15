@@ -45,10 +45,22 @@ const sectionHeading =
 // Customer form fields checked by validateTicketForm.
 const CUSTOMER_FIELDS = ["firstName", "phone", "street", "streetNumber", "postalCode", "city"];
 
-// Right sidebar for ticket creation: order type, customer and scheduled time.
-// With an order it edits that Order instead, prefilled from it. When "Print
-// on save" is on, onSaved receives the new ticket ({ order, customer }) for
-// the print preview; edits never print automatically.
+/**
+ * Right sidebar for ticket creation: order type, customer and scheduled time.
+ * With an order it edits that Order instead, prefilled from it. When "Print
+ * on save" is on, onSaved receives the new ticket ({ order, customer }) for
+ * the print preview; edits never print automatically. Closing with unsaved
+ * changes asks for confirmation.
+ * @param {object} props
+ * @param {string} props.companyId
+ * @param {string} props.storeId
+ * @param {?object} [props.order] - Order to edit; null to create.
+ * @param {function(): void} props.onClose
+ * @param {function({order: object, customer: object}): void} [props.onSaved]
+ * @returns {JSX.Element}
+ * @example
+ * <TicketSidebar companyId={companyId} storeId={storeId} onClose={close} onSaved={print} />
+ */
 export default function TicketSidebar({
   companyId,
   storeId,

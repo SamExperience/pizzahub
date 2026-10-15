@@ -178,11 +178,23 @@ function ActionsMenu({ disabled, onEdit, onCancel }) {
   );
 }
 
-// One ticket of the Tableau. Collapsed: time, customer, order type, item
-// count, total and actions; expanded (card click or the details toggle):
-// customer contacts and items. The status moves go one status back or
-// forward; edit and cancel sit in the "More actions" menu; the printer
-// button opens the print preview with the Customer loaded here.
+/**
+ * One ticket of the Tableau. Collapsed: time, customer, order type, item
+ * count, total and actions; expanded (card click or the details toggle):
+ * customer contacts and items. The status moves go one status back or
+ * forward; edit and cancel sit in the "More actions" menu; the printer
+ * button opens the print preview with the Customer loaded here. The
+ * Customer is listened to in real time, so edits from another ticket show up.
+ * @param {object} props
+ * @param {object} props.order
+ * @param {function(object, string): Promise<void>} props.onChangeStatus
+ * @param {function(object): void} props.onEdit
+ * @param {function(object): Promise<void>} props.onCancel
+ * @param {function(object, ?object): void} props.onPrint - (order, customer).
+ * @returns {JSX.Element}
+ * @example
+ * <TicketCard order={order} onChangeStatus={move} onEdit={edit} onCancel={cancel} onPrint={print} />
+ */
 export default function TicketCard({ order, onChangeStatus, onEdit, onCancel, onPrint }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);

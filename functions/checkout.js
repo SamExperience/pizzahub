@@ -79,7 +79,23 @@ async function findActiveSubscription(stripe, customerId) {
   );
 }
 
-// The companyId is always taken from the caller's profile, never from request.data.
+/**
+ * Logic of the createCheckoutSession callable, separated from onCall so the
+ * tests can inject Firestore and a fake Stripe client. The companyId is
+ * always taken from the caller's profile, never from request.data. Refuses
+ * when a subscription is already active (in Firestore or in Stripe, which
+ * also syncs Firestore), so a Company is never charged twice.
+ * @param {CallableRequest} request
+ * @param {object} deps
+ * @param {Firestore} deps.db
+ * @param {function(): object} deps.getStripe - Returns the Stripe client.
+ * @param {string} deps.priceId
+ * @param {string} deps.appUrl
+ * @returns {Promise<{url: string}>} The Stripe Checkout URL.
+ * @throws {HttpsError} unauthenticated, permission-denied, failed-precondition or internal.
+ * @example
+ * const { url } = await createCheckoutSessionHandler(request, { db, getStripe, priceId, appUrl });
+ */
 export async function createCheckoutSessionHandler(request, deps) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in to subscribe.");
@@ -153,6 +169,14 @@ export async function createCheckoutSessionHandler(request, deps) {
   return { url: session.url };
 }
 
+/**
+ * Callable function that starts a Stripe Checkout for the caller's Company.
+ * Only the secret key is bound, and params are read at call time.
+ * @type {CallableFunction}
+ * @example
+ * // Client side:
+ * await httpsCallable(functions, "createCheckoutSession")();
+ */
 export const createCheckoutSession = onCall(
   { secrets: [stripeSecretKey] },
   (request) =>

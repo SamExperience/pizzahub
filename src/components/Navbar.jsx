@@ -15,6 +15,17 @@ const linkSize = {
   vertical: "min-h-11 py-2.5 text-base",
 };
 
+/**
+ * Main navigation links (Tableau, Menu, Dashboard) with the active state.
+ * The same component serves the desktop bar and the vertical mobile menu,
+ * where onNavigate closes the menu after a click.
+ * @param {object} props
+ * @param {"horizontal"|"vertical"} [props.orientation]
+ * @param {function(): void} [props.onNavigate]
+ * @returns {JSX.Element}
+ * @example
+ * <Navbar orientation="vertical" onNavigate={() => setOpen(false)} />
+ */
 export default function Navbar({ orientation = "horizontal", onNavigate }) {
   const vertical = orientation === "vertical";
 

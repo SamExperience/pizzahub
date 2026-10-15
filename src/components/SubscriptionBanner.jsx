@@ -4,8 +4,14 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSubscriptionActive } from "../services/billing.service";
 import useSubscription from "../utils/useSubscription";
 
-// Warning shown on every app page while the Company's subscription is not
-// active. Hidden while loading and on read errors; it never blocks features.
+/**
+ * Warning shown on every app page while the Company's subscription is not
+ * active. Hidden while loading and on read errors, so it never flashes for
+ * a paying Company; it never blocks features (MVP decision).
+ * @returns {?JSX.Element}
+ * @example
+ * {menuReady && <SubscriptionBanner />}
+ */
 export default function SubscriptionBanner() {
   const { userProfile } = useAuth();
   const { subscription, loading, error } = useSubscription(userProfile?.companyId);

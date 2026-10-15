@@ -53,17 +53,29 @@ function LockedValue({ heading, value }) {
   );
 }
 
-// Item configuration step of the ticket creation. Adding: step 1 (only when
-// the product has sizes) picks the size; step 2 picks cooking level,
-// customizations and quantity, then adds the Item snapshot to the ticket.
-// With initialItem it reconfigures that Item on one page: the saved Item is
-// recalled in the header, sizes are a selector, options still offered by the
-// current product are prefilled and the saved price is kept unless the size
-// changes. restricted (Product no longer sellable, product may be null)
-// shows the size locked and allows only customizations and a quantity up to
-// maxQuantity; the cooking level stays selectable while the unavailable
-// Product is still in the Menu (it has no price impact), otherwise it is
-// locked too.
+/**
+ * Item configuration step of the ticket creation. Adding: step 1 (only when
+ * the product has sizes) picks the size; step 2 picks cooking level,
+ * customizations and quantity, then adds the Item snapshot to the ticket.
+ * With initialItem it reconfigures that Item on one page: the saved Item is
+ * recalled in the header, sizes are a selector, options still offered by the
+ * current product are prefilled and the saved price is kept unless the size
+ * changes. restricted (Product no longer sellable, product may be null)
+ * shows the size locked and allows only customizations and a quantity up to
+ * maxQuantity; the cooking level stays selectable while the unavailable
+ * Product is still in the Menu (it has no price impact), otherwise it is
+ * locked too.
+ * @param {object} props
+ * @param {?object} props.product
+ * @param {?object} [props.initialItem] - Item being edited.
+ * @param {boolean} [props.restricted]
+ * @param {?number} [props.maxQuantity]
+ * @param {function(object): void} props.onAdd - Receives the Item snapshot.
+ * @param {function(): void} props.onClose
+ * @returns {JSX.Element}
+ * @example
+ * <ItemConfigModal product={product} onAdd={addItem} onClose={close} />
+ */
 export default function ItemConfigModal({
   product,
   initialItem = null,

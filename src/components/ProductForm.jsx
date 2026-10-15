@@ -81,11 +81,22 @@ function TextListField({ legend, itemLabel, addLabel, limitLabel, items, onChang
   );
 }
 
-// `onSubmit(data)` saves the product; the parent closes the form on success.
-// With `product` the form starts from its values (edit mode). busy is true
-// while a product change (including the image upload) runs.
-// Validation rules live in the Product service; the checks here only decide
-// whether the submit button is enabled.
+/**
+ * Product create/edit form (name, description, price or sizes, ingredients,
+ * cooking levels, availability, image). With `product` the form starts from
+ * its values (edit mode). `onSubmit(data)` saves the product; the parent
+ * closes the form on success. busy is true while a product change
+ * (including the image upload) runs. Validation rules live in the Product
+ * service; the checks here only decide whether the submit button is enabled.
+ * @param {object} props
+ * @param {?object} [props.product]
+ * @param {function(object): Promise<*>} props.onSubmit
+ * @param {function(): void} props.onCancel
+ * @param {boolean} [props.busy]
+ * @returns {JSX.Element}
+ * @example
+ * <ProductForm product={product} onSubmit={save} onCancel={close} busy={pending} />
+ */
 export default function ProductForm({
   product,
   onSubmit,

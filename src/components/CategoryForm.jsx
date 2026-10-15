@@ -3,8 +3,17 @@ import { useState } from "react";
 import { FIELD_LIMITS } from "../utils/fieldLimits";
 import { input, primaryButton } from "../utils/styles";
 
-// `onSubmit` resolves to true when the category was saved; busy disables the
-// submit while another category change runs.
+/**
+ * Add-category form at the top of the Menu sidebar. The input is cleared
+ * only when `onSubmit` resolves to true, so a failed save keeps the typed
+ * name; busy disables the submit while another category change runs.
+ * @param {object} props
+ * @param {function(string): Promise<boolean>} props.onSubmit
+ * @param {boolean} [props.busy]
+ * @returns {JSX.Element}
+ * @example
+ * <CategoryForm onSubmit={handleCreate} busy={pending} />
+ */
 export default function CategoryForm({ onSubmit, busy = false }) {
   const [name, setName] = useState("");
 

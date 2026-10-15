@@ -24,6 +24,18 @@ const AuthContext = createContext();
 // was running: its result must not overwrite the current user's state.
 const isCurrentUser = (uid) => auth.currentUser?.uid === uid;
 
+/**
+ * Provides the signed-in user, their PizzaHub profile and the auth actions.
+ * One place listens to Firebase Auth, so every route sees the same state;
+ * loadingLogin stays true until the profile is known, so an existing user is
+ * never sent to /onboarding, and profileError replaces a wrong redirect with
+ * a retry.
+ * @param {object} props
+ * @param {ReactNode} props.children
+ * @returns {JSX.Element}
+ * @example
+ * <AuthProvider><App /></AuthProvider>
+ */
 export function AuthProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -105,6 +117,14 @@ export function AuthProvider({ children }) {
   );
 }
 
+/**
+ * Reads the auth state (authUser, userProfile, loadingLogin, profileError)
+ * and actions (login, register, loginWithGoogle, logout, retryProfile,
+ * refreshProfile). Must be used inside AuthProvider.
+ * @returns {object}
+ * @example
+ * const { authUser, userProfile, logout } = useAuth();
+ */
 export function useAuth() {
   return useContext(AuthContext);
 }

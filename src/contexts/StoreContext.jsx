@@ -34,6 +34,18 @@ const writeSelectedStoreId = (storeId) => {
   }
 };
 
+/**
+ * Provides the Store the user can access, the selected (active) Store and
+ * whether its Menu is ready. Kept apart from AuthProvider because it depends
+ * on the profile; the selection survives reloads (localStorage) and is valid
+ * only while it is the accessible Store, and responses that arrive after an
+ * account switch are discarded.
+ * @param {object} props
+ * @param {ReactNode} props.children
+ * @returns {JSX.Element}
+ * @example
+ * <AuthProvider><StoreProvider><App /></StoreProvider></AuthProvider>
+ */
 export function StoreProvider({ children }) {
   const [accessibleStore, setAccessibleStore] = useState(null);
   const [selectedStoreState, setSelectedStoreState] = useState(null);
@@ -155,6 +167,14 @@ export function StoreProvider({ children }) {
   );
 }
 
+/**
+ * Reads the Store state (accessibleStore, selectedStore, loadingStore,
+ * errorStore, menuReady, menuReadyError) and actions (setselectedStore,
+ * fetchAccesibleStore, refreshMenuReady). Must be used inside StoreProvider.
+ * @returns {object}
+ * @example
+ * const { selectedStore, menuReady } = useStore();
+ */
 export function useStore() {
   return useContext(StoreContext);
 }

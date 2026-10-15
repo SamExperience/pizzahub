@@ -24,7 +24,14 @@ const STATUS_LABELS = {
 const info =
   "flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800";
 
-// Subscription status of the Company and the Stripe Checkout entry point (test mode).
+/**
+ * Dashboard section with the Company's subscription status and the Stripe
+ * Checkout entry point (test mode). After the return from Checkout it shows
+ * "payment processing" until the webhook writes the active status.
+ * @returns {JSX.Element}
+ * @example
+ * <SubscriptionSection />
+ */
 export default function SubscriptionSection() {
   const { userProfile } = useAuth();
   const { subscription, loading, error, retry } = useSubscription(

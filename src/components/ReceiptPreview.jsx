@@ -2,9 +2,17 @@ import { Printer, X } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 import { button, iconButton, primaryButton } from "../utils/styles";
 
-// Print preview of a ticket receipt (plain text, 32 columns). No printer is
-// connected yet: Print only closes the preview. Escape and the backdrop
-// close it, and focus returns to the element that opened it.
+/**
+ * Print preview of a ticket receipt (plain text, 32 columns). No printer is
+ * connected yet: Print only closes the preview. Escape and the backdrop
+ * close it, and focus returns to the element that opened it.
+ * @param {object} props
+ * @param {string} props.receipt - Output of formatReceipt.
+ * @param {function(): void} props.onClose
+ * @returns {JSX.Element}
+ * @example
+ * <ReceiptPreview receipt={formatReceipt(data)} onClose={close} />
+ */
 export default function ReceiptPreview({ receipt, onClose }) {
   const titleId = useId();
   const printRef = useRef(null);

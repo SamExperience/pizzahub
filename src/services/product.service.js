@@ -32,10 +32,19 @@ import { logError } from "../utils/logger";
 const isValidPrice = (value) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
 
-// Central pricing rule:
-// - with sizes, each size carries its own price and `price` must be null;
-// - without sizes (null or empty), `price` is the single product price.
-// Returns the normalized { sizes, price } pair.
+/**
+ * Central pricing rule (decision A1, also enforced by the rules), so a
+ * Product never has two conflicting prices:
+ * - with sizes, each size carries its own price and `price` must be null;
+ * - without sizes (null or empty), `price` is the single product price.
+ * @param {object} pricing
+ * @param {?Array<{name: string, price: number}>} [pricing.sizes]
+ * @param {?number} [pricing.price]
+ * @returns {{sizes: ?Array<{name: string, price: number}>, price: ?number}}
+ * @example
+ * validateProductPricing({ sizes: null, price: 12 }); // { sizes: null, price: 12 }
+ * validateProductPricing({ sizes: [{ name: "Large", price: 15 }] }); // price null
+ */
 export const validateProductPricing = ({ sizes, price }) => {
   const hasSizes = Array.isArray(sizes) && sizes.length > 0;
   const hasPrice = price !== null && price !== undefined;
@@ -155,9 +164,18 @@ const normalizeStringList = (value, label) => {
   return items.length > 0 ? items : null;
 };
 
-// Returns the normalized { availableCookingLevels, defaultCookingLevel } pair.
-// Levels and default go together: without levels both are null; with levels
-// the default is required and must be one of them.
+/**
+ * Returns the normalized { availableCookingLevels, defaultCookingLevel }
+ * pair. Levels and default go together, so a new ticket item always gets a
+ * valid preselected level: without levels both are null; with levels the
+ * default is required and must be one of them.
+ * @param {object} levels
+ * @param {?string[]} [levels.availableCookingLevels]
+ * @param {?string} [levels.defaultCookingLevel]
+ * @returns {{availableCookingLevels: ?string[], defaultCookingLevel: ?string}}
+ * @example
+ * validateProductCookingLevels({ availableCookingLevels: ["Normal", "Well done"], defaultCookingLevel: "Normal" });
+ */
 export const validateProductCookingLevels = ({
   availableCookingLevels,
   defaultCookingLevel,
@@ -205,6 +223,16 @@ const validateOptionalText = (value, label, max = null) => {
 const validateProductDescription = (value) =>
   validateOptionalText(value, "description", FIELD_LIMITS.DESCRIPTION);
 
+/**
+ * Creates a Product in a Category after validating every field with the
+ * same limits as the rules; name and position must be unique in the
+ * Category. Availability defaults to true.
+ * @param {string} categoryId
+ * @param {object} data - Product fields (name, position, price or sizes, ...).
+ * @returns {Promise<object>} The created Product with its id.
+ * @example
+ * await createProduct("category1", { name: "Margherita", position: 1, price: 12 });
+ */
 export const createProduct = async (categoryId, data) => {
   if (!categoryId) throw new Error("Category ID is required");
 
@@ -264,6 +292,16 @@ const UPDATABLE_FIELDS = [
   "imageUrl",
 ];
 
+/**
+ * Updates only the provided Product fields. Pricing and cooking levels are
+ * validated on the merged result (current + changes), so a partial update
+ * can never break the pricing or cooking level rules.
+ * @param {string} productId
+ * @param {object} data - Any subset of the updatable fields.
+ * @returns {Promise<void>}
+ * @example
+ * await updateProductById("product1", { price: 13.5 });
+ */
 export const updateProductById = async (productId, data) => {
   if (!productId) throw new Error("Product ID is required");
 
@@ -350,8 +388,16 @@ export const updateProductById = async (productId, data) => {
   });
 };
 
-// Availability is a flag only: an unavailable product stays in the menu and
-// is never deleted or hidden by the service layer.
+/**
+ * Toggles a Product's availability. Availability is a flag only: an
+ * unavailable Product stays in the Menu (disabled in "Add product") and is
+ * never deleted or hidden by the service layer.
+ * @param {string} productId
+ * @param {boolean} isAvailable
+ * @returns {Promise<void>}
+ * @example
+ * await setProductAvailability("product1", false);
+ */
 export const setProductAvailability = async (productId, isAvailable) => {
   if (!productId) throw new Error("Product ID is required");
 
@@ -367,6 +413,14 @@ export const setProductAvailability = async (productId, isAvailable) => {
   });
 };
 
+/**
+ * Reads the Category's Products in display order (position ascending; needs
+ * the products(categoryId, position) composite index in production).
+ * @param {string} categoryId
+ * @returns {Promise<object[]>}
+ * @example
+ * const products = await getProductsByCategoryId("category1");
+ */
 export const getProductsByCategoryId = async (categoryId) => {
   if (!categoryId) throw new Error("Category ID is required");
 
@@ -384,7 +438,14 @@ export const getProductsByCategoryId = async (categoryId) => {
   }));
 };
 
-// Counts on the server, so the Menu sidebar badges never download products.
+/**
+ * Counts a Category's Products on the server, so the Menu sidebar badges
+ * never download the Products themselves.
+ * @param {string} categoryId
+ * @returns {Promise<number>}
+ * @example
+ * const count = await countProductsByCategoryId("category1");
+ */
 export const countProductsByCategoryId = async (categoryId) => {
   if (!categoryId) throw new Error("Category ID is required");
 
@@ -396,6 +457,14 @@ export const countProductsByCategoryId = async (categoryId) => {
   return (await getCountFromServer(q)).data().count;
 };
 
+/**
+ * Reads one Product; throws "Product not found" so callers can tell a
+ * deleted Product apart from other errors.
+ * @param {string} productId
+ * @returns {Promise<object>}
+ * @example
+ * const product = await getProductById("product1");
+ */
 export const getProductById = async (productId) => {
   if (!productId) throw new Error("Product ID is required");
 
@@ -408,16 +477,30 @@ export const getProductById = async (productId) => {
   };
 };
 
+/**
+ * State of the Product behind a ticket Item; it decides whether the Item
+ * gets the full edit (sellable) or the restricted one.
+ * @enum {string}
+ * @example
+ * if (status === ITEM_PRODUCT_STATUS.SELLABLE) reconfigureItem(product, item, options);
+ */
 export const ITEM_PRODUCT_STATUS = {
   SELLABLE: "sellable",
   UNAVAILABLE: "unavailable",
   DELETED: "deleted",
 };
 
-// Current Product of an Order Item with its status: sellable (exists and
-// available), unavailable, or deleted (product null). Reading a deleted
-// Product, or one whose Category was deleted, is denied by the rules
-// because they check its Category, so permission-denied also means deleted.
+/**
+ * Reads the current Product of an Order Item with its status: sellable
+ * (exists and available), unavailable, or deleted (product null). Reading a
+ * deleted Product, or one whose Category was deleted, is denied by the
+ * rules because they check its Category, so permission-denied also means
+ * deleted.
+ * @param {string} productId - Item productId.
+ * @returns {Promise<{status: string, product: ?object}>}
+ * @example
+ * const { status, product } = await getItemProduct(item.productId);
+ */
 export const getItemProduct = async (productId) => {
   try {
     const product = await getProductById(productId);
@@ -437,9 +520,18 @@ export const getItemProduct = async (productId) => {
   }
 };
 
-// Uploads the product image to a fixed path, so replacing it overwrites the
-// previous file. Expects a file already compressed by compressProductImage;
-// limits mirror storage.rules. Returns the download URL.
+/**
+ * Uploads the product image to a fixed path, so replacing it overwrites the
+ * previous file instead of leaving orphans. Expects a file already
+ * compressed by compressProductImage; the checks mirror storage.rules so the
+ * user gets a clear message instead of a permission error.
+ * @param {string} storeId
+ * @param {string} productId
+ * @param {File|Blob} file - WebP or JPEG under 150 KB.
+ * @returns {Promise<string>} The download URL.
+ * @example
+ * const imageUrl = await uploadProductImage("store1", "product1", compressed);
+ */
 export const uploadProductImage = async (storeId, productId, file) => {
   if (!storeId) throw new Error("Store ID is required");
   if (!productId) throw new Error("Product ID is required");
@@ -461,7 +553,14 @@ export const uploadProductImage = async (storeId, productId, file) => {
   return getDownloadURL(imageRef);
 };
 
-// Best-effort image removal: an orphaned file must never block a deletion.
+/**
+ * Best-effort image removal: an orphaned file must never block a deletion,
+ * so errors are logged (development only) and swallowed.
+ * @param {?string} imageUrl - Download URL; nothing happens when empty.
+ * @returns {Promise<void>}
+ * @example
+ * await deleteProductImage(product.imageUrl);
+ */
 export const deleteProductImage = async (imageUrl) => {
   if (!imageUrl) return;
 
@@ -472,9 +571,16 @@ export const deleteProductImage = async (imageUrl) => {
   }
 };
 
-// Deletes the product and renumbers the remaining products of its category
-// to 1..n in one atomic batch. The image is removed afterwards on a
-// best-effort basis: an orphaned file must never block the deletion.
+/**
+ * Deletes the Product and renumbers the remaining Products of its Category
+ * to 1..n in one atomic batch, so positions never have gaps. The image is
+ * removed afterwards on a best-effort basis: an orphaned file must never
+ * block the deletion. Tickets keep their Item snapshots.
+ * @param {string} productId
+ * @returns {Promise<void>}
+ * @example
+ * await deleteProductById("product1");
+ */
 export const deleteProductById = async (productId) => {
   if (!productId) throw new Error("Product ID is required");
 
@@ -502,8 +608,16 @@ export const deleteProductById = async (productId) => {
   await deleteProductImage(imageUrl);
 };
 
-// Swaps the position of a product with its neighbour in the category.
-// Does nothing at the first or last position.
+/**
+ * Swaps the position of a Product with its neighbour in the Category in one
+ * batch, so positions stay unique. Does nothing at the first or last
+ * position.
+ * @param {string} productId
+ * @param {"up"|"down"} direction
+ * @returns {Promise<void>}
+ * @example
+ * await moveProductById("product2", "up");
+ */
 export const moveProductById = async (productId, direction) => {
   if (!productId) throw new Error("Product ID is required");
 

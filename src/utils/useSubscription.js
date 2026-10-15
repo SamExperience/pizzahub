@@ -2,9 +2,17 @@ import { useEffect, useState } from "react";
 import { subscribeToSubscription } from "../services/billing.service";
 import { logError } from "./logger";
 
-// Real-time subscription of a Company: subscription is null when the Company
-// never subscribed; loading stays true until the first snapshot or error;
-// retry() starts a new listener.
+/**
+ * React hook for the real-time subscription of a Company, shared by the
+ * header banner and the Dashboard section. subscription is null when the
+ * Company never subscribed; loading stays true until the first snapshot or
+ * error; retry() starts a new listener. Results are keyed per Company and
+ * attempt, so a late snapshot of a previous Company is never shown.
+ * @param {?string} companyId
+ * @returns {{subscription: ?object, error: ?Error, loading: boolean, retry: function(): void}}
+ * @example
+ * const { subscription, loading, error, retry } = useSubscription(profile?.companyId);
+ */
 export default function useSubscription(companyId) {
   // Bumped to restart the listener after an error.
   const [retryKey, setRetryKey] = useState(0);

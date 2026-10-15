@@ -74,10 +74,30 @@ function CustomerCard({ form, isDelivery, onEdit }) {
   );
 }
 
-// Customer part of the ticket: the first name input also searches the
-// Company's Customers; selecting one fills the form. A selected Customer is
-// shown as a card until "Edit details"; the form opens by itself while a
-// required field is missing (incomplete) and stays open once edited.
+/**
+ * Customer part of the ticket: the first name input also searches the
+ * Company's Customers; selecting one fills the form. A selected Customer is
+ * shown as a card until "Edit details"; the form opens by itself while a
+ * required field is missing (incomplete) and stays open once edited.
+ * Controlled by TicketSidebar, which owns the form state.
+ * @param {object} props
+ * @param {"takeaway"|"delivery"} props.orderType - Delivery shows phone and address.
+ * @param {object[]} props.customers
+ * @param {boolean} props.loading
+ * @param {?Error} props.error
+ * @param {function(): void} props.onRetry
+ * @param {object} props.form
+ * @param {function(object): void} props.onFormChange
+ * @param {?object} props.selectedCustomer
+ * @param {function(object): void} props.onSelect
+ * @param {function(): void} props.onClear
+ * @param {boolean} [props.incomplete]
+ * @param {Object<string, string>} [props.errors]
+ * @returns {JSX.Element}
+ * @example
+ * <TicketCustomerSection orderType="takeaway" customers={customers} form={form}
+ *   onFormChange={setForm} onSelect={select} onClear={clear} ... />
+ */
 export default function TicketCustomerSection({
   orderType,
   customers,

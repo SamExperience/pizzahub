@@ -5,6 +5,14 @@ import { useStore } from "../contexts/StoreContext";
 
 const MINIMAL_LAYOUT_PATHS = ["/onboarding", "/stores"];
 
+/**
+ * App shell of every protected page: header, subscription banner and the
+ * routed page. Onboarding and store selection get a minimal header, because
+ * navigation makes no sense before a Store is chosen.
+ * @returns {JSX.Element}
+ * @example
+ * { element: <AppLayout />, children: [{ path: "/menu", element: <Menu /> }] }
+ */
 export default function AppLayout() {
   const { pathname } = useLocation();
   const { menuReady } = useStore();

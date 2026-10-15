@@ -15,7 +15,14 @@ import { formatReceipt } from "../utils/receipt";
 const changeTicketStatus = (order, status) => updateOrderStatus(order.id, status);
 const cancelTicket = (order) => cancelOrder(order.id);
 
-// Real-time orders of the active Store for the current day.
+/**
+ * Tableau page: real-time orders of the active Store for the current day,
+ * with ticket creation/editing and the print preview. The listener restarts
+ * at midnight, so the board always shows the current day.
+ * @returns {JSX.Element}
+ * @example
+ * { path: "/tableau", element: <Tableau /> }
+ */
 export default function Tableau() {
   const { selectedStore } = useStore();
   const storeId = selectedStore?.id;

@@ -4,8 +4,17 @@ function toTimestamp(seconds) {
   return typeof seconds === "number" ? Timestamp.fromMillis(seconds * 1000) : null;
 }
 
-// Maps a Stripe Subscription to the subscriptions/{companyId} fields (spec/01-data-model.md).
-// The billing period lives on the subscription item in current Stripe API versions.
+/**
+ * Maps a Stripe Subscription to the subscriptions/{companyId} fields
+ * (spec/01-data-model.md). Shared by the webhook and the Checkout sync, so
+ * both write the same shape. The billing period lives on the subscription
+ * item in current Stripe API versions.
+ * @param {object} subscription - Stripe Subscription object.
+ * @param {number} eventCreated - Unix seconds of the event (stale-event guard).
+ * @returns {object} Firestore fields.
+ * @example
+ * const data = buildSubscriptionData(event.data.object, event.created);
+ */
 export function buildSubscriptionData(subscription, eventCreated) {
   const item = subscription.items?.data?.[0];
   const customer = subscription.customer;
@@ -22,8 +31,17 @@ export function buildSubscriptionData(subscription, eventCreated) {
   };
 }
 
-// Writes the subscription unless a newer event was already applied (Stripe does not guarantee order)
-// or the stored active subscription is a different one (a duplicate must not overwrite it).
+/**
+ * Writes the subscription in a transaction unless a newer event was already
+ * applied (Stripe does not guarantee order) or the stored active
+ * subscription is a different one (a duplicate must not overwrite it).
+ * @param {Firestore} db
+ * @param {string} companyId
+ * @param {object} data - Output of buildSubscriptionData.
+ * @returns {Promise<boolean>} True when written, false when ignored.
+ * @example
+ * const applied = await applySubscription(db, "company1", data);
+ */
 export async function applySubscription(db, companyId, data) {
   const ref = db.collection("subscriptions").doc(companyId);
 

@@ -35,7 +35,14 @@ const parseDateValue = (value) => {
     : null;
 };
 
-// Read-only order history of the active Store for one day.
+/**
+ * Read-only order history of the active Store for one day (default today, no
+ * future dates). One read per date change instead of a listener, and the
+ * Company's Customers are loaded once for all rows.
+ * @returns {JSX.Element}
+ * @example
+ * <OrderHistory />
+ */
 export default function OrderHistory() {
   const { selectedStore } = useStore();
   const storeId = selectedStore?.id;

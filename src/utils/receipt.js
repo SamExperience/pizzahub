@@ -5,6 +5,12 @@ import { ORDER_TYPE_LABEL } from "./orderType";
 // Plain-text receipt for a 58mm thermal printer (32 characters per line),
 // shown in the print preview until a real printer is connected.
 
+/**
+ * Characters per line of a 58mm thermal printer.
+ * @type {number}
+ * @example
+ * "-".repeat(RECEIPT_WIDTH);
+ */
 export const RECEIPT_WIDTH = 32;
 
 const SEPARATOR = "-".repeat(RECEIPT_WIDTH);
@@ -24,8 +30,16 @@ const formatDay = (date) =>
 
 const isValidDate = (date) => date instanceof Date && !Number.isNaN(date.getTime());
 
-// Splits text into lines of at most width characters, on spaces when
-// possible; words longer than a line are cut.
+/**
+ * Splits text into lines of at most width characters, on spaces when
+ * possible; words longer than a line are cut, because a thermal printer
+ * would otherwise wrap them unpredictably.
+ * @param {string} text
+ * @param {number} [width]
+ * @returns {string[]}
+ * @example
+ * wrapText("Pizza Margherita", 8); // ["Pizza", "Margheri", "ta"]
+ */
 export const wrapText = (text, width = RECEIPT_WIDTH) => {
   const lines = [];
   let line = "";
@@ -113,8 +127,20 @@ const itemLines = (item) => {
   ];
 };
 
-// Receipt text of an Order: store, print time, order type and scheduled
-// time, customer, items with options and customizations, total.
+/**
+ * Builds the plain-text receipt of an Order: store, print time, order type
+ * and scheduled time, customer, items with options and customizations,
+ * total. Pure function (no printer, no DOM), so the same text can be shown
+ * in the preview today and sent to a printer later.
+ * @param {object} data
+ * @param {string} data.storeName
+ * @param {object} data.order
+ * @param {?object} [data.customer] - Customer, or null when unavailable.
+ * @param {Date} data.printedAt
+ * @returns {string} Lines joined by "\n", each at most RECEIPT_WIDTH long.
+ * @example
+ * const text = formatReceipt({ storeName: "Bella Napoli", order, customer, printedAt: new Date() });
+ */
 export const formatReceipt = ({ storeName, order, customer = null, printedAt }) => {
   const customerBlock = customerLines(customer, order.orderType);
 

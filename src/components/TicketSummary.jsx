@@ -20,10 +20,28 @@ const rowIconButton = `${iconButton} size-11`;
 // Ticket summary: header with the item count and "Add product", then one
 // compact row per Item with quantity controls, reconfiguration and removal.
 // Rows sit on one line in wide containers and on two lines otherwise. Per
-// Item index: maxQuantities caps the quantity (null = no limit), itemStatuses
-// labels Products no longer sellable and itemMessages shows a message under
-// the Item. editingIndex is the Item whose Product is loading for an edit:
-// every Edit button waits for it.
+/**
+ * Ticket summary: item rows with quantity +/-, remove and edit, plus the
+ * "Add product" entry point. Per-item props are indexed by Item index:
+ * maxQuantities caps the quantity (null = no limit), itemStatuses labels
+ * Products no longer sellable and itemMessages shows a message under the
+ * Item. editingIndex is the Item whose Product is loading for an edit:
+ * every Edit button waits for it.
+ * @param {object} props
+ * @param {object[]} props.items
+ * @param {function(): void} props.onAddProduct
+ * @param {function(number, number): void} props.onChangeQuantity - (index, quantity).
+ * @param {function(number): void} props.onRemove
+ * @param {function(number): void} props.onEdit
+ * @param {Array<?number>} [props.maxQuantities]
+ * @param {Array<?string>} [props.itemStatuses]
+ * @param {Object<number, string>} [props.itemMessages]
+ * @param {?number} [props.editingIndex]
+ * @returns {JSX.Element}
+ * @example
+ * <TicketSummary items={items} onAddProduct={openMenu} onChangeQuantity={setQty}
+ *   onRemove={remove} onEdit={edit} />
+ */
 export default function TicketSummary({
   items,
   onAddProduct,

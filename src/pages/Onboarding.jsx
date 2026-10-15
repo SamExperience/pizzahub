@@ -28,6 +28,14 @@ const initialFormData = {
 
 const fieldStack = "flex flex-col gap-1.5";
 
+/**
+ * First-access form that creates the Company, its Store and the admin
+ * profile. After creation a retry only reads the profile again, because a
+ * second creation would be refused by the rules.
+ * @returns {JSX.Element}
+ * @example
+ * { path: "/onboarding", element: <Onboarding /> }
+ */
 export default function Onboarding() {
   const [formData, setFormData] = useState(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);

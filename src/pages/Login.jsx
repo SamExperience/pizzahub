@@ -15,6 +15,14 @@ import {
 } from "../utils/styles";
 import { logError } from "../utils/logger";
 
+/**
+ * Sign-in and sign-up page (email/password or Google) with the "Forgot
+ * password?" flow. One auth request runs at a time, and messages never
+ * reveal whether an email is registered.
+ * @returns {JSX.Element}
+ * @example
+ * if (!authUser) return <Login />;
+ */
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
   const [password, setPassword] = useState("");

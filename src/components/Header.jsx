@@ -90,6 +90,16 @@ function MobileMenu({ storeName, userName }) {
   );
 }
 
+/**
+ * Sticky app header: brand, navigation (collapsible on mobile), active Store
+ * and user. Reads only the existing contexts, no extra queries; minimal hides
+ * navigation on pages used before a Store is selected.
+ * @param {object} props
+ * @param {boolean} [props.minimal]
+ * @returns {JSX.Element}
+ * @example
+ * <Header minimal={pathname === "/stores"} />
+ */
 export default function Header({ minimal = false }) {
   const { pathname } = useLocation();
   const { authUser, userProfile } = useAuth();

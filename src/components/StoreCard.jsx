@@ -1,6 +1,16 @@
 import { ArrowRight, MapPin, Store } from "lucide-react";
 import { muted, primaryButton, sectionTitle } from "../utils/styles";
 
+/**
+ * Store card of the store selection page: image (or a placeholder), name,
+ * address and the button that makes it the active Store.
+ * @param {object} props
+ * @param {object} props.store
+ * @param {function(object): void} props.onSelect
+ * @returns {JSX.Element}
+ * @example
+ * <StoreCard store={store} onSelect={handleSelect} />
+ */
 export default function StoreCard({ store, onSelect }) {
   const { name, address, imageUrl } = store;
 

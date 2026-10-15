@@ -5,6 +5,15 @@ import ErrorState from "./ErrorState";
 import LoadingState from "./LoadingState";
 import LogoutButton from "./LogoutButton";
 
+/**
+ * Guard of every app page, in order: signed in, profile exists (else
+ * /onboarding), Store selected (else /stores), Menu ready (else only /menu).
+ * Works also on direct URLs and shows errors with a retry instead of
+ * redirecting when a check cannot be read.
+ * @returns {JSX.Element}
+ * @example
+ * { element: <ProtectedRoute />, children: [...] }
+ */
 export default function ProtectedRoute() {
   const { authUser, userProfile, loadingLogin, profileError, retryProfile } =
     useAuth();

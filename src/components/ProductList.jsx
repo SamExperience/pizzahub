@@ -338,7 +338,19 @@ function ProductRow({
   );
 }
 
-// Products of one category ordered by position, with a form to add new ones.
+/**
+ * Products of one category ordered by position, with a form to add new ones.
+ * Rows are compact and expand in place, so long menus stay scannable;
+ * onChange gives the Menu page the new product count (badge and readiness).
+ * @param {object} props
+ * @param {string} props.storeId - Storage path of the images.
+ * @param {string} props.categoryId
+ * @param {string} props.categoryName
+ * @param {function(number): void} [props.onChange] - Product count.
+ * @returns {JSX.Element}
+ * @example
+ * <ProductList storeId={storeId} categoryId={id} categoryName="Pizzas" onChange={refresh} />
+ */
 export default function ProductList({
   storeId,
   categoryId,

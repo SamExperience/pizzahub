@@ -61,10 +61,21 @@ function ProductCard({ product, onSelect }) {
   );
 }
 
-// Left overlay of the ticket creation: quick Menu browsing for the cashier.
-// Unavailable products are shown but cannot be selected. Below md the panel
-// covers the ticket, so a "Done" footer recalls itemCount and total (the
-// ticket's current content) and closes the panel.
+/**
+ * Left overlay of the ticket creation: quick Menu browsing for the cashier.
+ * Unavailable products are shown but cannot be selected. Below md the panel
+ * covers the ticket, so a "Done" footer recalls itemCount and total (the
+ * ticket's current content) and closes the panel.
+ * @param {object} props
+ * @param {string} props.storeId
+ * @param {function(object): void} props.onSelectProduct
+ * @param {function(): void} props.onClose
+ * @param {number} [props.itemCount]
+ * @param {number} [props.total]
+ * @returns {JSX.Element}
+ * @example
+ * <MenuTableauPanel storeId={storeId} onSelectProduct={configure} onClose={close} />
+ */
 export default function MenuTableauPanel({
   storeId,
   onSelectProduct,

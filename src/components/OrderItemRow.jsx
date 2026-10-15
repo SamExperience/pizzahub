@@ -1,7 +1,15 @@
 import { formatPrice } from "../utils/format";
 import { muted } from "../utils/styles";
 
-// One order item snapshot: quantity x name, option details and subtotal.
+/**
+ * One order item snapshot: quantity x name, option details and subtotal.
+ * Shared by the Tableau card and the history detail so items read the same.
+ * @param {object} props
+ * @param {object} props.item - Item snapshot.
+ * @returns {JSX.Element}
+ * @example
+ * <ul>{order.items.map((item, i) => <OrderItemRow key={i} item={item} />)}</ul>
+ */
 export default function OrderItemRow({ item }) {
   const details = [item.size, item.cookingLevel, ...(item.customizations ?? [])]
     .filter(Boolean)

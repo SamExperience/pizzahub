@@ -37,6 +37,15 @@ const loadMenu = async (store) => {
   };
 };
 
+/**
+ * Menu management page of the active Store: category sidebar and the
+ * products of the selected category. It is the only page reachable until
+ * the Menu is ready, so it refreshes the readiness after product changes;
+ * category changes run one at a time.
+ * @returns {JSX.Element}
+ * @example
+ * { path: "/menu", element: <Menu /> }
+ */
 export default function Menu() {
   const { selectedStore, refreshMenuReady } = useStore();
   const [menuId, setMenuId] = useState(null);

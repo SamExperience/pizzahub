@@ -18,9 +18,15 @@ const requestedSection = (searchParams) =>
     ? "subscription"
     : null;
 
-// Dashboard shell: section sidebar (a top selector on mobile) and the active
-// section. The selection is local state, not a route; a URL request selects
-// its section on load and whenever the query string changes.
+/**
+ * Dashboard shell: section sidebar (a top selector on mobile) and the active
+ * section (order history, subscription). The selection is local state, not a
+ * route; a URL request (e.g. the Checkout return) selects its section on
+ * load and whenever the query string changes.
+ * @returns {JSX.Element}
+ * @example
+ * { path: "/dashboard", element: <Dashboard /> }
+ */
 export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const search = searchParams.toString();

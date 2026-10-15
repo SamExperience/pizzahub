@@ -4,8 +4,25 @@ import { button, primaryButton } from "../utils/styles";
 
 const dangerSolid = `${primaryButton} bg-red-600! hover:bg-red-700!`;
 
-// Modal confirmation for irreversible actions. Focus starts on the cancel
-// button, Escape and the backdrop cancel, and focus returns on close.
+/**
+ * Modal confirmation for irreversible actions. Focus starts on the cancel
+ * button, so Enter never confirms by accident; Escape and the backdrop
+ * cancel, and focus returns on close.
+ * @param {object} props
+ * @param {boolean} props.open
+ * @param {string} props.title
+ * @param {string} props.message
+ * @param {string} props.confirmLabel
+ * @param {string} props.cancelLabel
+ * @param {boolean} [props.destructive] - Red confirm button.
+ * @param {function(): void} props.onConfirm
+ * @param {function(): void} props.onCancel
+ * @returns {?JSX.Element}
+ * @example
+ * <ConfirmDialog open title="Cancel ticket?" message="This cannot be undone."
+ *   confirmLabel="Cancel ticket" cancelLabel="Keep" destructive
+ *   onConfirm={cancel} onCancel={close} />
+ */
 export default function ConfirmDialog({
   open,
   title,

@@ -4,6 +4,13 @@
 
 const PRINT_ON_SAVE_KEY = "pizzahub.printOnSave";
 
+/**
+ * Reads the "Print on save" preference of this device; on by default and
+ * when storage is unavailable.
+ * @returns {boolean}
+ * @example
+ * const [printOnSave, setPrintOnSave] = useState(readPrintOnSave);
+ */
 export const readPrintOnSave = () => {
   try {
     return localStorage.getItem(PRINT_ON_SAVE_KEY) !== "false";
@@ -12,6 +19,14 @@ export const readPrintOnSave = () => {
   }
 };
 
+/**
+ * Remembers the "Print on save" preference on this device (localStorage,
+ * not Firestore: each till may have its own printer).
+ * @param {boolean} value
+ * @returns {void}
+ * @example
+ * writePrintOnSave(false);
+ */
 export const writePrintOnSave = (value) => {
   try {
     localStorage.setItem(PRINT_ON_SAVE_KEY, String(Boolean(value)));

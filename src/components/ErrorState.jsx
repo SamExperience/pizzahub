@@ -1,7 +1,18 @@
 import { alert, button } from "../utils/styles";
 
-// Error alert with a "Try again" button; fullPage centers it on the viewport.
-// Extra actions (e.g. Logout) are passed as children.
+/**
+ * Error alert with a "Try again" button, shared so every failed load offers
+ * a retry instead of a wrong redirect; fullPage centers it on the viewport.
+ * Extra actions (e.g. Logout) are passed as children.
+ * @param {object} props
+ * @param {string} props.message
+ * @param {function(): void} [props.onRetry]
+ * @param {boolean} [props.fullPage]
+ * @param {ReactNode} [props.children]
+ * @returns {JSX.Element}
+ * @example
+ * <ErrorState message="Unable to load the menu." onRetry={reload} />
+ */
 export default function ErrorState({
   message,
   onRetry,
