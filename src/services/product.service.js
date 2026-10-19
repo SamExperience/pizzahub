@@ -29,6 +29,15 @@ import { assertMaxItems, assertMaxLength } from "../utils/textValidation";
 import { db, storage } from "./firebase";
 import { logError } from "../utils/logger";
 
+/**
+ * Tells whether the value is a valid price: a finite number greater than or
+ * equal to 0.
+ * @private
+ * @param {*} value
+ * @returns {boolean}
+ * @example
+ * isValidPrice(12); // true
+ */
 const isValidPrice = (value) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
 
@@ -86,6 +95,15 @@ export const validateProductPricing = ({ sizes, price }) => {
   return { sizes: null, price };
 };
 
+/**
+ * Validates the Product name and returns it trimmed.
+ * @private
+ * @param {string} name
+ * @returns {string}
+ * @throws {Error} When the name is missing, blank or too long.
+ * @example
+ * validateProductName(" Margherita "); // "Margherita"
+ */
 const validateProductName = (name) => {
   if (typeof name !== "string" || !name.trim())
     throw new Error("Product name is required");
@@ -95,6 +113,15 @@ const validateProductName = (name) => {
   return name.trim();
 };
 
+/**
+ * Validates the Product availability flag and returns it.
+ * @private
+ * @param {boolean} isAvailable
+ * @returns {boolean}
+ * @throws {Error} When the value is not a boolean.
+ * @example
+ * validateProductAvailability(data.isAvailable ?? true);
+ */
 const validateProductAvailability = (isAvailable) => {
   if (typeof isAvailable !== "boolean")
     throw new Error("Product availability must be a boolean");
@@ -102,6 +129,15 @@ const validateProductAvailability = (isAvailable) => {
   return isAvailable;
 };
 
+/**
+ * Validates that the Product position is a positive integer and returns it.
+ * @private
+ * @param {number} position
+ * @returns {number}
+ * @throws {Error} When the position is not a positive integer.
+ * @example
+ * validateProductPositionFormat(1); // 1
+ */
 const validateProductPositionFormat = (position) => {
   if (!Number.isInteger(position) || position < 1)
     throw new Error("Product position must be a positive integer");
@@ -111,6 +147,17 @@ const validateProductPositionFormat = (position) => {
 
 // Position is unique within a category. `excludeProductId` lets a product
 // keep its own position on update.
+/**
+ * Checks that no other Product of the Category uses this position.
+ * @private
+ * @param {string} categoryId
+ * @param {number} position
+ * @param {?string} [excludeProductId] - Product being updated.
+ * @returns {Promise<void>}
+ * @throws {Error} When the position is already in use.
+ * @example
+ * await validateProductPositionUnique("category1", 2, "product1");
+ */
 const validateProductPositionUnique = async (
   categoryId,
   position,
@@ -129,6 +176,17 @@ const validateProductPositionUnique = async (
 
 // Name is unique within a category (exact, case-sensitive match, as for
 // category names). `excludeProductId` lets a product keep its own name.
+/**
+ * Checks that no other Product of the Category has this exact name.
+ * @private
+ * @param {string} categoryId
+ * @param {string} name - Normalized Product name.
+ * @param {?string} [excludeProductId] - Product being updated.
+ * @returns {Promise<void>}
+ * @throws {Error} When the name already exists.
+ * @example
+ * await validateProductNameUnique("category1", "Margherita");
+ */
 const validateProductNameUnique = async (
   categoryId,
   name,
@@ -144,6 +202,18 @@ const validateProductNameUnique = async (
     throw new Error("Product name already exists");
 };
 
+/**
+ * Validates a Product text list and returns its values trimmed, or null when
+ * the value is missing or the list is empty.
+ * @private
+ * @param {?string[]} value
+ * @param {string} label - Field name used in the error messages.
+ * @returns {?string[]}
+ * @throws {Error} When the value is not an array, is too long, or contains
+ * blank, too long or duplicate values.
+ * @example
+ * normalizeStringList([" Tomato ", "Mozzarella"], "ingredients"); // ["Tomato", "Mozzarella"]
+ */
 const normalizeStringList = (value, label) => {
   if (value === null || value === undefined) return null;
 
@@ -207,6 +277,19 @@ export const validateProductCookingLevels = ({
   return { availableCookingLevels: levels, defaultCookingLevel: defaultLevel };
 };
 
+/**
+ * Validates an optional Product text: null when missing; without max the
+ * text is returned as is, otherwise trimmed, length-checked and null when
+ * blank.
+ * @private
+ * @param {?string} value
+ * @param {string} label - Field name used in the error messages.
+ * @param {?number} [max] - Maximum length; null skips trimming and the check.
+ * @returns {?string}
+ * @throws {Error} When the value is not text or is too long.
+ * @example
+ * validateOptionalText(data.imageUrl, "image URL");
+ */
 const validateOptionalText = (value, label, max = null) => {
   if (value === null || value === undefined) return null;
 
@@ -220,6 +303,16 @@ const validateOptionalText = (value, label, max = null) => {
   return text || null;
 };
 
+/**
+ * Validates the optional Product description: trimmed, within the
+ * description limit, null when missing or blank.
+ * @private
+ * @param {?string} value
+ * @returns {?string}
+ * @throws {Error} When the value is not text or is too long.
+ * @example
+ * validateProductDescription(" Tomato and mozzarella "); // "Tomato and mozzarella"
+ */
 const validateProductDescription = (value) =>
   validateOptionalText(value, "description", FIELD_LIMITS.DESCRIPTION);
 

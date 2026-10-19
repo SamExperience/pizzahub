@@ -1,5 +1,13 @@
 // Scheduled time helpers for the ticket form (time-only input on today's date).
 
+/**
+ * Converts a value to a string padded to two digits with leading zeros.
+ * @private
+ * @param {(number|string)} value
+ * @returns {string}
+ * @example
+ * pad(5); // "05"
+ */
 const pad = (value) => String(value).padStart(2, "0");
 
 /**

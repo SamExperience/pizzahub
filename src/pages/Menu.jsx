@@ -19,6 +19,15 @@ import { logError } from "../utils/logger";
 
 // Loads the Store's Menu (creating it on first access), its categories and
 // the product count of each category for the sidebar badges.
+/**
+ * Loads (or creates) the Store's Menu with its categories and the product
+ * count of each category.
+ * @private
+ * @param {object} store
+ * @returns {Promise<{menuId: string, categories: object[], productCounts: Object<string, number>}>}
+ * @example
+ * const { menuId, categories, productCounts } = await loadMenu(selectedStore);
+ */
 const loadMenu = async (store) => {
   const menu =
     (await getMenuByStoreId(store.id)) ??

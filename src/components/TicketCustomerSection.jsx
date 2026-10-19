@@ -20,6 +20,15 @@ const ADDRESS_INPUTS = [
 const fieldInput = input;
 const fieldLabel = `${label} mb-1 block`;
 
+/**
+ * Describes a Customer on one line for the search results: last name, phone,
+ * street and number, city, skipping missing parts.
+ * @private
+ * @param {object} customer
+ * @returns {string}
+ * @example
+ * describeCustomer(customer); // "Rossi · 079 123 45 67 · Via Nassa 5 · Lugano"
+ */
 const describeCustomer = ({ lastName, phone, address }) =>
   [
     lastName,
@@ -30,6 +39,15 @@ const describeCustomer = ({ lastName, phone, address }) =>
     .filter(Boolean)
     .join(" · ");
 
+/**
+ * Formats a full address on one line, country included, skipping missing
+ * parts.
+ * @private
+ * @param {?object} address
+ * @returns {string}
+ * @example
+ * formatAddress(form.address); // "Via Nassa 5, 6900 Lugano, Switzerland"
+ */
 const formatAddress = (address) =>
   [
     [address?.street, address?.streetNumber].filter(Boolean).join(" "),
@@ -41,6 +59,18 @@ const formatAddress = (address) =>
 
 // Read-only summary of the selected Customer with the button that opens the
 // form to edit the details.
+/**
+ * Card with the selected Customer's name, phone and (for deliveries) address,
+ * plus the "Edit details" button.
+ * @private
+ * @param {object} props
+ * @param {object} props.form - Customer form values.
+ * @param {boolean} props.isDelivery
+ * @param {function(): void} props.onEdit
+ * @returns {JSX.Element}
+ * @example
+ * <CustomerCard form={form} isDelivery={isDelivery} onEdit={startEditing} />
+ */
 function CustomerCard({ form, isDelivery, onEdit }) {
   const name = [form.firstName, form.lastName].filter(Boolean).join(" ");
   const address = formatAddress(form.address);

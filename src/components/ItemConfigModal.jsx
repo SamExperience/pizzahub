@@ -28,6 +28,15 @@ const fieldHeading =
   "mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase";
 
 // "2 x Margherita · Small · Rare · No basil · €10.00": the Item as saved.
+/**
+ * Describes a saved Item on one line: quantity and name, size, cooking
+ * level, customizations and subtotal, skipping missing parts.
+ * @private
+ * @param {object} item - Item snapshot.
+ * @returns {string}
+ * @example
+ * describeItem(initialItem); // "2 x Margherita · Small · €10.00"
+ */
 const describeItem = (item) =>
   [
     `${item.quantity} x ${item.productName}`,
@@ -40,6 +49,16 @@ const describeItem = (item) =>
     .join(" · ");
 
 // Read-only value of an option that cannot change (restricted edit).
+/**
+ * Shows an option value with its heading and a lock icon, read-only.
+ * @private
+ * @param {object} props
+ * @param {string} props.heading
+ * @param {string} props.value
+ * @returns {JSX.Element}
+ * @example
+ * <LockedValue heading="Size" value={initialItem.size} />
+ */
 function LockedValue({ heading, value }) {
   return (
     <div className="min-w-0">

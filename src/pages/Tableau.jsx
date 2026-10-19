@@ -12,7 +12,24 @@ import {
 import { logError } from "../utils/logger";
 import { formatReceipt } from "../utils/receipt";
 
+/**
+ * Moves a ticket's Order to another Tableau status.
+ * @private
+ * @param {object} order
+ * @param {string} status - One of ORDER_STATUSES.
+ * @returns {Promise<void>}
+ * @example
+ * await changeTicketStatus(order, ORDER_STATUS.IN_PROGRESS);
+ */
 const changeTicketStatus = (order, status) => updateOrderStatus(order.id, status);
+/**
+ * Cancels a ticket's Order.
+ * @private
+ * @param {object} order
+ * @returns {Promise<void>}
+ * @example
+ * await cancelTicket(order);
+ */
 const cancelTicket = (order) => cancelOrder(order.id);
 
 /**

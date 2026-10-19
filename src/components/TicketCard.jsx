@@ -48,12 +48,28 @@ const BACK_LABEL = {
   [ORDER_STATUS.IN_PROGRESS]: "Reopen",
 };
 
+/**
+ * Sums the quantities of an Order's Items.
+ * @private
+ * @param {object[]} [items]
+ * @returns {number}
+ * @example
+ * countItems(order.items); // 3
+ */
 const countItems = (items = []) =>
   items.reduce((total, item) => total + (item.quantity ?? 0), 0);
 
 // Customer referenced by the Order, kept up to date in real time (it can be
 // edited from any ticket); null while loading or when unavailable. failed
 // tells a read error apart from a deleted Customer.
+/**
+ * Subscribes to a Customer in real time and resets when the id changes.
+ * @private
+ * @param {?string} customerId
+ * @returns {{loading: boolean, customer: ?object, failed: boolean}}
+ * @example
+ * const { loading, customer, failed } = useCustomer(order.customerId);
+ */
 function useCustomer(customerId) {
   const [result, setResult] = useState({
     id: null,
@@ -81,6 +97,18 @@ function useCustomer(customerId) {
   };
 }
 
+/**
+ * Full name of the ticket's Customer, or a loading, error or unavailable
+ * placeholder.
+ * @private
+ * @param {object} props
+ * @param {boolean} props.loading
+ * @param {?object} props.customer
+ * @param {boolean} props.failed
+ * @returns {JSX.Element}
+ * @example
+ * <CustomerName loading={loading} customer={customer} failed={failed} />
+ */
 function CustomerName({ loading, customer, failed }) {
   if (loading) return <span className={muted}>Loading customer ...</span>;
   if (failed) {
@@ -97,6 +125,18 @@ function CustomerName({ loading, customer, failed }) {
 
 // "More actions" menu holding the edit and cancel actions. Escape and clicks
 // outside close it.
+/**
+ * "More actions" button with a dropdown menu; an action is listed only when
+ * its handler is given, and choosing one closes the menu first.
+ * @private
+ * @param {object} props
+ * @param {boolean} props.disabled
+ * @param {function(): void} [props.onEdit]
+ * @param {function(): void} [props.onCancel]
+ * @returns {JSX.Element}
+ * @example
+ * <ActionsMenu disabled={saving} onEdit={edit} onCancel={askCancel} />
+ */
 function ActionsMenu({ disabled, onEdit, onCancel }) {
   const [open, setOpen] = useState(false);
   const menuId = useId();

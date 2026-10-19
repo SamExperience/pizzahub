@@ -16,6 +16,18 @@ const SUBSCRIPTION_EVENTS = [
 ];
 
 // Returns { companyId, subscription } for the handled event types, or null to ignore the event.
+/**
+ * Extracts the companyId and the Stripe Subscription from a verified event.
+ * For checkout.session.completed in subscription mode, the subscription is
+ * retrieved from Stripe; for customer.subscription.* events it is the event
+ * object itself.
+ * @private
+ * @param {object} event - Verified Stripe Event.
+ * @param {object} stripe - Stripe client.
+ * @returns {Promise<?{companyId: (string|undefined), subscription: object}>} Null when the event is ignored.
+ * @example
+ * const resolved = await resolveSubscription(event, stripe);
+ */
 async function resolveSubscription(event, stripe) {
   const object = event.data.object;
 

@@ -17,10 +17,26 @@ const removeButton =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40";
 const addButton = `${button} self-start`;
 
+/**
+ * Checks that a price input holds a finite, non-negative number.
+ * @private
+ * @param {string} value - Raw input value.
+ * @returns {boolean}
+ * @example
+ * isValidPrice("8.50"); // true
+ */
 const isValidPrice = (value) =>
   value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
 
 // Trimmed, non-blank values of a text list; no values -> null.
+/**
+ * Trims the values of a text list and drops the blank ones.
+ * @private
+ * @param {string[]} items
+ * @returns {?string[]} Null when no value is left.
+ * @example
+ * cleanList([" Basil ", ""]); // ["Basil"]
+ */
 const cleanList = (items) => {
   const values = items.map((item) => item.trim()).filter(Boolean);
 
@@ -28,6 +44,22 @@ const cleanList = (items) => {
 };
 
 // Repeatable text inputs with an add and a remove button.
+/**
+ * Fieldset of repeatable text inputs, each with a remove button, plus an add
+ * button disabled once FIELD_LIMITS.LIST_SIZE values are reached.
+ * @private
+ * @param {object} props
+ * @param {string} props.legend
+ * @param {string} props.itemLabel - Accessible label prefix of each input.
+ * @param {string} props.addLabel
+ * @param {string} props.limitLabel - Plural noun of the limit message.
+ * @param {string[]} props.items
+ * @param {function(string[]): void} props.onChange - Receives the new list.
+ * @returns {JSX.Element}
+ * @example
+ * <TextListField legend="Ingredients" itemLabel="Ingredient" addLabel="Add ingredient"
+ *   limitLabel="ingredients" items={ingredients} onChange={setIngredients} />
+ */
 function TextListField({ legend, itemLabel, addLabel, limitLabel, items, onChange }) {
   const isFull = items.length >= FIELD_LIMITS.LIST_SIZE;
 
