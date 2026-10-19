@@ -9,6 +9,13 @@ import Navbar from "./Navbar";
 
 const MENU_PANEL_ID = "mobile-menu-panel";
 
+/**
+ * PizzaHub logo mark and wordmark shown at the start of the header.
+ * @private
+ * @returns {JSX.Element}
+ * @example
+ * <Brand />
+ */
 function Brand() {
   return (
     <div className="flex shrink-0 items-center gap-2">
@@ -22,6 +29,16 @@ function Brand() {
   );
 }
 
+/**
+ * Active Store name with a store icon, truncated when too long.
+ * @private
+ * @param {object} props
+ * @param {string} props.name
+ * @param {string} [props.className] - Extra classes for the wrapper.
+ * @returns {JSX.Element}
+ * @example
+ * <StoreName name={storeName} className="max-w-48" />
+ */
 function StoreName({ name, className = "" }) {
   return (
     <span
@@ -33,6 +50,16 @@ function StoreName({ name, className = "" }) {
   );
 }
 
+/**
+ * Signed-in user name with a user icon, truncated when too long.
+ * @private
+ * @param {object} props
+ * @param {string} props.name
+ * @param {string} [props.className] - Extra classes for the wrapper.
+ * @returns {JSX.Element}
+ * @example
+ * <UserName name={userName} className="max-w-48" />
+ */
 function UserName({ name, className = "" }) {
   return (
     <span
@@ -48,6 +75,17 @@ function UserName({ name, className = "" }) {
 }
 
 // Mobile menu state resets whenever the route changes (keyed by pathname).
+/**
+ * Mobile header controls below lg: the Store name and a toggle that opens a
+ * panel with the vertical navigation, Store, user and logout.
+ * @private
+ * @param {object} props
+ * @param {string} [props.storeName]
+ * @param {string} [props.userName]
+ * @returns {JSX.Element}
+ * @example
+ * <MobileMenu key={pathname} storeName={storeName} userName={userName} />
+ */
 function MobileMenu({ storeName, userName }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);

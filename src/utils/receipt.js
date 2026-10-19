@@ -17,17 +17,58 @@ const SEPARATOR = "-".repeat(RECEIPT_WIDTH);
 // Indent of the option and customization lines under an item.
 const DETAIL_INDENT = "  ";
 
+/**
+ * Converts a Firestore Timestamp into a Date; any other value is returned
+ * unchanged.
+ * @private
+ * @param {(Timestamp|Date|null)} value
+ * @returns {(Date|null)}
+ * @example
+ * toDate(order.scheduledTime); // Date
+ */
 const toDate = (value) => (value?.toDate ? value.toDate() : value);
 
+/**
+ * Converts a value to a string padded to two digits with leading zeros.
+ * @private
+ * @param {(number|string)} value
+ * @returns {string}
+ * @example
+ * pad2(5); // "05"
+ */
 const pad2 = (value) => String(value).padStart(2, "0");
 
 // Fixed formats instead of the device locale, so the receipt width is
 // predictable on every printer.
+/**
+ * Formats the time of a Date as "HH:MM".
+ * @private
+ * @param {Date} date
+ * @returns {string}
+ * @example
+ * formatClock(new Date(2026, 9, 15, 9, 5)); // "09:05"
+ */
 const formatClock = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 
+/**
+ * Formats the day of a Date as "DD.MM.YYYY".
+ * @private
+ * @param {Date} date
+ * @returns {string}
+ * @example
+ * formatDay(new Date(2026, 9, 5)); // "05.10.2026"
+ */
 const formatDay = (date) =>
   `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${date.getFullYear()}`;
 
+/**
+ * Checks whether a value is a Date holding a valid time.
+ * @private
+ * @param {*} date
+ * @returns {boolean}
+ * @example
+ * isValidDate(new Date("invalid")); // false
+ */
 const isValidDate = (date) => date instanceof Date && !Number.isNaN(date.getTime());
 
 /**
@@ -69,6 +110,15 @@ export const wrapText = (text, width = RECEIPT_WIDTH) => {
   return lines;
 };
 
+/**
+ * Centers text on a RECEIPT_WIDTH line by padding it on the left; trailing
+ * spaces are removed, and text longer than a line is left unpadded.
+ * @private
+ * @param {string} text
+ * @returns {string}
+ * @example
+ * center("TOTAL"); // "             TOTAL"
+ */
 const center = (text) => {
   const space = Math.max(0, RECEIPT_WIDTH - text.length);
 
@@ -76,6 +126,16 @@ const center = (text) => {
 };
 
 // Left text wrapped next to a right-aligned value on the first line.
+/**
+ * Wraps the left text so the right value fits after it, then right-aligns
+ * the value on the first line; further lines hold the rest of the text.
+ * @private
+ * @param {string} left
+ * @param {string} right
+ * @returns {string[]}
+ * @example
+ * leftRight("TOTAL", "€12.50"); // ["TOTAL                     €12.50"]
+ */
 const leftRight = (left, right) => {
   const [first = "", ...rest] = wrapText(left, RECEIPT_WIDTH - right.length - 1);
   const gap = RECEIPT_WIDTH - first.length - right.length;
@@ -83,14 +143,43 @@ const leftRight = (left, right) => {
   return [`${first}${" ".repeat(gap)}${right}`, ...rest];
 };
 
+/**
+ * Wraps text into detail lines indented by DETAIL_INDENT, each at most
+ * RECEIPT_WIDTH long.
+ * @private
+ * @param {string} text
+ * @returns {string[]}
+ * @example
+ * indented("Large · Well done"); // ["  Large · Well done"]
+ */
 const indented = (text) =>
   wrapText(text, RECEIPT_WIDTH - DETAIL_INDENT.length).map((line) => `${DETAIL_INDENT}${line}`);
 
+/**
+ * Builds the centered header lines: the store name, then the print day and
+ * time; the time line is omitted when printedAt is not a valid Date.
+ * @private
+ * @param {string} storeName
+ * @param {Date} printedAt
+ * @returns {string[]}
+ * @example
+ * headerLines("Bella Napoli", new Date());
+ */
 const headerLines = (storeName, printedAt) => [
   ...wrapText(storeName).map(center),
   ...(isValidDate(printedAt) ? [center(`${formatDay(printedAt)} ${formatClock(printedAt)}`)] : []),
 ];
 
+/**
+ * Builds the order type line in upper case, with the Delivery or Pickup
+ * scheduled time right-aligned; only the label when the time is missing or
+ * invalid.
+ * @private
+ * @param {object} order
+ * @returns {string[]}
+ * @example
+ * orderLines(order); // ["DELIVERY          Delivery 19:30"]
+ */
 const orderLines = (order) => {
   const isDelivery = order.orderType === ORDER_TYPE.DELIVERY;
   const label = (ORDER_TYPE_LABEL[order.orderType] ?? order.orderType ?? "").toUpperCase();
@@ -103,6 +192,16 @@ const orderLines = (order) => {
 
 // Customer name, plus phone and address for a Delivery; nothing when the
 // Customer is unavailable.
+/**
+ * Builds the wrapped Customer lines: full name, plus phone (when present)
+ * and address for a Delivery; empty when the Customer is null.
+ * @private
+ * @param {?object} customer
+ * @param {string} orderType
+ * @returns {string[]}
+ * @example
+ * customerLines(null, "takeaway"); // []
+ */
 const customerLines = (customer, orderType) => {
   if (!customer) return [];
 
@@ -117,6 +216,16 @@ const customerLines = (customer, orderType) => {
   return lines;
 };
 
+/**
+ * Builds the lines of an Order item: quantity and product name with the
+ * right-aligned subtotal, then indented size and cooking level, then one
+ * indented "+ " line per customization.
+ * @private
+ * @param {object} item
+ * @returns {string[]}
+ * @example
+ * order.items.flatMap(itemLines);
+ */
 const itemLines = (item) => {
   const options = [item.size, item.cookingLevel].filter(Boolean).join(" · ");
 

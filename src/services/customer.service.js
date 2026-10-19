@@ -20,11 +20,29 @@ const ADDRESS_FIELDS = ["street", "streetNumber", "postalCode", "city", "country
 const DELIVERY_ADDRESS_FIELDS = ["street", "streetNumber", "postalCode", "city"];
 
 // Trimmed string, or null when empty or not a string.
+/**
+ * Returns the trimmed text, or null when the value is not a string or is
+ * blank.
+ * @private
+ * @param {*} value
+ * @returns {?string}
+ * @example
+ * normalizeText("  Mario "); // "Mario"
+ */
 const normalizeText = (value) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
 // Keeps only the Customer's editable fields, trimmed; empty values become
 // null and an address without any value becomes null.
+/**
+ * Builds the normalized Customer from form values: names, phone and address
+ * fields are trimmed, blanks become null, and an all-empty address is null.
+ * @private
+ * @param {object} [data] - Customer form values.
+ * @returns {{firstName: ?string, lastName: ?string, phone: ?string, address: ?object}}
+ * @example
+ * normalizeCustomer({ firstName: " Mario ", phone: "" }); // phone null, address null
+ */
 const normalizeCustomer = (data = {}) => {
   const address = Object.fromEntries(
     ADDRESS_FIELDS.map((field) => [field, normalizeText(data.address?.[field])]),
@@ -39,6 +57,16 @@ const normalizeCustomer = (data = {}) => {
   };
 };
 
+/**
+ * Tells whether the saved Customer, once normalized, has the same editable
+ * fields as the already normalized new values (no update needed).
+ * @private
+ * @param {object} current - Saved Customer.
+ * @param {object} next - Normalized Customer, as returned by validateCustomer.
+ * @returns {boolean}
+ * @example
+ * isSameCustomer(existingCustomer, customer); // true when nothing changed
+ */
 const isSameCustomer = (current, next) =>
   JSON.stringify(normalizeCustomer(current)) === JSON.stringify(next);
 

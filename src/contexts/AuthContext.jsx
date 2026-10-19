@@ -22,6 +22,14 @@ const AuthContext = createContext();
 
 // A profile request is stale when another account signed in (or out) while it
 // was running: its result must not overwrite the current user's state.
+/**
+ * Checks whether the given uid is still the signed-in Firebase Auth user.
+ * @private
+ * @param {string} uid
+ * @returns {boolean}
+ * @example
+ * if (isCurrentUser(uid)) setUserProfile(userDB);
+ */
 const isCurrentUser = (uid) => auth.currentUser?.uid === uid;
 
 /**

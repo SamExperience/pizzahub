@@ -55,10 +55,28 @@ export const ORDER_TYPE = {
   DELIVERY: "delivery",
 };
 
+/**
+ * Rounds an amount to cents.
+ * @private
+ * @param {number} value
+ * @returns {number}
+ * @example
+ * roundPrice(0.1 + 0.2); // 0.3
+ */
 const roundPrice = (value) => Math.round(value * 100) / 100;
 
 // Trimmed, non-empty customization texts; at most LIST_SIZE of at most
 // LIST_ITEM characters each.
+/**
+ * Keeps only the string customizations, trimmed and non-empty, and checks
+ * the list size and text length limits.
+ * @private
+ * @param {string[]} [customizations]
+ * @returns {string[]}
+ * @throws {Error} When there are too many customizations or one is too long.
+ * @example
+ * normalizeCustomizations([" No basil ", ""]); // ["No basil"]
+ */
 const normalizeCustomizations = (customizations = []) => {
   const texts = customizations
     .filter((text) => typeof text === "string")
@@ -73,13 +91,39 @@ const normalizeCustomizations = (customizations = []) => {
   return texts;
 };
 
+/**
+ * Tells whether the value is a finite number greater than or equal to 0.
+ * @private
+ * @param {*} value
+ * @returns {boolean}
+ * @example
+ * isNonNegativeNumber(12.5); // true
+ */
 const isNonNegativeNumber = (value) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
 
+/**
+ * Tells whether the value is a string with at least one non-blank character.
+ * @private
+ * @param {*} value
+ * @returns {boolean}
+ * @example
+ * isNonEmptyString("  "); // false
+ */
 const isNonEmptyString = (value) =>
   typeof value === "string" && value.trim() !== "";
 
 // Shape of a saved Item, checked before the Order is written.
+/**
+ * Checks an Item snapshot: product id and name, positive integer quantity,
+ * non-negative unit price and subtotal, and a customizations text list
+ * within the limits.
+ * @private
+ * @param {object} item
+ * @throws {Error} When a field is missing, invalid or too long.
+ * @example
+ * items.forEach(validateOrderItem);
+ */
 const validateOrderItem = (item) => {
   if (!item || typeof item !== "object") throw new Error("Order item is invalid");
 
@@ -435,6 +479,15 @@ export const updateOrderStatus = async (orderId, status) => {
 };
 
 // Milliseconds of a Firestore Timestamp or Date; null when missing.
+/**
+ * Converts a Firestore Timestamp or a Date to milliseconds since the epoch;
+ * any other value gives null.
+ * @private
+ * @param {?(Timestamp|Date)} value
+ * @returns {?number}
+ * @example
+ * toMillis(order.scheduledTime); // 1760545800000
+ */
 const toMillis = (value) => {
   if (typeof value?.toMillis === "function") return value.toMillis();
 
@@ -508,6 +561,16 @@ export const getDayRange = (date = new Date()) => {
 };
 
 // Query of the Orders created on a day for a Store, oldest first.
+/**
+ * Builds the Firestore query of a Store's Orders whose createdAt falls in
+ * the day range of the given date, ordered by createdAt ascending.
+ * @private
+ * @param {string} storeId
+ * @param {Date} date
+ * @returns {Query}
+ * @example
+ * const snapshot = await getDocs(dayOrdersQuery("store1", new Date()));
+ */
 const dayOrdersQuery = (storeId, date) => {
   const { start, end } = getDayRange(date);
 

@@ -11,6 +11,16 @@ const DELIVERY_ADDRESS_LABELS = {
   city: "City is required",
 };
 
+/**
+ * Checks whether a value is missing: true for non-strings and for strings
+ * that are empty or contain only whitespace.
+ * @private
+ * @param {*} value
+ * @returns {boolean}
+ * @example
+ * isBlank("  "); // true
+ * isBlank("Mario"); // false
+ */
 const isBlank = (value) => typeof value !== "string" || value.trim() === "";
 
 /**

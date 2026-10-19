@@ -40,6 +40,17 @@ const MIN_IMAGE_SIDE = 200;
 
 // Encodes the canvas as WebP; browsers that cannot encode WebP silently
 // return PNG, in which case JPEG is used instead.
+/**
+ * Encodes a canvas as a WebP Blob at the given quality, falling back to JPEG
+ * when the browser does not produce WebP. Resolves to null when the canvas
+ * cannot be encoded.
+ * @private
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} quality - Encoder quality between 0 and 1.
+ * @returns {Promise<?Blob>}
+ * @example
+ * const blob = await encodeCanvas(canvas, 0.8);
+ */
 const encodeCanvas = (canvas, quality) =>
   new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality)).then(
     (blob) =>
@@ -52,6 +63,17 @@ const encodeCanvas = (canvas, quality) =>
 
 // White background: JPEG has no transparency, and both formats then look the
 // same on the white product cards.
+/**
+ * Draws an image onto a new canvas of the given size, over a white
+ * background, scaling it to fill the canvas.
+ * @private
+ * @param {ImageBitmap} bitmap
+ * @param {number} width
+ * @param {number} height
+ * @returns {HTMLCanvasElement}
+ * @example
+ * const canvas = drawImage(bitmap, 800, 600);
+ */
 const drawImage = (bitmap, width, height) => {
   const canvas = document.createElement("canvas");
   canvas.width = width;

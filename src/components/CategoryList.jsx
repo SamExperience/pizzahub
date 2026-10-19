@@ -10,11 +10,47 @@ const actionButton =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-40 md:rounded-lg md:text-neutral-500 md:hover:bg-brand-100 md:hover:text-brand-800 md:focus-visible:ring-brand-500/40";
 
 // Large counts are capped so the badge keeps a fixed footprint.
+/**
+ * Formats a product count for the badge, capped at "99+".
+ * @private
+ * @param {number} count
+ * @returns {string}
+ * @example
+ * formatCount(120); // "99+"
+ */
 const formatCount = (count) => (count > 99 ? "99+" : String(count));
+/**
+ * Formats a product count as readable text, singular or plural.
+ * @private
+ * @param {number} count
+ * @returns {string}
+ * @example
+ * countLabel(1); // "1 product"
+ */
 const countLabel = (count) => `${count} ${count === 1 ? "product" : "products"}`;
 
 // `onRename` resolves to true when the category was saved; busy disables the
 // actions while a category change runs.
+/**
+ * One category card with its product count badge; when selected it shows the
+ * move, rename and delete actions, and rename switches it to an inline form.
+ * @private
+ * @param {object} props
+ * @param {object} props.category
+ * @param {number} props.productCount
+ * @param {boolean} props.busy
+ * @param {boolean} props.isFirst
+ * @param {boolean} props.isLast
+ * @param {boolean} props.isSelected
+ * @param {function(string): void} props.onSelect
+ * @param {function(string, string): Promise<boolean>} props.onRename - (id, name); true when saved.
+ * @param {function(object): void} props.onRequestDelete - Category to confirm deletion of.
+ * @param {function(string, string): void} props.onMove - (id, "up" or "down").
+ * @returns {JSX.Element}
+ * @example
+ * <CategoryRow category={category} productCount={3} isSelected onSelect={select}
+ *   onRename={rename} onRequestDelete={ask} onMove={move} />
+ */
 function CategoryRow({
   category,
   productCount,

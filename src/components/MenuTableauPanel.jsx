@@ -16,11 +16,31 @@ import LoadingState from "./LoadingState";
 import { logError } from "../utils/logger";
 
 // Single price, or "From <lowest size price>" when the product has sizes.
+/**
+ * Formats the price shown on a product card: the single price, or the lowest
+ * size price prefixed with "From".
+ * @private
+ * @param {object} product
+ * @returns {string}
+ * @example
+ * formatCardPrice(product); // "From €8.00"
+ */
 const formatCardPrice = ({ price, sizes }) =>
   Array.isArray(sizes) && sizes.length > 0
     ? `From ${formatPrice(Math.min(...sizes.map((size) => Number(size.price))))}`
     : formatPrice(price);
 
+/**
+ * Selectable product card with image (or placeholder), name and price;
+ * unavailable products are shown disabled with an "Unavailable" tag.
+ * @private
+ * @param {object} props
+ * @param {object} props.product
+ * @param {function(object): void} props.onSelect - Receives the product.
+ * @returns {JSX.Element}
+ * @example
+ * <ProductCard product={product} onSelect={onSelectProduct} />
+ */
 function ProductCard({ product, onSelect }) {
   const available = product.isAvailable !== false;
 
