@@ -11,6 +11,17 @@ import {
 import { applySubscription, buildSubscriptionData } from "./subscription.js";
 
 // Reads the caller's profile and returns its companyId; only an admin may subscribe.
+/**
+ * Loads users/{uid} and returns its companyId when the user is the Company
+ * admin.
+ * @private
+ * @param {Firestore} db
+ * @param {string} uid - Caller's Auth uid.
+ * @returns {Promise<string>} The admin's companyId.
+ * @throws {HttpsError} permission-denied when the user is missing, not an admin or has no companyId.
+ * @example
+ * const companyId = await getAdminCompanyId(db, request.auth.uid);
+ */
 async function getAdminCompanyId(db, uid) {
   const userSnapshot = await db.collection("users").doc(uid).get();
   const user = userSnapshot.exists ? userSnapshot.data() : null;
@@ -25,6 +36,20 @@ async function getAdminCompanyId(db, uid) {
   return user.companyId;
 }
 
+/**
+ * Builds the Stripe Checkout Session parameters for a one-seat subscription.
+ * The companyId is set as client_reference_id and as metadata on both the
+ * session and the subscription, so the webhook can map events to a Company.
+ * @private
+ * @param {object} params
+ * @param {string} params.companyId
+ * @param {string} params.customerId - Stripe Customer id.
+ * @param {string} params.priceId - Stripe Price id.
+ * @param {string} params.appUrl - Base URL for the success and cancel redirects.
+ * @returns {object} Parameters for stripe.checkout.sessions.create.
+ * @example
+ * const params = buildSessionParams({ companyId, customerId, priceId, appUrl });
+ */
 function buildSessionParams({ companyId, customerId, priceId, appUrl }) {
   return {
     mode: "subscription",
@@ -40,6 +65,21 @@ function buildSessionParams({ companyId, customerId, priceId, appUrl }) {
 
 // One Stripe Customer per Company: created on the first Subscribe and stored before any Checkout,
 // so every later Checkout and the active-subscription check use the same Customer.
+/**
+ * Returns the Company's Stripe Customer id, creating the Customer (with an
+ * idempotency key) and merging its id into subscriptions/{companyId} if none
+ * is stored yet.
+ * @private
+ * @param {object} params
+ * @param {Firestore} params.db
+ * @param {object} params.stripe - Stripe client.
+ * @param {string} params.companyId
+ * @param {?object} params.subscription - Stored subscriptions/{companyId} data, or null.
+ * @param {string} [params.email] - Caller's email, set on a new Customer.
+ * @returns {Promise<string>} The Stripe Customer id.
+ * @example
+ * const customerId = await ensureStripeCustomer({ db, stripe, companyId, subscription, email });
+ */
 async function ensureStripeCustomer({ db, stripe, companyId, subscription, email }) {
   if (subscription?.stripeCustomerId) {
     return subscription.stripeCustomerId;
@@ -59,12 +99,30 @@ async function ensureStripeCustomer({ db, stripe, companyId, subscription, email
   return customer.id;
 }
 
+/**
+ * Returns the current period end of a Stripe Subscription's first item.
+ * @private
+ * @param {object} subscription - Stripe Subscription object.
+ * @returns {number} Unix seconds, or 0 when the item has no period end.
+ * @example
+ * const end = periodEnd(subscription);
+ */
 function periodEnd(subscription) {
   return subscription.items?.data?.[0]?.current_period_end ?? 0;
 }
 
 // Returns the Customer's active Stripe subscription with the most distant period end, or null.
 // Covers a webhook that is late or was missed: Stripe is checked, not only Firestore.
+/**
+ * Lists up to 10 active Stripe subscriptions of the Customer and returns the
+ * one with the latest period end.
+ * @private
+ * @param {object} stripe - Stripe client.
+ * @param {string} customerId - Stripe Customer id.
+ * @returns {Promise<?object>} The Stripe Subscription object, or null.
+ * @example
+ * const active = await findActiveSubscription(stripe, customerId);
+ */
 async function findActiveSubscription(stripe, customerId) {
   const { data } = await stripe.subscriptions.list({
     customer: customerId,

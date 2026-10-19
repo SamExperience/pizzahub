@@ -17,6 +17,16 @@ import { assertMaxLength } from "../utils/textValidation";
 import { db } from "./firebase";
 import { deleteProductImage, getProductsByCategoryId } from "./product.service";
 
+/**
+ * Checks that no Category of the Menu already has this exact name
+ * (case-sensitive match).
+ * @private
+ * @param {string} menuId
+ * @param {string} name - Normalized Category name.
+ * @returns {Promise<boolean>} True when the name is free.
+ * @example
+ * const isNameValid = await validateCategoryName("menu1", "Pizzas");
+ */
 const validateCategoryName = async (menuId, name) => {
   const categoryRef = collection(db, "categories");
 
@@ -30,6 +40,15 @@ const validateCategoryName = async (menuId, name) => {
 
   return result.empty;
 };
+/**
+ * Checks that no Category of the Menu already uses this position.
+ * @private
+ * @param {string} menuId
+ * @param {number} position
+ * @returns {Promise<boolean>} True when the position is free.
+ * @example
+ * const isPositionValid = await validateCategoryPosition("menu1", 2);
+ */
 const validateCategoryPosition = async (menuId, position) => {
   const categoryRef = collection(db, "categories");
 

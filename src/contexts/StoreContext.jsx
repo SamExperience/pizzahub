@@ -17,6 +17,13 @@ const StoreContext = createContext();
 // (private mode, blocked data), so every access is guarded.
 const SELECTED_STORE_KEY = "pizzahub.selectedStoreId";
 
+/**
+ * Reads the persisted selected Store id from localStorage.
+ * @private
+ * @returns {?string} Null when none is saved or storage is unavailable.
+ * @example
+ * const storeId = readSelectedStoreId();
+ */
 const readSelectedStoreId = () => {
   try {
     return localStorage.getItem(SELECTED_STORE_KEY);
@@ -25,6 +32,15 @@ const readSelectedStoreId = () => {
   }
 };
 
+/**
+ * Persists the selected Store id in localStorage, or removes it when empty;
+ * storage failures are ignored.
+ * @private
+ * @param {?string} storeId
+ * @returns {void}
+ * @example
+ * writeSelectedStoreId(store.id);
+ */
 const writeSelectedStoreId = (storeId) => {
   try {
     if (storeId) localStorage.setItem(SELECTED_STORE_KEY, storeId);

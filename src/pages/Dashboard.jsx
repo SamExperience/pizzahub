@@ -13,6 +13,14 @@ const SECTIONS = [
 
 // Section requested by the URL: the Checkout return (?checkout=...) and the
 // subscription banner (?section=subscription) open Subscription.
+/**
+ * Returns the Dashboard section requested by the query string, if any.
+ * @private
+ * @param {URLSearchParams} searchParams
+ * @returns {?string} "subscription", or null when no section is requested.
+ * @example
+ * requestedSection(new URLSearchParams("?checkout=success")); // "subscription"
+ */
 const requestedSection = (searchParams) =>
   searchParams.has("checkout") || searchParams.get("section") === "subscription"
     ? "subscription"

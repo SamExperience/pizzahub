@@ -10,11 +10,38 @@ import {
 } from "../utils/orderType";
 import { badge, muted, statusStyles } from "../utils/styles";
 
+/**
+ * Joins a Customer's first and last name, skipping missing parts.
+ * @private
+ * @param {object} customer
+ * @returns {string}
+ * @example
+ * fullName({ firstName: "Mario", lastName: "Rossi" }); // "Mario Rossi"
+ */
 const fullName = (customer) =>
   [customer.firstName, customer.lastName].filter(Boolean).join(" ");
 
+/**
+ * Formats HH:mm from a timestamp, or an em dash when it is missing.
+ * @private
+ * @param {(Timestamp|Date|null)} timestamp
+ * @returns {string}
+ * @example
+ * timeOrDash(order.completedAt); // "—" while not completed
+ */
 const timeOrDash = (timestamp) => formatTime(timestamp) || "—";
 
+/**
+ * Full name of the Order's Customer, or a muted placeholder while the
+ * Customers load or when the Customer is unavailable.
+ * @private
+ * @param {object} props
+ * @param {?Map<string, object>} props.customers - Null while loading.
+ * @param {string} props.customerId
+ * @returns {JSX.Element}
+ * @example
+ * <CustomerName customers={customers} customerId={order.customerId} />
+ */
 function CustomerName({ customers, customerId }) {
   // Null while the customers are loading.
   if (!customers) return <span className={muted}>Loading customer ...</span>;
@@ -30,6 +57,19 @@ function CustomerName({ customers, customerId }) {
 }
 
 // Read-only detail of an Order: items, customer contacts, times and total.
+/**
+ * Expanded panel of an order row: Item snapshots, Customer name and phone
+ * (address for deliveries), created/scheduled/completed times and total.
+ * @private
+ * @param {object} props
+ * @param {string} props.id - Panel id referenced by the row toggle.
+ * @param {object} props.order
+ * @param {?object} [props.customer]
+ * @param {boolean} props.loadingCustomer
+ * @returns {JSX.Element}
+ * @example
+ * <OrderDetail id={detailId} order={order} customer={customer} loadingCustomer={false} />
+ */
 function OrderDetail({ id, order, customer, loadingCustomer }) {
   const isDelivery = order.orderType === ORDER_TYPE.DELIVERY;
   const times = [
@@ -93,6 +133,20 @@ function OrderDetail({ id, order, customer, loadingCustomer }) {
   );
 }
 
+/**
+ * One order of the history: a toggle button with time, Customer, order type,
+ * status and total that expands the read-only detail; cancelled Orders are
+ * dimmed.
+ * @private
+ * @param {object} props
+ * @param {object} props.order
+ * @param {?Map<string, object>} props.customers - Null while loading.
+ * @param {boolean} props.expanded
+ * @param {function(): void} props.onToggle
+ * @returns {JSX.Element}
+ * @example
+ * <OrderRow order={order} customers={customers} expanded={open} onToggle={toggle} />
+ */
 function OrderRow({ order, customers, expanded, onToggle }) {
   const detailId = useId();
   const cancelled = order.status === ORDER_STATUS.CANCELLED;

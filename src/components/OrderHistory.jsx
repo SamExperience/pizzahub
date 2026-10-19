@@ -14,13 +14,38 @@ import {
 } from "../utils/styles";
 import { logError } from "../utils/logger";
 
+/**
+ * Pads a date part to two digits with a leading zero.
+ * @private
+ * @param {number} value
+ * @returns {string}
+ * @example
+ * pad(7); // "07"
+ */
 const pad = (value) => String(value).padStart(2, "0");
 
 // Local YYYY-MM-DD (not UTC, so it matches the day on the device).
+/**
+ * Formats a Date as a local YYYY-MM-DD value for the date input.
+ * @private
+ * @param {Date} date
+ * @returns {string}
+ * @example
+ * toDateValue(new Date(2026, 9, 15)); // "2026-10-15"
+ */
 const toDateValue = (date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 // Local Date from a YYYY-MM-DD value; null when empty or invalid.
+/**
+ * Parses a YYYY-MM-DD value into a local Date, rejecting impossible dates
+ * (e.g. 2026-02-30).
+ * @private
+ * @param {?string} value
+ * @returns {?Date} Null when empty or invalid.
+ * @example
+ * parseDateValue("2026-10-15"); // Date for 15 October 2026, 00:00 local
+ */
 const parseDateValue = (value) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
   if (!match) return null;

@@ -1,5 +1,13 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
+/**
+ * Converts Unix seconds to a Firestore Timestamp.
+ * @private
+ * @param {*} seconds - Unix seconds; any non-number yields null.
+ * @returns {?Timestamp} The Timestamp, or null.
+ * @example
+ * const lastEventAt = toTimestamp(event.created);
+ */
 function toTimestamp(seconds) {
   return typeof seconds === "number" ? Timestamp.fromMillis(seconds * 1000) : null;
 }

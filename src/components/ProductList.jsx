@@ -43,6 +43,15 @@ const panelButton =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-40";
 
 // Price rows: one per size, or a single "Price" row.
+/**
+ * Builds the label/price rows of a product: one per size, or a single
+ * "Price" row when it has no sizes.
+ * @private
+ * @param {object} product
+ * @returns {Array<{label: string, price: number}>}
+ * @example
+ * getPriceRows({ price: 8 }); // [{ label: "Price", price: 8 }]
+ */
 function getPriceRows(product) {
   return Array.isArray(product.sizes) && product.sizes.length > 0
     ? product.sizes.map((size) => ({ label: size.name, price: size.price }))
@@ -50,6 +59,15 @@ function getPriceRows(product) {
 }
 
 // "€min – €max" for sizes (just "€x" when all equal), "€x" for a single price.
+/**
+ * Summarizes a product's price as a formatted price or price range, with the
+ * number of sizes (0 for a single price).
+ * @private
+ * @param {object} product
+ * @returns {{text: string, sizesCount: number}}
+ * @example
+ * getPriceSummary(product); // { text: "€8.00 – €12.00", sizesCount: 2 }
+ */
 function getPriceSummary(product) {
   if (!Array.isArray(product.sizes) || product.sizes.length === 0)
     return { text: formatPrice(product.price), sizesCount: 0 };
@@ -67,6 +85,16 @@ function getPriceSummary(product) {
   };
 }
 
+/**
+ * Product description, ingredients and cooking levels (the default one in
+ * bold), or "No details yet." when none is set.
+ * @private
+ * @param {object} props
+ * @param {object} props.product
+ * @returns {JSX.Element}
+ * @example
+ * <ProductDetails product={product} />
+ */
 function ProductDetails({ product }) {
   const ingredients = Array.isArray(product.ingredients)
     ? product.ingredients
@@ -120,6 +148,25 @@ function ProductDetails({ product }) {
 }
 
 // busy disables the row actions while a product change runs.
+/**
+ * One product of the list: move buttons, image, name, price summary and
+ * availability toggle; clicking the row (or its title button) expands the
+ * details panel with the edit and delete actions.
+ * @private
+ * @param {object} props
+ * @param {object} props.product
+ * @param {boolean} props.busy
+ * @param {boolean} props.isFirst
+ * @param {boolean} props.isLast
+ * @param {function(string, string): void} props.onMove - (id, "up" or "down").
+ * @param {function(string): void} props.onEdit - Product id.
+ * @param {function(object): void} props.onRequestDelete - Product to confirm deletion of.
+ * @param {function(string, boolean): void} props.onToggleAvailability - (id, isAvailable).
+ * @returns {JSX.Element}
+ * @example
+ * <ProductRow product={product} busy={pending} onMove={move} onEdit={edit}
+ *   onRequestDelete={ask} onToggleAvailability={toggle} />
+ */
 function ProductRow({
   product,
   busy,
